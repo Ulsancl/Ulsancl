@@ -1,0 +1,218 @@
+/* 통계 패널 스타일 */
+.statistics-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: var(--spacing-lg);
+}
+
+.statistics-panel {
+    background: linear-gradient(180deg, #1a1f2e 0%, #111827 100%);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: var(--radius-xl);
+    width: 100%;
+    max-width: 550px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(99, 102, 241, 0.1);
+    animation: modalSlideIn 0.25s ease;
+}
+
+.statistics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, transparent 100%);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.statistics-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.no-stats {
+    padding: var(--spacing-2xl);
+    text-align: center;
+}
+
+.no-stats span {
+    font-size: 3rem;
+    opacity: 0.4;
+}
+
+.no-stats p {
+    color: var(--color-text-muted);
+    margin-top: var(--spacing-md);
+}
+
+.statistics-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+}
+
+.stats-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.summary-card {
+    padding: var(--spacing-md);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    text-align: center;
+}
+
+.summary-card.profit {
+    border-color: var(--color-profit);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.summary-card.loss {
+    border-color: var(--color-loss);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.summary-card.good {
+    border-color: var(--color-profit);
+}
+
+.summary-card.warning {
+    border-color: #fbbf24;
+}
+
+.summary-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-bottom: 4px;
+}
+
+.summary-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: var(--font-family-mono);
+}
+
+.summary-card.profit .summary-value {
+    color: var(--color-profit);
+}
+
+.summary-card.loss .summary-value {
+    color: var(--color-loss);
+}
+
+.stats-grid {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+}
+
+.stat-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: var(--font-family-mono);
+}
+
+.stat-value.profit,
+.stat-value .win {
+    color: var(--color-profit);
+}
+
+.stat-value.loss,
+.stat-value .loss {
+    color: var(--color-loss);
+}
+
+.performance-analysis {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+}
+
+.performance-analysis h4 {
+    margin: 0 0 var(--spacing-md);
+    font-size: 0.9rem;
+}
+
+.analysis-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.bar-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.bar-label {
+    width: 60px;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+}
+
+.bar-track {
+    flex: 1;
+    height: 12px;
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    transition: width 0.5s ease;
+}
+
+.bar-fill.win {
+    background: linear-gradient(90deg, var(--color-profit), #22c55e);
+}
+
+.bar-fill.risk {
+    background: linear-gradient(90deg, #fbbf24, var(--color-loss));
+}
+
+.bar-value {
+    width: 50px;
+    text-align: right;
+    font-size: 0.8rem;
+    font-family: var(--font-family-mono);
+    font-weight: 600;
+}

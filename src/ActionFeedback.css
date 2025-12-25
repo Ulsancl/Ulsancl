@@ -1,0 +1,49 @@
+.feedback-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 9998;
+    /* Below Toast */
+}
+
+.feedback-item {
+    position: absolute;
+    font-weight: 800;
+    font-size: 1.2rem;
+    pointer-events: none;
+    animation: floatUp 1s ease-out forwards;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    white-space: nowrap;
+}
+
+.feedback-item.profit {
+    color: #4caf50;
+}
+
+.feedback-item.loss {
+    color: #ff5252;
+}
+
+.feedback-item.neutral {
+    color: #fff;
+}
+
+@keyframes floatUp {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 0) scale(0.5);
+    }
+
+    20% {
+        opacity: 1;
+        transform: translate(calc(-50% + var(--random-x)), -20px) scale(1.2);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--random-x)), -80px) scale(1);
+    }
+}

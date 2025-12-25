@@ -1,0 +1,382 @@
+/* ========================================
+   CSS Design System - Stock Trading Game
+   ======================================== */
+
+/* CSS Variables */
+:root {
+  /* Colors */
+  --color-bg-primary: #0a0e17;
+  --color-bg-secondary: #111827;
+  --color-bg-card: #1a1f2e;
+  --color-bg-hover: #252d3f;
+
+  --color-text-primary: #f3f4f6;
+  --color-text-secondary: #9ca3af;
+  --color-text-muted: #6b7280;
+
+  --color-profit: #10b981;
+  --color-profit-light: #34d399;
+  --color-profit-bg: rgba(16, 185, 129, 0.1);
+
+  --color-loss: #ef4444;
+  --color-loss-light: #f87171;
+  --color-loss-bg: rgba(239, 68, 68, 0.1);
+
+  --color-accent: #6366f1;
+  --color-accent-light: #818cf8;
+  --color-accent-bg: rgba(99, 102, 241, 0.1);
+
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(255, 255, 255, 0.15);
+
+  /* Gradients */
+  --gradient-profit: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-loss: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  --gradient-accent: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  --gradient-gold: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+  --gradient-card: linear-gradient(180deg, rgba(26, 31, 46, 0.8) 0%, rgba(26, 31, 46, 0.95) 100%);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+  --shadow-glow-profit: 0 0 20px rgba(16, 185, 129, 0.3);
+  --shadow-glow-loss: 0 0 20px rgba(239, 68, 68, 0.3);
+  --shadow-glow-accent: 0 0 20px rgba(99, 102, 241, 0.3);
+
+  /* Typography */
+  --font-family-sans: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-family-mono: 'Roboto Mono', monospace;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+}
+
+/* Reset and Base Styles */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Background Pattern */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(16, 185, 129, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.04) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Utility Classes */
+.text-profit {
+  color: var(--color-profit);
+}
+
+.text-loss {
+  color: var(--color-loss);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.bg-profit {
+  background: var(--color-profit-bg);
+}
+
+.bg-loss {
+  background: var(--color-loss-bg);
+}
+
+.font-mono {
+  font-family: var(--font-family-mono);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 5px currentColor;
+  }
+
+  50% {
+    box-shadow: 0 0 20px currentColor;
+  }
+}
+
+@keyframes priceUp {
+  0% {
+    background-color: transparent;
+  }
+
+  50% {
+    background-color: var(--color-profit-bg);
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes priceDown {
+  0% {
+    background-color: transparent;
+  }
+
+  50% {
+    background-color: var(--color-loss-bg);
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.6s ease forwards;
+}
+
+.animate-pulse {
+  animation: pulse 2s infinite;
+}
+
+.price-up {
+  animation: priceUp 0.5s ease;
+}
+
+.price-down {
+  animation: priceDown 0.5s ease;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-hover);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-accent);
+  color: white;
+}
+
+/* ========================================
+   Unified Modal Theme
+   ======================================== */
+
+/* 모든 모달 오버레이 통일 */
+.modal-overlay,
+.watchlist-overlay,
+.trade-history-overlay,
+.statistics-overlay,
+.missions-overlay,
+.leaderboard-overlay,
+.alert-manager-overlay,
+.asset-chart-overlay,
+.skills-panel-overlay,
+.settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: var(--spacing-lg);
+}
+
+/* 모든 모달 패널 통일 */
+.modal-content,
+.watchlist-panel,
+.trade-history-panel,
+.statistics-panel,
+.missions-panel,
+.leaderboard-panel,
+.alert-manager-panel,
+.asset-chart-panel,
+.skills-panel,
+.settings-panel {
+  background: linear-gradient(180deg, #1a1f2e 0%, #111827 100%);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(99, 102, 241, 0.1);
+  animation: modalSlideIn 0.25s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 모달 헤더 통일 */
+.modal-header,
+.watchlist-header,
+.trade-history-header,
+.statistics-header,
+.missions-header,
+.leaderboard-header,
+.alert-manager-header,
+.asset-chart-header,
+.skills-header,
+.settings-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, transparent 100%);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.modal-header h2,
+.watchlist-header h2,
+.trade-history-header h2,
+.statistics-header h2,
+.missions-header h2,
+.leaderboard-header h2,
+.alert-manager-header h2,
+.asset-chart-header h2,
+.skills-header h2,
+.settings-header h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* 닫기 버튼 통일 */
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-muted);
+  font-size: 1.25rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: var(--color-loss);
+  color: white;
+  transform: scale(1.1);
+}

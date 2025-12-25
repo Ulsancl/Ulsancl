@@ -1,0 +1,80 @@
+.ticker-tape-container {
+    width: 100%;
+    height: 40px;
+    background-color: var(--color-bg-secondary);
+    border-bottom: 1px solid var(--color-border);
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+    display: flex;
+    align-items: center;
+    z-index: 10;
+}
+
+.ticker-track {
+    display: inline-flex;
+    align-items: center;
+    animation: scroll 40s linear infinite;
+    padding-left: 100%;
+    /* 시작 시 화면 밖에서 시작 */
+}
+
+/* 마우스 올리면 멈춤 */
+.ticker-tape-container:hover .ticker-track {
+    animation-play-state: paused;
+}
+
+.ticker-item {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 48px;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+}
+
+.ticker-label {
+    background-color: var(--color-accent);
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-right: 8px;
+    font-weight: bold;
+}
+
+.ticker-news.positive {
+    color: var(--color-profit);
+}
+
+.ticker-news.negative {
+    color: var(--color-loss);
+}
+
+.ticker-stock {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stock-name {
+    font-weight: bold;
+    color: var(--color-text-primary);
+}
+
+.stock-change.up {
+    color: var(--color-profit);
+}
+
+.stock-change.down {
+    color: var(--color-loss);
+}
+
+@keyframes scroll {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
+}

@@ -1,0 +1,183 @@
+.order-book {
+    width: 100%;
+    background: var(--bg-card);
+    border-left: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    font-size: 0.85rem;
+    overflow: hidden;
+}
+
+.order-book-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    font-weight: bold;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.8rem;
+}
+
+.order-book-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.asks-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    /* 아래로 정렬 */
+    padding-bottom: 4px;
+}
+
+.bids-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* 위로 정렬 */
+    padding-top: 4px;
+}
+
+.order-row {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 12px;
+    cursor: pointer;
+    height: 24px;
+}
+
+.order-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.order-price {
+    z-index: 2;
+    font-family: 'Roboto Mono', monospace;
+    font-weight: 500;
+}
+
+.ask .order-price {
+    color: var(--color-loss);
+}
+
+.bid .order-price {
+    color: var(--color-profit);
+}
+
+.order-amount {
+    z-index: 2;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.volume-bar {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    right: 0;
+    opacity: 0.15;
+    z-index: 1;
+    transition: width 0.3s ease;
+}
+
+.volume-bar.ask {
+    background-color: var(--color-loss);
+}
+
+.volume-bar.bid {
+    background-color: var(--color-profit);
+}
+
+.current-price-display {
+    padding: 10px 12px;
+    text-align: center;
+    border-top: 2px solid var(--color-border);
+    border-bottom: 2px solid var(--color-border);
+    background: rgba(255, 255, 255, 0.03);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1rem;
+}
+
+.current-price-display strong {
+    font-size: 1.1rem;
+    font-family: 'Roboto Mono', monospace;
+}
+
+.current-price-display strong.up {
+    color: var(--color-profit);
+}
+
+.current-price-display strong.down {
+    color: var(--color-loss);
+}
+
+.spread-info {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+/* 현재가에 가장 가까운 호가 하이라이트 */
+.order-row.nearest {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.order-row.nearest .order-price {
+    font-weight: bold;
+}
+
+.scrolling-ticker {
+    font-size: 0.7rem;
+    color: var(--accent-color);
+    animation: blink 2s infinite;
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* 수량 소진 표시 */
+.consuming {
+    color: #ff9800;
+    font-size: 0.6rem;
+    margin-left: 4px;
+    animation: pulse 0.5s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+}
+
+/* 수량 변화 하이라이트 */
+.order-amount {
+    transition: color 0.3s ease;
+}
+
+.order-row.ask:hover .order-amount,
+.order-row.bid:hover .order-amount {
+    color: white;
+}

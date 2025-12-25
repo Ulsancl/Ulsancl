@@ -1,0 +1,189 @@
+/* 미션 패널 스타일 */
+.missions-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: var(--spacing-lg);
+}
+
+.missions-panel {
+    background: linear-gradient(180deg, #1a1f2e 0%, #111827 100%);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: var(--radius-xl);
+    width: 100%;
+    max-width: 550px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(99, 102, 241, 0.1);
+    animation: modalSlideIn 0.25s ease;
+}
+
+.missions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, transparent 100%);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.missions-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.missions-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+}
+
+.mission-section {
+    margin-bottom: var(--spacing-xl);
+}
+
+.mission-section h3 {
+    margin: 0 0 var(--spacing-xs);
+    font-size: 1rem;
+}
+
+.mission-reset {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin: 0 0 var(--spacing-md);
+}
+
+.mission-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.mission-card.completed {
+    opacity: 0.6;
+    background: rgba(16, 185, 129, 0.05);
+    border-color: var(--color-profit);
+}
+
+.mission-card.claimable {
+    border-color: #fbbf24;
+    background: rgba(251, 191, 36, 0.1);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 0 8px rgba(251, 191, 36, 0);
+    }
+}
+
+.mission-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.mission-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: 4px;
+}
+
+.mission-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.completed-badge {
+    font-size: 0.7rem;
+    color: var(--color-profit);
+    background: rgba(16, 185, 129, 0.15);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.mission-desc {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin: 0 0 var(--spacing-sm);
+}
+
+.mission-progress-bar {
+    height: 6px;
+    background: var(--color-bg-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.mission-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-accent), #8b5cf6);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.mission-progress-text {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-family-mono);
+}
+
+.mission-rewards {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    margin-left: var(--spacing-md);
+}
+
+.reward-xp {
+    font-size: 0.75rem;
+    color: #8b5cf6;
+    font-weight: 600;
+}
+
+.reward-cash {
+    font-size: 0.75rem;
+    color: var(--color-profit);
+    font-family: var(--font-family-mono);
+}
+
+.claim-btn {
+    padding: 4px 12px;
+    border: none;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #000;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.claim-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+}

@@ -1,0 +1,306 @@
+/* 시즌 종료 모달 스타일 */
+.season-end-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.season-end-modal {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 24px;
+    padding: 40px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 2px solid rgba(99, 102, 241, 0.5);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+    animation: slideUp 0.5s ease;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.season-end-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.season-end-header h1 {
+    font-size: 2.5rem;
+    margin: 0;
+    background: linear-gradient(90deg, #ffd700, #ff6b6b, #ffd700);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
+.season-subtitle {
+    color: #a0a0b0;
+    margin-top: 10px;
+    font-size: 1.1rem;
+}
+
+/* 등급 섹션 */
+.grade-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.grade-badge {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.grade-title {
+    margin-top: 15px;
+    font-size: 1.3rem;
+    color: #fff;
+    font-weight: 600;
+}
+
+/* 통계 그리드 */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.stat-box {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-box.positive {
+    border-color: rgba(16, 185, 129, 0.5);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.stat-box.negative {
+    border-color: rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.stat-box .stat-label {
+    color: #a0a0b0;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+}
+
+.stat-box .stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #fff;
+}
+
+.stat-box .stat-value.profit {
+    color: #10b981;
+}
+
+.stat-box .stat-value.loss {
+    color: #ef4444;
+}
+
+/* 상세 통계 */
+.detailed-stats {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+.detailed-stats h3 {
+    margin: 0 0 15px 0;
+    color: #fff;
+    font-size: 1.1rem;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.detail-label {
+    color: #a0a0b0;
+}
+
+.detail-value {
+    font-weight: 600;
+    color: #fff;
+}
+
+.text-profit {
+    color: #10b981 !important;
+}
+
+.text-loss {
+    color: #ef4444 !important;
+}
+
+/* 업적 섹션 */
+.achievements-section {
+    margin-bottom: 25px;
+}
+
+.achievements-section h3 {
+    margin: 0 0 15px 0;
+    color: #fff;
+    font-size: 1.1rem;
+}
+
+.achievement-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.achievement-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 15px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
+    border-radius: 20px;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.ach-icon {
+    font-size: 1.2rem;
+}
+
+.ach-name {
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+/* 버튼 */
+.season-end-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.btn-new-season {
+    padding: 15px 40px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-new-season:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.8);
+}
+
+.btn-continue {
+    padding: 15px 30px;
+    font-size: 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    color: #a0a0b0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-continue:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+
+/* 스크롤바 */
+.season-end-modal::-webkit-scrollbar {
+    width: 6px;
+}
+
+.season-end-modal::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.season-end-modal::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.5);
+    border-radius: 3px;
+}

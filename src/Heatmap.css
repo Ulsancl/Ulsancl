@@ -1,0 +1,167 @@
+/* 히트맵 스타일 */
+.heatmap-container {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.heatmap-title,
+.pie-title {
+    margin: 0 0 var(--spacing-md);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.heatmap-legend {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: var(--spacing-md);
+}
+
+.legend-item {
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 0.65rem;
+    color: white;
+    font-weight: 600;
+}
+
+.heatmap-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.sector-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.sector-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    padding-left: var(--spacing-sm);
+    border-left: 3px solid var(--color-accent);
+}
+
+.sector-stocks {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: var(--spacing-sm);
+}
+
+.heatmap-cell {
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    min-height: 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.heatmap-cell:hover {
+    transform: scale(1.05);
+    z-index: 10;
+    box-shadow: var(--shadow-lg);
+}
+
+.heatmap-cell.held {
+    border: 2px solid white;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.cell-code {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.cell-change {
+    font-size: 0.65rem;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    font-family: var(--font-family-mono);
+}
+
+.held-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 0.5rem;
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-weight: 600;
+}
+
+/* 파이 차트 */
+.pie-chart-container {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.pie-chart-wrapper {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.pie-chart {
+    flex-shrink: 0;
+}
+
+.pie-segment {
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.pie-segment:hover {
+    transform: scale(1.02);
+    filter: brightness(1.1);
+}
+
+.pie-legend {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    min-width: 150px;
+}
+
+.pie-legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.8rem;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.legend-name {
+    flex: 1;
+    color: var(--color-text-secondary);
+}
+
+.legend-percent {
+    font-family: var(--font-family-mono);
+    font-weight: 600;
+}

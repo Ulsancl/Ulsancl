@@ -1,0 +1,233 @@
+/**
+ * 대시보드 카드 CSS 모듈
+ */
+
+/* Stat Card */
+.statCard {
+    background: var(--gradient-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    transition: all 0.2s ease;
+}
+
+.statCard:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.statCard.clickable {
+    cursor: pointer;
+}
+
+.statLabel {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.statValue {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: var(--font-family-mono);
+    color: var(--color-text-primary);
+}
+
+/* Stat Card Variants */
+.statTotal {
+    border-left: 3px solid var(--color-primary);
+}
+
+.statProfit {
+    border-left: 3px solid currentColor;
+}
+
+.statProfit.positive {
+    color: var(--color-profit);
+}
+
+.statProfit.positive .statValue {
+    color: var(--color-profit);
+}
+
+.statProfit.negative {
+    color: var(--color-loss);
+}
+
+.statProfit.negative .statValue {
+    color: var(--color-loss);
+}
+
+.statCash {
+    border-left: 3px solid #3b82f6;
+}
+
+.statStock {
+    border-left: 3px solid #8b5cf6;
+}
+
+/* Dashboard Grid */
+.dashboardGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-md);
+}
+
+@media (max-width: 1024px) {
+    .dashboardGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboardGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Credit Trading Card */
+.creditCard {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.creditCard.marginCall {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(249, 115, 22, 0.15) 100%);
+    border-color: var(--color-loss);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
+}
+
+.creditHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-md);
+}
+
+.creditTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.marginCallBadge {
+    background: var(--color-loss);
+    color: white;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 600;
+    animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.creditInfoGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.creditInfo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.creditLabel {
+    font-size: 0.65rem;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+}
+
+.creditValue {
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: var(--font-family-mono);
+}
+
+.creditValue.positive {
+    color: var(--color-profit);
+}
+
+.creditValue.negative {
+    color: var(--color-loss);
+}
+
+.creditActions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.creditBtn {
+    flex: 1;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.creditBtn.borrow {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    color: white;
+}
+
+.creditBtn.borrow:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.creditBtn.repay {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.creditBtn.repay:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.creditBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+    .creditInfoGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

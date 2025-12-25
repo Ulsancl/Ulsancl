@@ -1,0 +1,17 @@
+{
+    "name": "트레이딩 게임",
+    "short_name": "트레이딩 게임",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#1a1a2e",
+    "theme_color": "#1a1a2e",
+    "description": "실시간 가상 주식 트레이딩 시뮬레이션 게임",
+    "icons": [
+        {
+            "src": "app-icon.svg",
+            "sizes": "192x192 512x512",
+            "type": "image/svg+xml"
+        }
+    ],
+    "orientation": "portrait-primary"
+}

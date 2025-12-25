@@ -1,0 +1,331 @@
+/* 주문 관리 스타일 */
+.order-manager-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1500;
+    padding: var(--spacing-lg);
+}
+
+.order-manager {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    width: 100%;
+    max-width: 450px;
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.order-stock-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.order-stock-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: white;
+}
+
+.order-stock-info h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.current-price {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    font-family: var(--font-family-mono);
+}
+
+.order-form {
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.order-section label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.order-type-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-sm);
+}
+
+.order-type-btn {
+    padding: var(--spacing-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.order-type-btn:hover {
+    border-color: var(--color-accent);
+}
+
+.order-type-btn.active {
+    background: var(--color-accent);
+    color: white;
+    border-color: var(--color-accent);
+}
+
+.side-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+}
+
+.side-btn {
+    padding: var(--spacing-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.side-btn.buy:hover,
+.side-btn.buy.active {
+    background: var(--color-profit);
+    border-color: var(--color-profit);
+    color: white;
+}
+
+.side-btn.sell:hover,
+.side-btn.sell.active {
+    background: var(--color-loss);
+    border-color: var(--color-loss);
+    color: white;
+}
+
+.side-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.price-input-group,
+.qty-input-group {
+    display: flex;
+    align-items: center;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.price-input-group button,
+.qty-input-group button {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.price-input-group button:hover,
+.qty-input-group button:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
+.price-input-group input,
+.qty-input-group input {
+    flex: 1;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-primary);
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: var(--font-family-mono);
+}
+
+.price-input-group input:focus,
+.qty-input-group input:focus {
+    outline: none;
+}
+
+.price-unit,
+.qty-unit {
+    padding: 0 var(--spacing-md);
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+}
+
+.price-diff,
+.qty-info {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-top: var(--spacing-xs);
+}
+
+.order-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+}
+
+.summary-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    font-family: var(--font-family-mono);
+}
+
+.submit-order-btn {
+    width: 100%;
+    padding: var(--spacing-md);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.submit-order-btn.buy {
+    background: var(--gradient-profit);
+    color: white;
+}
+
+.submit-order-btn.sell {
+    background: var(--gradient-loss);
+    color: white;
+}
+
+.submit-order-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.submit-order-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 예약 주문 목록 */
+.pending-orders {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    margin-top: var(--spacing-md);
+    overflow: hidden;
+}
+
+.pending-orders h4 {
+    margin: 0;
+    padding: var(--spacing-md);
+    background: var(--color-bg-secondary);
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.pending-orders-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.pending-order {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.pending-order:last-child {
+    border-bottom: none;
+}
+
+.pending-order-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.order-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    background: var(--color-accent-bg);
+    color: var(--color-accent-light);
+    border-radius: var(--radius-sm);
+}
+
+.pending-order.stopLoss .order-badge {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--color-loss);
+}
+
+.pending-order.takeProfit .order-badge {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--color-profit);
+}
+
+.order-stock {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.order-details {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-family-mono);
+}
+
+.cancel-order-btn {
+    padding: 4px 10px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-secondary);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.cancel-order-btn:hover {
+    background: var(--color-loss);
+    border-color: var(--color-loss);
+    color: white;
+}

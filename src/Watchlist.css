@@ -1,0 +1,191 @@
+/* 워치리스트 스타일 */
+.watchlist-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: var(--spacing-lg);
+}
+
+.watchlist-panel {
+    background: linear-gradient(180deg, #1a1f2e 0%, #111827 100%);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: var(--radius-xl);
+    width: 100%;
+    max-width: 450px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(99, 102, 241, 0.1);
+    animation: modalSlideIn 0.25s ease;
+}
+
+.watchlist-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+    background: linear-gradient(180deg, rgba(251, 191, 36, 0.1) 0%, transparent 100%);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.watchlist-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.watchlist-empty {
+    padding: var(--spacing-2xl);
+    text-align: center;
+}
+
+.empty-icon {
+    font-size: 3rem;
+    opacity: 0.3;
+}
+
+.watchlist-empty p {
+    margin: var(--spacing-sm) 0 0;
+    color: var(--color-text-muted);
+}
+
+.empty-hint {
+    font-size: 0.8rem;
+}
+
+.watchlist-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-md);
+}
+
+.watchlist-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.watchlist-item:hover {
+    border-color: var(--color-accent);
+    transform: translateX(4px);
+}
+
+.watchlist-item-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex: 1;
+}
+
+.item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: white;
+}
+
+.item-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.item-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.item-code {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+}
+
+.watchlist-item-price {
+    text-align: right;
+}
+
+.watchlist-item-price .price {
+    display: block;
+    font-weight: 600;
+    font-family: var(--font-family-mono);
+    font-size: 0.9rem;
+}
+
+.watchlist-item-price .price.up {
+    color: var(--color-profit);
+}
+
+.watchlist-item-price .price.down {
+    color: var(--color-loss);
+}
+
+.watchlist-item-price .change {
+    font-size: 0.75rem;
+    font-family: var(--font-family-mono);
+}
+
+.watchlist-item-price .change.up {
+    color: var(--color-profit);
+}
+
+.watchlist-item-price .change.down {
+    color: var(--color-loss);
+}
+
+.remove-watch-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: all var(--transition-fast);
+}
+
+.remove-watch-btn:hover {
+    background: var(--color-loss);
+    color: white;
+}
+
+/* 워치 버튼 */
+.watch-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    font-size: 1.1rem;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    transition: all var(--transition-fast);
+    padding: 0;
+}
+
+.watch-btn:hover {
+    color: #fbbf24;
+    transform: scale(1.2);
+}
+
+.watch-btn.watched {
+    color: #fbbf24;
+}
