@@ -31,6 +31,14 @@ import {
 const PRICE_RESET_DELAY = 500
 const ASSET_HISTORY_INTERVAL = 10000
 
+const getLeverageDebt = (portfolio) => {
+    if (!portfolio) return 0
+    return Object.values(portfolio).reduce((total, holding) => {
+        const borrowed = typeof holding.borrowed === 'number' ? holding.borrowed : 0
+        return total + borrowed
+    }, 0)
+}
+
 export const useGameLoop = ({
     stocks,
     setStocks,
@@ -84,44 +92,45 @@ export const useGameLoop = ({
     const gameStartTimeRef = useRef(gameStartTime)
     const stocksRef = useRef(stocks)
     const alertsRef = useRef(alerts)
+    const pendingOrdersRef = useRef(pendingOrders)
     const marketStateRef = useRef(marketState)
     const cashRef = useRef(cash)
     const portfolioRef = useRef(portfolio)
     const shortPositionsRef = useRef(shortPositions)
     const creditUsedRef = useRef(creditUsed)
     const creditInterestRef = useRef(creditInterest)
+    const unlockedSkillsRef = useRef(unlockedSkills)
     const showNotificationRef = useRef(showNotification)
     const playSoundRef = useRef(playSound)
-    const formatNumberRef = useRef(formatNumber)
-
     // Sync refs
     useLayoutEffect(() => {
         gameStartTimeRef.current = gameStartTime
         stocksRef.current = stocks
         alertsRef.current = alerts
+        pendingOrdersRef.current = pendingOrders
         marketStateRef.current = marketState
         cashRef.current = cash
         portfolioRef.current = portfolio
         shortPositionsRef.current = shortPositions
         creditUsedRef.current = creditUsed
         creditInterestRef.current = creditInterest
+        unlockedSkillsRef.current = unlockedSkills
         showNotificationRef.current = showNotification
         playSoundRef.current = playSound
-        formatNumberRef.current = formatNumber
-    }, [gameStartTime, stocks, alerts, marketState, cash, portfolio, shortPositions, creditUsed, creditInterest, showNotification, playSound, formatNumber])
+    }, [gameStartTime, stocks, alerts, pendingOrders, marketState, cash, portfolio, shortPositions, creditUsed, creditInterest, unlockedSkills, showNotification, playSound])
 
     // 서브 모듈 초기화
     const priceUpdater = usePriceUpdater({
-        stocks, setStocks, marketState, setPriceHistory, setPriceChanges
+        setPriceHistory, setPriceChanges
     })
 
     const newsGenerator = useNewsGenerator({
-        stocks, marketState, setNews, showNotification, playSound
+        setNews, showNotification, playSound
     })
 
     const orderProcessor = useOrderProcessor({
-        pendingOrders, setPendingOrders, stocks, cash, setCash,
-        portfolio, setPortfolio, unlockedSkills, setTradeHistory,
+        setPendingOrders, setCash,
+        setPortfolio, setTradeHistory,
         setTotalTrades, setDailyTrades, setTotalProfit, setDailyProfit, setWinStreak,
         showNotification, playSound
     })
@@ -135,7 +144,7 @@ export const useGameLoop = ({
     })
 
     const dividendManager = useDividendManager({
-        portfolio, setCash, setTotalDividends, showNotification, formatNumber
+        setCash, setTotalDividends, showNotification, formatNumber
     })
 
     const crisisManager = useCrisisManager({
@@ -149,9 +158,23 @@ export const useGameLoop = ({
             const currentStocks = stocksRef.current
             const currentAlerts = alertsRef.current
             const currentMarketState = marketStateRef.current
+            const currentCash = cashRef.current
+            const currentPortfolio = portfolioRef.current
+            const currentShortPositions = shortPositionsRef.current
+            const currentCreditUsed = creditUsedRef.current
+            const currentCreditInterest = creditInterestRef.current
+            const currentPendingOrders = pendingOrdersRef.current
+            const currentUnlockedSkills = unlockedSkillsRef.current
             const showNotificationCurrent = showNotificationRef.current
             const playSoundCurrent = playSoundRef.current
-            const formatNumberCurrent = formatNumberRef.current
+            let workingStocks = currentStocks
+            let workingMarketState = currentMarketState
+            let workingCash = currentCash
+            let workingPortfolio = currentPortfolio
+            let workingShortPositions = currentShortPositions
+            let workingCreditUsed = currentCreditUsed
+            let workingCreditInterest = currentCreditInterest
+            let workingPendingOrders = currentPendingOrders
 
             // 1. 게임 시간 업데이트
             const newGameTime = calculateGameDate(gameStartTimeRef.current, now)
@@ -165,8 +188,7 @@ export const useGameLoop = ({
 
             // 2. 시장 상태 업데이트
             const activeGlobalEvent = getActiveGlobalEvent()
-            let workingMarketState = updateMarketState(currentMarketState, activeGlobalEvent)
-            let workingStocks = currentStocks
+            workingMarketState = updateMarketState(workingMarketState, activeGlobalEvent)
 
             // 3. 신규 거래일 체크
             if (gameDay > lastDayRef.current) {
@@ -175,7 +197,10 @@ export const useGameLoop = ({
                 workingStocks = startNewTradingDay(workingStocks)
                 setDailyTrades(0)
                 setDailyProfit(0)
-                creditManager.processDailyInterest()
+                const interestAccrued = creditManager.processDailyInterest()
+                if (interestAccrued > 0) {
+                    workingCreditInterest += interestAccrued
+                }
                 showNotificationCurrent(`📅 ${newGameTime.displayDate} 거래일 시작!`, 'info')
                 playSoundCurrent('news')
             }
@@ -184,10 +209,22 @@ export const useGameLoop = ({
             let stockMap = new Map(workingStocks.map(stock => [stock.id, stock]))
 
             // 5. 마진콜 체크
-            creditManager.checkMarginCall(stockMap)
+            const marginResult = creditManager.checkMarginCall(stockMap, {
+                cash: workingCash,
+                portfolio: workingPortfolio,
+                shortPositions: workingShortPositions,
+                creditUsed: workingCreditUsed,
+                creditInterest: workingCreditInterest
+            })
+            if (marginResult?.forceLiquidation) {
+                if (marginResult.cash !== undefined) workingCash = marginResult.cash
+                if (marginResult.portfolio !== undefined) workingPortfolio = marginResult.portfolio
+                if (marginResult.creditUsed !== undefined) workingCreditUsed = marginResult.creditUsed
+                if (marginResult.creditInterest !== undefined) workingCreditInterest = marginResult.creditInterest
+            }
 
             // 6. 뉴스 생성
-            const newsResult = newsGenerator.tick(newGameTime)
+            const newsResult = newsGenerator.tick(workingStocks, workingMarketState, newGameTime)
             if (newsResult.stocks !== workingStocks) {
                 workingStocks = newsResult.stocks
                 workingMarketState = newsResult.marketState
@@ -204,10 +241,16 @@ export const useGameLoop = ({
             const event = generateMarketEvent(workingStocks)
             if (event) {
                 const { stocks: eventStocks, cash: eventCash, portfolio: eventPortfolio, message } =
-                    applyEventEffect(event, workingStocks, cashRef.current, portfolioRef.current)
+                    applyEventEffect(event, workingStocks, workingCash, workingPortfolio)
                 workingStocks = eventStocks
-                if (eventCash !== cashRef.current) setCash(eventCash)
-                if (eventPortfolio !== portfolioRef.current) setPortfolio(eventPortfolio)
+                if (eventCash !== workingCash) {
+                    workingCash = eventCash
+                    setCash(eventCash)
+                }
+                if (eventPortfolio !== workingPortfolio) {
+                    workingPortfolio = eventPortfolio
+                    setPortfolio(eventPortfolio)
+                }
                 if (message) showNotificationCurrent(`${event.icon} ${message}`, 'info')
             }
 
@@ -215,7 +258,7 @@ export const useGameLoop = ({
             crisisManager.tick(workingStocks, workingMarketState, gameDay)
 
             // 10. 가격 변동
-            workingStocks = priceUpdater.tick(gameDay, newGameTime)
+            workingStocks = priceUpdater.tick(workingStocks, workingMarketState, gameDay, newGameTime)
             stockMap = new Map(workingStocks.map(stock => [stock.id, stock]))
 
             // 가격 변화 표시 리셋
@@ -223,13 +266,31 @@ export const useGameLoop = ({
             priceResetTimeoutRef.current = setTimeout(() => setPriceChanges({}), PRICE_RESET_DELAY)
 
             // 11. 주문 처리
-            orderProcessor.tick()
+            const orderResult = orderProcessor.tick({
+                pendingOrders: workingPendingOrders,
+                stocks: workingStocks,
+                cash: workingCash,
+                portfolio: workingPortfolio,
+                unlockedSkills: currentUnlockedSkills
+            })
+            if (orderResult) {
+                workingCash = orderResult.cash
+                workingPortfolio = orderResult.portfolio
+                workingPendingOrders = orderResult.pendingOrders
+            }
 
             // 12. 공매도 처리
-            creditManager.processShortPositions(stockMap)
+            const shortResult = creditManager.processShortPositions(stockMap, {
+                cash: workingCash,
+                shortPositions: workingShortPositions
+            })
+            if (shortResult) {
+                workingCash = shortResult.cash
+                workingShortPositions = shortResult.shortPositions
+            }
 
             // 13. 알림 체크
-            const triggeredAlerts = checkAlerts(currentAlerts, workingStocks, portfolioRef.current)
+            const triggeredAlerts = checkAlerts(currentAlerts, workingStocks, workingPortfolio)
             if (triggeredAlerts.length > 0) {
                 const triggeredIds = new Set(triggeredAlerts.map(a => a.id))
                 triggeredAlerts.forEach(alert => {
@@ -240,14 +301,18 @@ export const useGameLoop = ({
             }
 
             // 14. 배당금 처리 (1분마다)
-            dividendManager.tick(stockMap, now)
+            const dividendTotal = dividendManager.tick(stockMap, now, workingPortfolio)
+            if (dividendTotal > 0) {
+                workingCash += dividendTotal
+            }
 
             // 15. 자산 기록 (10초마다)
             if (now % ASSET_HISTORY_INTERVAL < updateInterval) {
-                const stockValueNow = calculateStockValueFromMap(stockMap, portfolioRef.current)
-                const shortValueNow = calculateShortValueFromMap(stockMap, shortPositionsRef.current)
-                const grossAssetsNow = cashRef.current + stockValueNow + shortValueNow
-                const totalAssetsNow = grossAssetsNow - creditUsedRef.current - creditInterestRef.current
+                const stockValueNow = calculateStockValueFromMap(stockMap, workingPortfolio)
+                const shortValueNow = calculateShortValueFromMap(stockMap, workingShortPositions)
+                const grossAssetsNow = workingCash + stockValueNow + shortValueNow
+                const leverageDebtNow = getLeverageDebt(workingPortfolio)
+                const totalAssetsNow = grossAssetsNow - workingCreditUsed - workingCreditInterest - leverageDebtNow
                 setAssetHistory(prev => [...prev.slice(-100), { value: totalAssetsNow, timestamp: now, day: gameDay }])
             }
 

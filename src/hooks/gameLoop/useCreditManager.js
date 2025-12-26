@@ -47,12 +47,13 @@ export const useCreditManager = ({
     }, [cash, portfolio, creditUsed, creditInterest, marginCallActive, shortPositions, showNotification, playSound, formatNumber])
 
     // 마진콜 체크
-    const checkMarginCall = useCallback((stockMap) => {
-        const currentCreditUsed = creditUsedRef.current
-        const currentCash = cashRef.current
-        const currentPortfolio = portfolioRef.current
-        const currentShortPositions = shortPositionsRef.current
-        const currentMarginCallActive = marginCallActiveRef.current
+    const checkMarginCall = useCallback((stockMap, overrides = {}) => {
+        const currentCreditUsed = overrides.creditUsed ?? creditUsedRef.current
+        const currentCash = overrides.cash ?? cashRef.current
+        const currentPortfolio = overrides.portfolio ?? portfolioRef.current
+        const currentShortPositions = overrides.shortPositions ?? shortPositionsRef.current
+        const currentMarginCallActive = overrides.marginCallActive ?? marginCallActiveRef.current
+        const currentCreditInterest = overrides.creditInterest ?? creditInterestRef.current
         const showNotificationCurrent = showNotificationRef.current
 
         if (currentCreditUsed <= 0) {
@@ -83,18 +84,29 @@ export const useCreditManager = ({
 
             setPortfolio({})
 
-            const repayable = Math.min(workingCash, currentCreditUsed + creditInterestRef.current)
+            const repayable = Math.min(workingCash, currentCreditUsed + currentCreditInterest)
+            let newCreditUsed = currentCreditUsed
+            let newCreditInterest = currentCreditInterest
             if (repayable > 0) {
-                const interestPayment = Math.min(repayable, creditInterestRef.current)
+                const interestPayment = Math.min(repayable, currentCreditInterest)
                 setCreditInterest(prev => prev - interestPayment)
                 const principalPayment = repayable - interestPayment
                 setCreditUsed(prev => Math.max(0, prev - principalPayment))
+                newCreditInterest = currentCreditInterest - interestPayment
+                newCreditUsed = Math.max(0, currentCreditUsed - principalPayment)
                 workingCash -= repayable
             }
 
             setCash(workingCash)
             setMarginCallActive(true)
-            return { marginCallActive: true, forceLiquidation: true }
+            return {
+                marginCallActive: true,
+                forceLiquidation: true,
+                cash: workingCash,
+                portfolio: {},
+                creditUsed: newCreditUsed,
+                creditInterest: newCreditInterest
+            }
         } else if (currentMarginRatio <= CREDIT_TRADING.maintenanceMargin && !currentMarginCallActive) {
             showNotificationCurrent('⚠️ 마진콜 경고! 담보 비율이 30% 이하입니다.', 'warning')
             setMarginCallActive(true)
@@ -110,9 +122,9 @@ export const useCreditManager = ({
     }, [setCash, setCreditInterest, setCreditUsed, setMarginCallActive, setPortfolio])
 
     // 공매도 이자 및 강제청산
-    const processShortPositions = useCallback((stockMap) => {
-        const currentShortPositions = shortPositionsRef.current
-        const currentCash = cashRef.current
+    const processShortPositions = useCallback((stockMap, overrides = {}) => {
+        const currentShortPositions = overrides.shortPositions ?? shortPositionsRef.current
+        const currentCash = overrides.cash ?? cashRef.current
         const showNotificationCurrent = showNotificationRef.current
         const playSoundCurrent = playSoundRef.current
 
@@ -143,7 +155,10 @@ export const useCreditManager = ({
 
         if (liquidated.length > 0) {
             liquidated.forEach(({ position, stock, pnl }) => {
-                newCash += position.entryPrice * position.quantity + pnl
+                const marginReturn = typeof position.margin === 'number'
+                    ? position.margin
+                    : position.entryPrice * position.quantity * SHORT_SELLING.marginRate
+                newCash += marginReturn + pnl
                 showNotificationCurrent(`⚠️ ${stock.name} 공매도 강제청산!`, 'error')
                 playSoundCurrent('error')
             })

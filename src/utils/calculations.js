@@ -102,12 +102,16 @@ export const calculateAssets = ({
 
     const stockValue = calculateStockValue(portfolio, stocks)
     const shortValue = calculateShortValue(shortPositions, stocks)
+    const leverageDebt = Object.values(portfolio || {}).reduce((total, holding) => {
+        const borrowed = typeof holding.borrowed === 'number' ? holding.borrowed : 0
+        return total + (isNaN(borrowed) ? 0 : borrowed)
+    }, 0)
 
     // 총 자산 (부채 제외)
     const grossAssets = safeCash + stockValue + shortValue
 
     // 순 자산 (부채 차감)
-    const totalAssets = grossAssets - safeCreditUsed - safeCreditInterest
+    const totalAssets = grossAssets - safeCreditUsed - safeCreditInterest - leverageDebt
 
     // 수익률
     const profitRate = INITIAL_CAPITAL > 0
@@ -119,7 +123,7 @@ export const calculateAssets = ({
     const creditLimitRatio = CREDIT_TRADING.creditLimit[`level${Math.min(levelInfo?.level || 1, 6)}`] || 0
     const maxCreditLimit = Math.floor(grossAssets * creditLimitRatio)
     const availableCredit = Math.max(0, maxCreditLimit - safeCreditUsed)
-    const totalDebt = safeCreditUsed + safeCreditInterest
+    const totalDebt = safeCreditUsed + safeCreditInterest + leverageDebt
 
     return {
         stockValue,
@@ -132,6 +136,7 @@ export const calculateAssets = ({
         maxCreditLimit,
         availableCredit,
         totalDebt,
+        leverageDebt,
         safeCash,
         safeCreditUsed,
         safeCreditInterest

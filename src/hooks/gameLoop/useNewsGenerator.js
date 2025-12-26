@@ -13,27 +13,21 @@ import {
 } from '../../engine'
 
 export const useNewsGenerator = ({
-    stocks,
-    marketState,
     setNews,
     showNotification,
     playSound
 }) => {
-    const stocksRef = useRef(stocks)
-    const marketStateRef = useRef(marketState)
     const showNotificationRef = useRef(showNotification)
     const playSoundRef = useRef(playSound)
 
     useLayoutEffect(() => {
-        stocksRef.current = stocks
-        marketStateRef.current = marketState
         showNotificationRef.current = showNotification
         playSoundRef.current = playSound
-    }, [stocks, marketState, showNotification, playSound])
+    }, [showNotification, playSound])
 
-    const tick = useCallback((gameTime) => {
-        let workingStocks = stocksRef.current
-        let workingMarketState = marketStateRef.current
+    const tick = useCallback((stocks, marketState, gameTime) => {
+        let workingStocks = stocks
+        let workingMarketState = marketState
         const showNotificationCurrent = showNotificationRef.current
         const playSoundCurrent = playSoundRef.current
         let newsGenerated = null

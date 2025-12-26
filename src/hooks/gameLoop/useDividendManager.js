@@ -27,13 +27,13 @@ export const useDividendManager = ({
         formatNumberRef.current = formatNumber
     }, [portfolio, showNotification, formatNumber])
 
-    const tick = useCallback((stockMap, now) => {
+    const tick = useCallback((stockMap, now, portfolioOverride) => {
         // 1분마다 배당금 처리
         if (now - lastDividendTimeRef.current < DIVIDEND_INTERVAL) {
             return 0
         }
 
-        const currentPortfolio = portfolioRef.current
+        const currentPortfolio = portfolioOverride ?? portfolioRef.current
         const formatNumberCurrent = formatNumberRef.current
         const showNotificationCurrent = showNotificationRef.current
 

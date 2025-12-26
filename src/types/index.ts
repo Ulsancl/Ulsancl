@@ -33,6 +33,8 @@ export interface StockFundamentals {
 export interface PortfolioHolding {
     quantity: number
     totalCost: number
+    borrowed?: number
+    margin?: number
     leverage?: number
     firstBuyTime?: number
 }
@@ -221,6 +223,7 @@ export interface CalculatedAssets {
     maxCreditLimit: number
     availableCredit: number
     totalDebt: number
+    leverageDebt?: number
     safeCash: number
     safeCreditUsed: number
     safeCreditInterest: number

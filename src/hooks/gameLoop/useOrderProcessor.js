@@ -8,14 +8,9 @@ import { processOrders } from '../../engine'
 import { generateId } from '../../utils/index.js'
 
 export const useOrderProcessor = ({
-    pendingOrders,
     setPendingOrders,
-    stocks,
-    cash,
     setCash,
-    portfolio,
     setPortfolio,
-    unlockedSkills,
     setTradeHistory,
     setTotalTrades,
     setDailyTrades,
@@ -25,35 +20,26 @@ export const useOrderProcessor = ({
     showNotification,
     playSound
 }) => {
-    const pendingOrdersRef = useRef(pendingOrders)
-    const stocksRef = useRef(stocks)
-    const cashRef = useRef(cash)
-    const portfolioRef = useRef(portfolio)
-    const unlockedSkillsRef = useRef(unlockedSkills)
     const showNotificationRef = useRef(showNotification)
     const playSoundRef = useRef(playSound)
 
     useLayoutEffect(() => {
-        pendingOrdersRef.current = pendingOrders
-        stocksRef.current = stocks
-        cashRef.current = cash
-        portfolioRef.current = portfolio
-        unlockedSkillsRef.current = unlockedSkills
         showNotificationRef.current = showNotification
         playSoundRef.current = playSound
-    }, [pendingOrders, stocks, cash, portfolio, unlockedSkills, showNotification, playSound])
+    }, [showNotification, playSound])
 
-    const tick = useCallback(() => {
-        const currentPendingOrders = pendingOrdersRef.current
-        const currentStocks = stocksRef.current
-        const currentCash = cashRef.current
-        const currentPortfolio = portfolioRef.current
-        const currentUnlockedSkills = unlockedSkillsRef.current
+    const tick = useCallback(({
+        pendingOrders: currentPendingOrders,
+        stocks: currentStocks,
+        cash: currentCash,
+        portfolio: currentPortfolio,
+        unlockedSkills: currentUnlockedSkills
+    }) => {
         const showNotificationCurrent = showNotificationRef.current
         const playSoundCurrent = playSoundRef.current
 
-        if (currentPendingOrders.length === 0) {
-            return { cash: currentCash, portfolio: currentPortfolio, pendingOrders: currentPendingOrders }
+        if (!currentPendingOrders || currentPendingOrders.length === 0) {
+            return { cash: currentCash, portfolio: currentPortfolio, pendingOrders: currentPendingOrders || [] }
         }
 
         // 수수료 계산
@@ -106,7 +92,7 @@ export const useOrderProcessor = ({
             return { cash: newCash, portfolio: newPortfolio, pendingOrders: remainingOrders }
         }
 
-        return { cash: currentCash, portfolio: currentPortfolio, pendingOrders: currentPendingOrders }
+        return { cash: currentCash, portfolio: currentPortfolio, pendingOrders: currentPendingOrders || [] }
     }, [setCash, setDailyProfit, setDailyTrades, setPendingOrders, setPortfolio, setTotalProfit, setTotalTrades, setTradeHistory, setWinStreak])
 
     return { tick }
