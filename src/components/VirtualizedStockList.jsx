@@ -56,14 +56,13 @@ const VirtualizedStockList = memo(function VirtualizedStockList({
     }, [])
 
     // 보이는 아이템 범위 계산
-    const { startIndex, endIndex, totalHeight, offsetY } = useMemo(() => {
+    const { startIndex, endIndex, totalHeight } = useMemo(() => {
         const totalHeight = stocks.length * ITEM_HEIGHT
         const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - OVERSCAN)
         const visibleCount = Math.ceil(containerHeight / ITEM_HEIGHT) + 2 * OVERSCAN
         const endIndex = Math.min(stocks.length - 1, startIndex + visibleCount)
-        const offsetY = startIndex * ITEM_HEIGHT
 
-        return { startIndex, endIndex, totalHeight, offsetY }
+        return { startIndex, endIndex, totalHeight }
     }, [stocks.length, scrollTop, containerHeight])
 
     // 보이는 아이템만 렌더링

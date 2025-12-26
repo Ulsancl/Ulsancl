@@ -141,12 +141,13 @@ const checkAlertCondition = (alert, stock, portfolio, priceHistory, news) => {
             return macdBear.histogram[macdBear.histogram.length - 2] > 0 &&
                 macdBear.histogram[macdBear.histogram.length - 1] < 0
 
-        case 'PROFIT_TARGET':
+        case 'PROFIT_TARGET': {
             if (!stock || !portfolio[stock.id]) return false
             const holding = portfolio[stock.id]
             const avgCost = holding.totalCost / holding.quantity
             const profitRate = ((stock.price - avgCost) / avgCost) * 100
             return profitRate >= alert.value
+        }
 
         case 'STOP_LOSS':
             if (!stock || !portfolio[stock.id]) return false
@@ -181,13 +182,10 @@ const checkAlertCondition = (alert, stock, portfolio, priceHistory, news) => {
 export const generateSmartAlerts = (portfolio, stocks, priceHistory) => {
     const smartAlerts = []
 
-    Object.entries(portfolio).forEach(([stockId, holding]) => {
+    Object.entries(portfolio).forEach(([stockId]) => {
         const stock = stocks.find(s => s.id === parseInt(stockId))
         if (!stock) return
-
-        const avgCost = holding.totalCost / holding.quantity
-
-        // 자동 익절선 (15%)
+// 자동 익절선 (15%)
         smartAlerts.push(createAlert({
             stockId: stock.id,
             type: 'PROFIT_TARGET',

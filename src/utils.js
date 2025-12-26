@@ -293,7 +293,7 @@ export const saveToLeaderboard = (score) => {
         const top10 = existing.slice(0, 10)
         localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(top10))
         return top10
-    } catch (error) {
+    } catch {
         return []
     }
 }

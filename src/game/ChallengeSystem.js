@@ -369,7 +369,7 @@ export class ChallengeManager {
      * 목표 달성 체크
      */
     checkGoal(goal, gameState, scenario) {
-        const { totalAssets, profit, winRate, sectorProfits, typeProfits, monthlyDividend, maxDrawdown } = gameState
+        const { totalAssets, profit, sectorProfits, typeProfits, monthlyDividend, maxDrawdown } = gameState
 
         switch (goal.type) {
             case 'profit':

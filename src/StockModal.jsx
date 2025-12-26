@@ -229,7 +229,7 @@ function aggregateTicksToCandles(ticks, ticksPerCandle, maxCandles = 60) {
     return candles
 }
 
-export default function StockModal({ stock, onClose, currentPrice, tradeHistory, history, onOpenOrder }) {
+export default function StockModal({ stock, onClose, currentPrice, onOpenOrder }) {
     const [category, setCategory] = useState('min')
     const [subOption, setSubOption] = useState(1)
     const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
@@ -239,6 +239,11 @@ export default function StockModal({ stock, onClose, currentPrice, tradeHistory,
     // 기본 틱 데이터 저장 (일관성 유지를 위해)
     const baseTickDataRef = useRef(null)
     const lastPriceRef = useRef(currentPrice)
+    const seedConfigRef = useRef({
+        currentPrice,
+        basePrice: stock.price,
+        volatility: stock.volatility || 2
+    })
 
     const timeframeKey = `${category}-${subOption}`
     const ticksPerCandle = TIMEFRAME_TICKS[timeframeKey] || 60
@@ -260,14 +265,22 @@ export default function StockModal({ stock, onClose, currentPrice, tradeHistory,
         }
     }, [])
 
+    useEffect(() => {
+        seedConfigRef.current = {
+            currentPrice,
+            basePrice: stock.price,
+            volatility: stock.volatility || 2
+        }
+    }, [currentPrice, stock.price, stock.volatility])
+
     // 기본 틱 데이터 초기화 (주식별로 한 번만)
     useEffect(() => {
-        const volatility = (stock.volatility || 2) / 100
+        const { currentPrice: seedPrice, basePrice, volatility } = seedConfigRef.current
         // 충분한 틱 데이터 생성 (약 3시간분 = 10800틱)
         const tickCount = 10800
-        const seed = stock.id * 1000 + stock.price // 주식별 고유 시드
-        baseTickDataRef.current = generateBaseTickData(currentPrice, tickCount, volatility * 0.01, seed)
-        lastPriceRef.current = currentPrice
+        const seed = stock.id * 1000 + basePrice // 주식별 고유 시드
+        baseTickDataRef.current = generateBaseTickData(seedPrice, tickCount, (volatility / 100) * 0.01, seed)
+        lastPriceRef.current = seedPrice
     }, [stock.id])
 
     // 가격 변동 시 틱 데이터 업데이트
@@ -294,13 +307,14 @@ export default function StockModal({ stock, onClose, currentPrice, tradeHistory,
     }, [currentPrice])
 
     // 현재 시간프레임에 맞는 캔들 데이터 계산
+    const tickVersion = baseTickDataRef.current?.length ?? 0
     const candleData = useMemo(() => {
-        if (!baseTickDataRef.current || baseTickDataRef.current.length === 0) {
+        if (!tickVersion) {
             return []
         }
 
         return aggregateTicksToCandles(baseTickDataRef.current, ticksPerCandle, 60)
-    }, [baseTickDataRef.current?.length, ticksPerCandle, currentPrice])
+    }, [tickVersion, ticksPerCandle])
 
     // 카테고리 변경
     const handleCategoryChange = (newCategory) => {

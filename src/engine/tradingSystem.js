@@ -181,7 +181,7 @@ export const processOrders = (orders, stocks, cash, portfolio, options = {}) => 
  */
 export const checkAchievements = (gameState, unlockedAchievements, achievements = ACHIEVEMENTS) => {
     const newUnlocks = []
-    const { totalTrades, totalProfit, totalAssets, portfolio, tradeHistory, winStreak } = gameState
+    const { totalTrades, totalProfit, totalAssets, portfolio, winStreak } = gameState
 
     if (!unlockedAchievements.firstTrade && totalTrades >= 1) newUnlocks.push('firstTrade')
     if (!unlockedAchievements.trader10 && totalTrades >= 10) newUnlocks.push('trader10')

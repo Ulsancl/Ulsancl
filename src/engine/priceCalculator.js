@@ -4,7 +4,6 @@
  */
 
 import { SECTORS, MACRO_CONFIG } from '../constants'
-import { randomRange, randomInt, generateId } from '../utils'
 
 // 상품 타입별 변동성 설정
 export const VOLATILITY_CONFIG = {
@@ -107,7 +106,7 @@ export const normalizePrice = (price, type = 'stock') => {
 export const calculatePriceChange = (
     stock,
     marketState = {},
-    gameDay = 0,
+    _gameDay = 0,
     activeNewsEffects = [],
     activeGlobalEvent = null
 ) => {

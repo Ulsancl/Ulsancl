@@ -78,13 +78,10 @@ export function PortfolioPieChart({ portfolio, stocks, cash, totalAssets }) {
 
     // 데이터 계산
     const data = []
-    let totalStockValue = 0
-
     Object.entries(portfolio).forEach(([stockId, holding]) => {
         const stock = stocks.find(s => s.id === parseInt(stockId))
         if (stock) {
             const value = stock.price * holding.quantity
-            totalStockValue += value
             data.push({
                 name: stock.name,
                 code: stock.code,

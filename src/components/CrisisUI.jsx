@@ -3,7 +3,7 @@
  * 활성 위기 상태 표시 및 위기 알림
  */
 import React, { memo, useEffect, useState } from 'react'
-import { CRISIS_TYPES, BOOM_EVENTS, getActiveCrisis } from '../game/CrisisEvents'
+import { CRISIS_TYPES, BOOM_EVENTS } from '../game/CrisisEvents'
 import './CrisisUI.css'
 
 /**
@@ -18,7 +18,7 @@ export const CrisisAlert = memo(function CrisisAlert({ crisis, onClose }) {
             const timer = setTimeout(() => setIsVisible(false), 10000)
             return () => clearTimeout(timer)
         }
-    }, [crisis?.id])
+    }, [crisis])
 
     if (!crisis || !isVisible) return null
 

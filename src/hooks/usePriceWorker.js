@@ -40,7 +40,7 @@ export function usePriceWorker() {
                 console.error('Price Worker Error:', error)
             }
         } catch (error) {
-            console.warn('Web Worker not supported, falling back to main thread')
+            console.warn('Web Worker not supported, falling back to main thread', error)
             setIsReady(false)
         }
 
@@ -116,7 +116,7 @@ export function usePriceWorker() {
  * (Worker 미지원 환경용)
  */
 export function usePriceCalculatorFallback() {
-    const calculatePrices = useCallback((stocks, marketState) => {
+    const calculatePrices = useCallback((stocks, _marketState) => {
         // 간단한 폴백 구현
         return stocks.map(stock => ({
             id: stock.id,

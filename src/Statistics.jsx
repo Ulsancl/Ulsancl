@@ -1,6 +1,6 @@
 // 고급 통계 컴포넌트
 import { useMemo } from 'react'
-import { formatNumber, formatPercent, formatCompact } from './utils'
+import { formatPercent, formatCompact } from './utils'
 import { INITIAL_CAPITAL } from './constants'
 import './Statistics.css'
 
@@ -93,16 +93,6 @@ export default function StatisticsPanel({ tradeHistory, assetHistory, totalAsset
             losses: losses.length,
         }
     }, [tradeHistory, assetHistory, totalAssets])
-
-    const formatValue = (value, format) => {
-        switch (format) {
-            case 'percent': return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
-            case 'currency': return formatCompact(value)
-            case 'ratio': return value === Infinity ? '∞' : value.toFixed(2)
-            case 'time': return `${Math.round(value)}초`
-            default: return formatNumber(value)
-        }
-    }
 
     return (
         <div className="statistics-overlay" onClick={onClose}>

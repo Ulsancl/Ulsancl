@@ -1,7 +1,6 @@
 
 import React from 'react'
 import { SKILLS } from './constants'
-import { formatNumber } from './utils'
 import './SkillsPanel.css'
 
 export default function SkillsPanel({ unlockedSkills = {}, skillPoints = 0, onUpgradeSkill, onClose }) {
