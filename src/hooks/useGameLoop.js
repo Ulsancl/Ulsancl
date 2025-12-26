@@ -87,6 +87,10 @@ export const useGameLoop = ({
     const unlockedSkillsRef = useRef(unlockedSkills)
     const gameStartTimeRef = useRef(gameStartTime)
     const marginCallActiveRef = useRef(marginCallActive)
+    const gameTimeRef = useRef(null)
+    const showNotificationRef = useRef(showNotification)
+    const playSoundRef = useRef(playSound)
+    const formatNumberRef = useRef(formatNumber)
 
     useLayoutEffect(() => {
         stocksRef.current = stocks
@@ -101,6 +105,9 @@ export const useGameLoop = ({
         unlockedSkillsRef.current = unlockedSkills
         gameStartTimeRef.current = gameStartTime
         marginCallActiveRef.current = marginCallActive
+        showNotificationRef.current = showNotification
+        playSoundRef.current = playSound
+        formatNumberRef.current = formatNumber
     }, [
         alerts,
         cash,
@@ -111,7 +118,10 @@ export const useGameLoop = ({
         marketState,
         pendingOrders,
         portfolio,
+        showNotification,
         shortPositions,
+        formatNumber,
+        playSound,
         stocks,
         unlockedSkills
     ])
@@ -131,10 +141,25 @@ export const useGameLoop = ({
             const currentUnlockedSkills = unlockedSkillsRef.current
             const currentGameStartTime = gameStartTimeRef.current
             const currentMarginCallActive = marginCallActiveRef.current
+            const formatNumberCurrent = formatNumberRef.current
+            const showNotificationCurrent = showNotificationRef.current
+            const playSoundCurrent = playSoundRef.current
+            let nextMarginCallActive = currentMarginCallActive
 
             // 게임 시간 업데이트
             const newGameTime = calculateGameDate(currentGameStartTime, now)
-            setGameTime(newGameTime)
+            if (!gameTimeRef.current
+                || gameTimeRef.current.day !== newGameTime.day
+                || gameTimeRef.current.hour !== newGameTime.hour
+                || gameTimeRef.current.minute !== newGameTime.minute
+                || gameTimeRef.current.season !== newGameTime.season
+                || gameTimeRef.current.isMarketOpen !== newGameTime.isMarketOpen
+                || gameTimeRef.current.isMarketClosing !== newGameTime.isMarketClosing
+                || gameTimeRef.current.displayDate !== newGameTime.displayDate
+                || gameTimeRef.current.displayTime !== newGameTime.displayTime) {
+                gameTimeRef.current = newGameTime
+                setGameTime(newGameTime)
+            }
             const gameDay = newGameTime.day
 
             let workingStocks = currentStocks
@@ -189,12 +214,12 @@ export const useGameLoop = ({
                     const dailyInterest = Math.floor(workingCreditUsed * CREDIT_TRADING.dailyInterestRate)
                     workingCreditInterest += dailyInterest
                     if (dailyInterest > 0) {
-                        showNotification(`💳 신용 이자 ${formatNumber(dailyInterest)}원 발생`, 'warning')
+                        showNotificationCurrent(`💳 신용 이자 ${formatNumberCurrent(dailyInterest)}원 발생`, 'warning')
                     }
                 }
 
-                showNotification(`📅 ${newGameTime.displayDate} 거래일 시작!`, 'info')
-                playSound('news')
+                showNotificationCurrent(`📅 ${newGameTime.displayDate} 거래일 시작!`, 'info')
+                playSoundCurrent('news')
             }
 
             workingStocks.forEach(stock => {
@@ -209,8 +234,8 @@ export const useGameLoop = ({
                 const currentMarginRatio = grossAssetsNow / workingCreditUsed
                 if (currentMarginRatio <= CREDIT_TRADING.liquidationMargin) {
                     // 강제 청산
-                    showNotification('⚠️ 마진콜! 담보 부족으로 포지션 강제 청산됩니다!', 'error')
-                    setMarginCallActive(true)
+                    showNotificationCurrent('⚠️ 마진콜! 담보 부족으로 포지션 강제 청산됩니다!', 'error')
+                    nextMarginCallActive = true
                     // 모든 주식 매도
                     Object.keys(workingPortfolio).forEach(stockId => {
                         const holding = workingPortfolio[stockId]
@@ -231,21 +256,21 @@ export const useGameLoop = ({
                         workingCash -= repayable
                     }
                 } else if (currentMarginRatio <= CREDIT_TRADING.maintenanceMargin && !currentMarginCallActive) {
-                    showNotification('⚠️ 마진콜 경고! 담보 비율이 30% 이하입니다. 추가 입금 또는 포지션 정리를 권장합니다.', 'warning')
-                    setMarginCallActive(true)
+                    showNotificationCurrent('⚠️ 마진콜 경고! 담보 비율이 30% 이하입니다. 추가 입금 또는 포지션 정리를 권장합니다.', 'warning')
+                    nextMarginCallActive = true
                 } else if (currentMarginRatio > CREDIT_TRADING.maintenanceMargin) {
-                    setMarginCallActive(false)
+                    nextMarginCallActive = false
                 }
             } else if (currentMarginCallActive) {
-                setMarginCallActive(false)
+                nextMarginCallActive = false
             }
 
             // 뉴스 생성 (3% 확률)
             const newNews = generateNews(workingStocks, 0.03)
             if (newNews) {
                 setNews(prev => [newNews, ...prev].slice(0, 50))
-                showNotification(`📰 ${newNews.text}`, newNews.type === 'positive' ? 'success' : newNews.type === 'negative' ? 'error' : 'info')
-                playSound('news')
+                showNotificationCurrent(`📰 ${newNews.text}`, newNews.type === 'positive' ? 'success' : newNews.type === 'negative' ? 'error' : 'info')
+                playSoundCurrent('news')
 
                 const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(workingStocks, newNews, workingMarketState)
                 workingStocks = impactedStocks
@@ -257,8 +282,8 @@ export const useGameLoop = ({
             if (globalEvent) {
                 setNews(prev => [globalEvent, ...prev].slice(0, 50))
                 const notifType = globalEvent.type === 'positive' ? 'success' : globalEvent.type === 'negative' ? 'error' : 'info'
-                showNotification(`${globalEvent.icon} 속보: ${globalEvent.text}`, notifType)
-                playSound('news')
+                showNotificationCurrent(`${globalEvent.icon} 속보: ${globalEvent.text}`, notifType)
+                playSoundCurrent('news')
 
                 // 글로벌 이벤트는 전체 시장에 영향
                 const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(workingStocks, globalEvent, workingMarketState)
@@ -271,8 +296,8 @@ export const useGameLoop = ({
             if (seasonalEvent) {
                 setNews(prev => [seasonalEvent, ...prev].slice(0, 50))
                 const notifType = seasonalEvent.type === 'positive' ? 'success' : 'error'
-                showNotification(`${seasonalEvent.icon} 계절 뉴스: ${seasonalEvent.text}`, notifType)
-                playSound('news')
+                showNotificationCurrent(`${seasonalEvent.icon} 계절 뉴스: ${seasonalEvent.text}`, notifType)
+                playSoundCurrent('news')
 
                 const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(workingStocks, seasonalEvent, workingMarketState)
                 workingStocks = impactedStocks
@@ -283,7 +308,7 @@ export const useGameLoop = ({
             if (newGameTime.isYearEnd && lastSeasonYearRef.current < newGameTime.year) {
                 lastSeasonYearRef.current = newGameTime.year
                 setShowSeasonEnd(true)
-                playSound('levelUp')
+                playSoundCurrent('levelUp')
             }
 
             // 마켓 이벤트 체크
@@ -295,7 +320,7 @@ export const useGameLoop = ({
                 workingCash = eventCash
                 workingPortfolio = eventPortfolio
                 if (message) {
-                    showNotification(`${event.icon} ${message}`, 'info')
+                    showNotificationCurrent(`${event.icon} ${message}`, 'info')
                 }
             }
 
@@ -311,15 +336,15 @@ export const useGameLoop = ({
                     setCrisisHistory(prev => [...prev, { ...crisis, startDay: gameDay }])
 
                     const isPositive = crisis.baseImpact && crisis.baseImpact[0] > 0
-                    showNotification(
+                    showNotificationCurrent(
                         `${crisis.icon} ${isPositive ? '호재' : '위기'} 발생: ${crisis.name}`,
                         isPositive ? 'success' : 'error'
                     )
-                    playSound('news')
+                    playSoundCurrent('news')
                 } else if (type === 'crisis_ended') {
                     // 위기 종료
                     setActiveCrisis(null)
-                    showNotification(`✅ ${crisis.name} 종료, 시장 정상화`, 'info')
+                    showNotificationCurrent(`✅ ${crisis.name} 종료, 시장 정상화`, 'info')
                 } else if (type === 'crisis_update') {
                     // 위기 진행 업데이트
                     setActiveCrisis(crisisResult.activeCrisis)
@@ -392,8 +417,8 @@ export const useGameLoop = ({
                     let profitDelta = 0
 
                     executedOrders.forEach(order => {
-                        showNotification(`🔔 ${order.stockName} ${order.type} 주문 체결!`, 'success')
-                        playSound(order.side === 'buy' ? 'buy' : 'sell')
+                        showNotificationCurrent(`🔔 ${order.stockName} ${order.type} 주문 체결!`, 'success')
+                        playSoundCurrent(order.side === 'buy' ? 'buy' : 'sell')
                         setTradeHistory(prev => [...prev, { ...order, type: order.side, id: generateId(), timestamp: now }])
                         if (order.side === 'sell' && typeof order.profit === 'number') {
                             profitDelta += order.profit
@@ -444,8 +469,8 @@ export const useGameLoop = ({
                 if (liquidated.length > 0) {
                     liquidated.forEach(({ position, stock, pnl }) => {
                         newCash += position.entryPrice * position.quantity + pnl
-                        showNotification(`⚠️ ${stock.name} 공매도 강제청산!`, 'error')
-                        playSound('error')
+                        showNotificationCurrent(`⚠️ ${stock.name} 공매도 강제청산!`, 'error')
+                        playSoundCurrent('error')
                     })
                     workingShortPositions = updatedShorts
                 }
@@ -458,8 +483,8 @@ export const useGameLoop = ({
             if (triggeredAlerts.length > 0) {
                 const triggeredIds = new Set(triggeredAlerts.map(alert => alert.id))
                 triggeredAlerts.forEach(alert => {
-                    showNotification(`Alert: ${alert.stockName}`, 'info')
-                    playSound('news')
+                    showNotificationCurrent(`Alert: ${alert.stockName}`, 'info')
+                    playSoundCurrent('news')
                 })
                 workingAlerts = workingAlerts.map(a => triggeredIds.has(a.id) ? { ...a, triggered: true } : a)
             }
@@ -477,7 +502,7 @@ export const useGameLoop = ({
                 if (dividendTotal > 0) {
                     workingCash += dividendTotal
                     setTotalDividends(prev => prev + dividendTotal)
-                    showNotification(`💰 배당금 ${formatNumber(dividendTotal)}원`, 'success')
+                    showNotificationCurrent(`💰 배당금 ${formatNumberCurrent(dividendTotal)}원`, 'success')
                 }
                 lastDividendTimeRef.current = now
             }
@@ -493,8 +518,9 @@ export const useGameLoop = ({
 
             // console.timeEnd('gameLoop:tick')
 
-            setStocks(workingStocks)
-            setMarketState(workingMarketState)
+            if (workingStocks !== currentStocks) setStocks(workingStocks)
+            if (workingMarketState !== currentMarketState) setMarketState(workingMarketState)
+            if (nextMarginCallActive !== currentMarginCallActive) setMarginCallActive(nextMarginCallActive)
             if (workingCash !== currentCash) setCash(workingCash)
             if (workingPortfolio !== currentPortfolio) setPortfolio(workingPortfolio)
             if (workingPendingOrders !== currentPendingOrders) setPendingOrders(workingPendingOrders)
@@ -510,7 +536,7 @@ export const useGameLoop = ({
                 clearTimeout(priceResetTimeoutRef.current)
             }
         }
-    }, [formatNumber, playSound, showNotification, updateInterval])
+    }, [updateInterval])
 }
 
 export default useGameLoop
