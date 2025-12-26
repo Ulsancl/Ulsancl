@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { formatNumber } from './utils'
+import { formatNumber } from '../utils'
 import './OrderBook.css'
 
 // 호가 틱 사이즈 계산

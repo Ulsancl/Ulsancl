@@ -1,5 +1,5 @@
 // 뉴스 피드 컴포넌트
-import { formatTime } from './utils'
+import { formatTime } from '../utils'
 import './NewsFeed.css'
 
 export default function NewsFeed({ news, onNewsClick }) {

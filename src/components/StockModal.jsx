@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import OrderBook from './OrderBook'
-import { formatNumber, formatPercent, formatCompact } from './utils'
-import TechnicalChart from './components/TechnicalChart'
+import { formatNumber, formatPercent, formatCompact } from '../utils'
+import TechnicalChart from './TechnicalChart'
 import './StockModal.css'
 
 // 순수 SVG 캔들스틱 차트 컴포넌트
@@ -234,16 +234,15 @@ export default function StockModal({ stock, onClose, currentPrice, onOpenOrder }
     const [subOption, setSubOption] = useState(1)
     const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
     const [chartMode, setChartMode] = useState('candle') // 'candle' | 'technical'
+    const [tickVersion, setTickVersion] = useState(0)
     const chartContainerRef = useRef(null)
 
     // 기본 틱 데이터 저장 (일관성 유지를 위해)
     const baseTickDataRef = useRef(null)
     const lastPriceRef = useRef(currentPrice)
-    const seedConfigRef = useRef({
-        currentPrice,
-        basePrice: stock.price,
-        volatility: stock.volatility || 2
-    })
+    const currentPriceRef = useRef(currentPrice)
+    const stockPriceRef = useRef(stock.price)
+    const volatilityRef = useRef(stock.volatility)
 
     const timeframeKey = `${category}-${subOption}`
     const ticksPerCandle = TIMEFRAME_TICKS[timeframeKey] || 60
@@ -265,22 +264,26 @@ export default function StockModal({ stock, onClose, currentPrice, onOpenOrder }
         }
     }, [])
 
-    useEffect(() => {
-        seedConfigRef.current = {
-            currentPrice,
-            basePrice: stock.price,
-            volatility: stock.volatility || 2
-        }
-    }, [currentPrice, stock.price, stock.volatility])
-
     // 기본 틱 데이터 초기화 (주식별로 한 번만)
     useEffect(() => {
-        const { currentPrice: seedPrice, basePrice, volatility } = seedConfigRef.current
+        currentPriceRef.current = currentPrice
+    }, [currentPrice])
+
+    useEffect(() => {
+        stockPriceRef.current = stock.price
+        volatilityRef.current = stock.volatility
+    }, [stock.price, stock.volatility])
+
+    useEffect(() => {
         // 충분한 틱 데이터 생성 (약 3시간분 = 10800틱)
         const tickCount = 10800
+        const basePrice = stockPriceRef.current ?? 0
+        const baseVolatility = volatilityRef.current ?? 2
         const seed = stock.id * 1000 + basePrice // 주식별 고유 시드
-        baseTickDataRef.current = generateBaseTickData(seedPrice, tickCount, (volatility / 100) * 0.01, seed)
-        lastPriceRef.current = seedPrice
+        const initialPrice = currentPriceRef.current ?? 0
+        baseTickDataRef.current = generateBaseTickData(initialPrice, tickCount, baseVolatility * 0.01, seed)
+        lastPriceRef.current = initialPrice
+        setTickVersion(prev => prev + 1)
     }, [stock.id])
 
     // 가격 변동 시 틱 데이터 업데이트
@@ -304,12 +307,13 @@ export default function StockModal({ stock, onClose, currentPrice, onOpenOrder }
         }
 
         lastPriceRef.current = currentPrice
+        setTickVersion(prev => prev + 1)
     }, [currentPrice])
 
     // 현재 시간프레임에 맞는 캔들 데이터 계산
-    const tickVersion = baseTickDataRef.current?.length ?? 0
     const candleData = useMemo(() => {
-        if (!tickVersion) {
+        void tickVersion
+        if (!baseTickDataRef.current || baseTickDataRef.current.length === 0) {
             return []
         }
 

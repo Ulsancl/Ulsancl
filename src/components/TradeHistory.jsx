@@ -1,7 +1,12 @@
 // 거래 내역 컴포넌트
-import { formatNumber, formatCompact, formatDate } from './utils'
+/** @typedef {import('../types').Trade} Trade */
+/** @typedef {import('../types').Stock} Stock */
+import { formatNumber, formatCompact, formatDate } from '../utils'
 import './TradeHistory.css'
 
+/**
+ * @param {{ trades: Trade[], stocks: Stock[], onClose: () => void }} props
+ */
 export default function TradeHistory({ trades, stocks, onClose }) {
     if (!trades || trades.length === 0) {
         return (

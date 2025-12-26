@@ -1,6 +1,6 @@
 
 import React from 'react'
-import { MACRO_CONFIG } from './constants'
+import { MACRO_CONFIG } from '../constants'
 import './MacroIndicators.css'
 
 export default function MacroIndicators({ macro }) {

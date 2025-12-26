@@ -20,11 +20,11 @@ import {
     updatePricesWithCrisis,
     getActiveCrisis,
     updateNewsEffects,
-    getActiveGlobalEvent
+    getActiveGlobalEvent,
+    checkAlerts
 } from '../engine'
 import { CREDIT_TRADING, DIVIDEND_RATES, SHORT_SELLING } from '../constants'
-import { generateId } from '../utils'
-import { checkAlerts } from '../AlertManager'
+import { generateId, calculateStockValueFromMap, calculateShortValueFromMap } from '../utils/index.js'
 
 export const useGameLoop = ({
     stocks,
@@ -178,26 +178,6 @@ export const useGameLoop = ({
             // 성능 측정 (개발용): 필요 시 아래 console.time을 주석 해제해서 tick 비용을 측정하세요.
             // console.time('gameLoop:tick')
 
-            const calcStockValue = (map, holdings) => {
-                if (!holdings) return 0
-                return Object.entries(holdings).reduce((total, [stockId, holding]) => {
-                    const stock = map.get(parseInt(stockId))
-                    if (!stock) return total
-                    const val = stock.price * holding.quantity
-                    return total + (isNaN(val) ? 0 : val)
-                }, 0)
-            }
-
-            const calcShortValue = (map, shorts) => {
-                if (!shorts) return 0
-                return Object.entries(shorts).reduce((total, [stockId, position]) => {
-                    const stock = map.get(parseInt(stockId))
-                    if (!stock) return total
-                    const pnl = (position.entryPrice - stock.price) * position.quantity
-                    return total + (isNaN(pnl) ? 0 : pnl)
-                }, 0)
-            }
-
             const shouldProfile = import.meta.env.DEV && now - lastProfileRef.current > 10000
             let stockMap
             let mapBuildDuration = 0
@@ -231,8 +211,8 @@ export const useGameLoop = ({
 
             // 마진콜 체크 (담보비율 30% 이하 경고, 20% 이하 강제청산)
             if (workingCreditUsed > 0) {
-                const stockValueNow = calcStockValue(stockMap, workingPortfolio)
-                const shortValueNow = calcShortValue(stockMap, workingShortPositions)
+                const stockValueNow = calculateStockValueFromMap(stockMap, workingPortfolio)
+                const shortValueNow = calculateShortValueFromMap(stockMap, workingShortPositions)
                 const grossAssetsNow = workingCash + stockValueNow + shortValueNow
                 const currentMarginRatio = grossAssetsNow / workingCreditUsed
                 if (currentMarginRatio <= CREDIT_TRADING.liquidationMargin) {
@@ -508,8 +488,8 @@ export const useGameLoop = ({
             }
 
             const assetCalcStart = shouldProfile ? performance.now() : 0
-            const stockValueNow = calcStockValue(stockMap, workingPortfolio)
-            const shortValueNow = calcShortValue(stockMap, workingShortPositions)
+            const stockValueNow = calculateStockValueFromMap(stockMap, workingPortfolio)
+            const shortValueNow = calculateShortValueFromMap(stockMap, workingShortPositions)
             const grossAssetsNow = workingCash + stockValueNow + shortValueNow
             const totalAssetsNow = grossAssetsNow - workingCreditUsed - workingCreditInterest
             if (shouldProfile) {

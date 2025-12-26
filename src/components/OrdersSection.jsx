@@ -1,5 +1,5 @@
 import React, { memo } from 'react'
-import { PendingOrders } from '../OrderManager'
+import { PendingOrders } from './OrderManager'
 
 const OrdersSection = memo(function OrdersSection({
   pendingOrders,

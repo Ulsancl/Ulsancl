@@ -18,7 +18,6 @@ export { useAppModalState } from './useAppModalState'
 export { useGameCalculations } from './useGameCalculations'
 
 // 성능 최적화
-export { useDebounce, useDebouncedCallback, useThrottle, useThrottledValue } from './useDebounce'
 export {
     useDebouncedValue,
     useThrottle as useThrottleCallback,
@@ -35,9 +34,5 @@ export {
 // 스토리지
 export { useLocalStorage, useSessionStorage } from './useStorage'
 
-// 성능 모니터링 (개발용)
-export { useRenderCount, useWhyDidYouUpdate, useMeasure, useMemoryUsage } from './usePerformance'
-
 // 게임 루프 및 Web Worker
 export { useGameLoop } from './useGameLoop'
-export { usePriceWorker, usePriceCalculatorFallback } from './usePriceWorker'

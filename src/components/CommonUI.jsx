@@ -4,6 +4,7 @@
  */
 
 import React from 'react'
+import { formatCompact, formatNumber } from '../utils'
 import './CommonUI.css'
 
 // 로딩 스피너
@@ -98,12 +99,14 @@ export const Tooltip = ({ children, text, position = 'top' }) => (
 )
 
 // 금액 표시 (색상 자동)
-export const Amount = ({ value, showSign = true }) => {
+export const Amount = ({ value, format = 'compact', showSign = true }) => {
     const isPositive = value >= 0
     const sign = showSign ? (isPositive ? '+' : '') : ''
 
-    // 간단한 포맷팅 (실제로는 utils.js의 함수 사용 권장)
-    const formatted = Math.abs(value).toLocaleString('ko-KR')
+    const absValue = Math.abs(value)
+    const formatted = format === 'compact'
+        ? formatCompact(absValue)
+        : formatNumber(absValue)
 
     return (
         <span className={`amount ${isPositive ? 'positive' : 'negative'}`}>

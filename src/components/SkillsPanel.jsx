@@ -1,6 +1,6 @@
 
 import React from 'react'
-import { SKILLS } from './constants'
+import { SKILLS } from '../constants'
 import './SkillsPanel.css'
 
 export default function SkillsPanel({ unlockedSkills = {}, skillPoints = 0, onUpgradeSkill, onClose }) {

@@ -1,6 +1,6 @@
 // 히트맵 컴포넌트 - 전체 종목 시각화
-import { formatNumber, formatPercent } from './utils'
-import { SECTORS } from './constants'
+import { formatNumber, formatPercent } from '../utils'
+import { SECTORS } from '../constants'
 import './Heatmap.css'
 
 export default function Heatmap({ stocks, portfolio, onStockClick }) {
@@ -17,12 +17,14 @@ export default function Heatmap({ stocks, portfolio, onStockClick }) {
     }
 
     // 섹터별 그룹화
+    const unknownSectorKey = 'misc'
     const stocksBySector = {}
     stocks.forEach(stock => {
-        if (!stocksBySector[stock.sector]) {
-            stocksBySector[stock.sector] = []
+        const sectorKey = stock.sector || unknownSectorKey
+        if (!stocksBySector[sectorKey]) {
+            stocksBySector[sectorKey] = []
         }
-        stocksBySector[stock.sector].push(stock)
+        stocksBySector[sectorKey].push(stock)
     })
 
     return (
@@ -39,32 +41,38 @@ export default function Heatmap({ stocks, portfolio, onStockClick }) {
             </div>
 
             <div className="heatmap-grid">
-                {Object.entries(stocksBySector).map(([sector, sectorStocks]) => (
-                    <div key={sector} className="sector-group">
-                        <div className="sector-label" style={{ borderColor: SECTORS[sector]?.color }}>
-                            {SECTORS[sector]?.name || sector}
+                {Object.entries(stocksBySector).map(([sector, sectorStocks]) => {
+                    const sectorInfo = SECTORS[sector]
+                    const sectorName = sectorInfo?.name || (sector === unknownSectorKey ? '기타' : sector)
+                    const sectorColor = sectorInfo?.color || '#6b7280'
+
+                    return (
+                        <div key={sector} className="sector-group">
+                            <div className="sector-label" style={{ borderColor: sectorColor }}>
+                                {sectorName}
+                            </div>
+                            <div className="sector-stocks">
+                                {sectorStocks.map(stock => {
+                                    const changeRate = ((stock.price - stock.basePrice) / stock.basePrice) * 100
+                                    const isHeld = portfolio?.[stock.id]
+                                    return (
+                                        <div
+                                            key={stock.id}
+                                            className={`heatmap-cell ${isHeld ? 'held' : ''}`}
+                                            style={{ background: getColor(changeRate) }}
+                                            onClick={() => onStockClick?.(stock)}
+                                            title={`${stock.name}: ${formatNumber(stock.price)}원 (${formatPercent(changeRate)})`}
+                                        >
+                                            <span className="cell-code">{stock.code}</span>
+                                            <span className="cell-change">{changeRate >= 0 ? '+' : ''}{changeRate.toFixed(1)}%</span>
+                                            {isHeld && <span className="held-badge">보유</span>}
+                                        </div>
+                                    )
+                                })}
+                            </div>
                         </div>
-                        <div className="sector-stocks">
-                            {sectorStocks.map(stock => {
-                                const changeRate = ((stock.price - stock.basePrice) / stock.basePrice) * 100
-                                const isHeld = portfolio?.[stock.id]
-                                return (
-                                    <div
-                                        key={stock.id}
-                                        className={`heatmap-cell ${isHeld ? 'held' : ''}`}
-                                        style={{ background: getColor(changeRate) }}
-                                        onClick={() => onStockClick?.(stock)}
-                                        title={`${stock.name}: ${formatNumber(stock.price)}원 (${formatPercent(changeRate)})`}
-                                    >
-                                        <span className="cell-code">{stock.code}</span>
-                                        <span className="cell-change">{changeRate >= 0 ? '+' : ''}{changeRate.toFixed(1)}%</span>
-                                        {isHeld && <span className="held-badge">보유</span>}
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                ))}
+                    )
+                })}
             </div>
         </div>
     )

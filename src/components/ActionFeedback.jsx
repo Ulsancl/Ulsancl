@@ -9,8 +9,15 @@ const FeedbackItem = ({ item, onRemove }) => {
         return () => clearTimeout(timer)
     }, [item, onRemove])
 
-    // Randomize slight x position for natural feel
-    const randomX = React.useMemo(() => Math.random() * 40 - 20, [])
+    // Deterministic offset based on id to keep renders pure
+    const randomX = React.useMemo(() => {
+        const seed = String(item.id ?? '')
+        let hash = 0
+        for (let i = 0; i < seed.length; i++) {
+            hash = (hash * 31 + seed.charCodeAt(i)) | 0
+        }
+        return (Math.abs(hash) % 41) - 20
+    }, [item.id])
 
     return (
         <div

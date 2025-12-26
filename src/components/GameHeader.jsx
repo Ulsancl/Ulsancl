@@ -3,7 +3,7 @@
  * 로고, 게임 시간, 메뉴 버튼들을 포함
  */
 import React, { memo } from 'react'
-import { LevelBadge } from '../Achievements'
+import { LevelBadge } from './Achievements'
 
 const GameHeader = memo(function GameHeader({
     gameTime,

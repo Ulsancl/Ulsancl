@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+Ulsancl-*-dist.zip
+Ulsancl-*-dist.zip.sha256
 
 # Editor directories and files
 .vscode/*

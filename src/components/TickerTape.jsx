@@ -1,6 +1,6 @@
 import React from 'react'
 import './TickerTape.css'
-import { formatNumber, formatPercent } from './utils'
+import { formatNumber, formatPercent } from '../utils'
 
 const TickerTape = ({ news, stocks }) => {
     // 최신 뉴스 5개와 시가총액 상위 10개 종목을 섞어서 표시

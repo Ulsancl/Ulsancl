@@ -1,5 +1,5 @@
 // 워치리스트 컴포넌트
-import { formatNumber, formatPercent } from './utils'
+import { formatNumber, formatPercent } from '../utils'
 import './Watchlist.css'
 
 export default function Watchlist({

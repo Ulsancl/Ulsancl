@@ -1,5 +1,5 @@
 // 리더보드 컴포넌트
-import { formatCompact, formatPercent, getLeaderboard, saveToLeaderboard } from './utils'
+import { formatCompact, formatPercent, getLeaderboard, saveToLeaderboard } from '../utils'
 import './Leaderboard.css'
 
 export default function Leaderboard({ currentScore, playerName, onClose, onSaveScore }) {

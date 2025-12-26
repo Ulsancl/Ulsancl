@@ -63,3 +63,7 @@ export {
     checkAndGenerateCrisis,
     calculateCrisisImpact
 } from './crisisSystem'
+
+export {
+    checkAlerts
+} from './alerts'

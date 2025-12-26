@@ -52,7 +52,7 @@ class ErrorBoundary extends Component {
                             아래 버튼을 눌러 다시 시도해 주세요.
                         </p>
 
-                        {process.env.NODE_ENV === 'development' && (
+                        {import.meta.env.DEV && (
                             <details style={styles.details}>
                                 <summary style={styles.summary}>오류 상세 정보</summary>
                                 <pre style={styles.errorText}>

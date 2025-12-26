@@ -1,18 +1,18 @@
 import React from 'react'
 import ErrorBoundary from './ErrorBoundary'
-import StockChartModal from '../StockModal'
-import { AchievementPopup, AchievementsPanel } from '../Achievements'
-import TradeHistory from '../TradeHistory'
-import OrderManager from '../OrderManager'
-import MissionsPanel from '../Missions'
-import Leaderboard from '../Leaderboard'
-import SettingsPanel from '../Settings'
-import AssetChart from '../AssetChart'
-import Watchlist from '../Watchlist'
-import StatisticsPanel from '../Statistics'
-import AlertManager from '../AlertManager'
-import SeasonEndModal from '../SeasonEnd'
-import SkillsPanel from '../SkillsPanel'
+import StockChartModal from './StockModal'
+import { AchievementPopup, AchievementsPanel } from './Achievements'
+import TradeHistory from './TradeHistory'
+import OrderManager from './OrderManager'
+import MissionsPanel from './Missions'
+import Leaderboard from './Leaderboard'
+import SettingsPanel from './Settings'
+import AssetChart from './AssetChart'
+import Watchlist from './Watchlist'
+import StatisticsPanel from './Statistics'
+import AlertManager from './AlertManager'
+import SeasonEndModal from './SeasonEnd'
+import SkillsPanel from './SkillsPanel'
 
 const AppModalsContainer = ({
   achievementPopup,
@@ -76,7 +76,6 @@ const AppModalsContainer = ({
   onStartNewSeason,
   onCloseSeasonEnd,
   chartStock,
-  priceHistory,
   stocksById,
   onCloseChartStock,
   onOpenOrder
@@ -206,8 +205,6 @@ const AppModalsContainer = ({
           stock={chartStock}
           onClose={onCloseChartStock}
           currentPrice={stocksById.get(chartStock.id)?.price || chartStock.price}
-          tradeHistory={tradeHistory}
-          history={priceHistory[chartStock.id] || []}
           onOpenOrder={onOpenOrder}
         />
       </ErrorBoundary>

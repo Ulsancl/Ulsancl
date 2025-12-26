@@ -1,5 +1,5 @@
 import React, { memo } from 'react'
-import NewsFeed from '../NewsFeed'
+import NewsFeed from './NewsFeed'
 
 const NewsSection = memo(function NewsSection({ news, onNewsClick }) {
   return (
