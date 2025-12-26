@@ -39,13 +39,13 @@ test.describe('앱 기본 기능', () => {
     test('탭 전환이 작동함', async ({ page }) => {
         // 튜토리얼 스킵
 
-        const tabButtons = page.locator('.tab-btn');
+        const tabButtons = page.locator('[data-testid="tab-btn"]');
         const clickTab = async (index, label) => {
             const tab = tabButtons.nth(index);
             await tab.scrollIntoViewIfNeeded();
             await tab.click({ force: true });
             await page.evaluate((i) => {
-                const btn = document.querySelectorAll('.tab-btn')[i];
+                const btn = document.querySelectorAll('[data-testid="tab-btn"]')[i];
                 btn?.click();
             }, index);
             await page.waitForFunction(
