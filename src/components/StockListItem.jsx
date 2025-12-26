@@ -31,9 +31,8 @@ const StockListItem = memo(function StockListItem({
     const shortQty = shortPosition?.quantity || 0
     const shortPnl = shortPosition ? (shortPosition.entryPrice - stock.price) * shortPosition.quantity : 0
 
-    const dailyOpen = stock.dailyOpen || stock.basePrice
-    const dailyChangeRate = dailyOpen > 0 ? ((stock.price - dailyOpen) / dailyOpen) * 100 : 0
-    const isUp = stock.price >= dailyOpen
+    const dailyChangeRate = stock.dailyOpen ? ((stock.price - stock.dailyOpen) / stock.dailyOpen) * 100 : 0
+    const isUp = dailyChangeRate >= 0
 
     const handleBuy = useCallback(() => {
         onBuy(stock, estimatedQty)
