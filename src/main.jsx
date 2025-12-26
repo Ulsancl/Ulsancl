@@ -5,6 +5,9 @@ import App from './App.jsx'
 import { AppProviders } from './context'
 
 console.log('App starting...');
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => { })
+}
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AppProviders>
