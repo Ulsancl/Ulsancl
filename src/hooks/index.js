@@ -14,6 +14,8 @@ export { useToast } from './useToast'
 export { useFeedback } from './useFeedback'
 export { useModals, MODAL_TYPES } from './useModals'
 export { useUiState } from './useUiState'
+export { useAppModalState } from './useAppModalState'
+export { useGameCalculations } from './useGameCalculations'
 
 // 성능 최적화
 export { useDebounce, useDebouncedCallback, useThrottle, useThrottledValue } from './useDebounce'

@@ -17,6 +17,11 @@ export { default as StockListItem } from './StockListItem'
 export { default as TabSection } from './TabSection'
 export { default as ViewSection } from './ViewSection'
 export { default as TradeModeSection } from './TradeModeSection'
+export { default as MarketSection } from './MarketSection'
+export { default as NewsSection } from './NewsSection'
+export { default as OrdersSection } from './OrdersSection'
+export { default as AppModalsContainer } from './AppModalsContainer'
+export { default as ErrorBoundary } from './ErrorBoundary'
 
 // Phase 3에서 추가된 성능 최적화 컴포넌트 (자체 구현)
 export { default as VirtualizedStockList } from './VirtualizedStockList'
