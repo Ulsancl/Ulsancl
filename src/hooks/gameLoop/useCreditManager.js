@@ -1,0 +1,182 @@
+/**
+ * useCreditManager - 신용 거래 및 마진콜 관리 훅
+ * useGameLoop에서 분리된 모듈
+ */
+
+import { useCallback, useRef, useLayoutEffect } from 'react'
+import { CREDIT_TRADING, SHORT_SELLING } from '../../constants'
+import { calculateStockValueFromMap, calculateShortValueFromMap } from '../../utils/index.js'
+
+export const useCreditManager = ({
+    cash,
+    setCash,
+    portfolio,
+    setPortfolio,
+    creditUsed,
+    setCreditUsed,
+    creditInterest,
+    setCreditInterest,
+    marginCallActive,
+    setMarginCallActive,
+    shortPositions,
+    setShortPositions,
+    showNotification,
+    playSound,
+    formatNumber
+}) => {
+    const cashRef = useRef(cash)
+    const portfolioRef = useRef(portfolio)
+    const creditUsedRef = useRef(creditUsed)
+    const creditInterestRef = useRef(creditInterest)
+    const marginCallActiveRef = useRef(marginCallActive)
+    const shortPositionsRef = useRef(shortPositions)
+    const showNotificationRef = useRef(showNotification)
+    const playSoundRef = useRef(playSound)
+    const formatNumberRef = useRef(formatNumber)
+
+    useLayoutEffect(() => {
+        cashRef.current = cash
+        portfolioRef.current = portfolio
+        creditUsedRef.current = creditUsed
+        creditInterestRef.current = creditInterest
+        marginCallActiveRef.current = marginCallActive
+        shortPositionsRef.current = shortPositions
+        showNotificationRef.current = showNotification
+        playSoundRef.current = playSound
+        formatNumberRef.current = formatNumber
+    }, [cash, portfolio, creditUsed, creditInterest, marginCallActive, shortPositions, showNotification, playSound, formatNumber])
+
+    // 마진콜 체크
+    const checkMarginCall = useCallback((stockMap) => {
+        const currentCreditUsed = creditUsedRef.current
+        const currentCash = cashRef.current
+        const currentPortfolio = portfolioRef.current
+        const currentShortPositions = shortPositionsRef.current
+        const currentMarginCallActive = marginCallActiveRef.current
+        const showNotificationCurrent = showNotificationRef.current
+
+        if (currentCreditUsed <= 0) {
+            if (currentMarginCallActive) {
+                setMarginCallActive(false)
+            }
+            return { marginCallActive: false }
+        }
+
+        const stockValueNow = calculateStockValueFromMap(stockMap, currentPortfolio)
+        const shortValueNow = calculateShortValueFromMap(stockMap, currentShortPositions)
+        const grossAssetsNow = currentCash + stockValueNow + shortValueNow
+        const currentMarginRatio = grossAssetsNow / currentCreditUsed
+
+        if (currentMarginRatio <= CREDIT_TRADING.liquidationMargin) {
+            // 강제 청산
+            showNotificationCurrent('⚠️ 마진콜! 담보 부족으로 포지션 강제 청산됩니다!', 'error')
+
+            let workingCash = currentCash
+            Object.keys(currentPortfolio).forEach(stockId => {
+                const holding = currentPortfolio[stockId]
+                const stock = stockMap.get(parseInt(stockId))
+                if (stock && holding.quantity > 0) {
+                    const saleAmount = Math.floor(stock.price * holding.quantity * 0.95)
+                    workingCash += saleAmount
+                }
+            })
+
+            setPortfolio({})
+
+            const repayable = Math.min(workingCash, currentCreditUsed + creditInterestRef.current)
+            if (repayable > 0) {
+                const interestPayment = Math.min(repayable, creditInterestRef.current)
+                setCreditInterest(prev => prev - interestPayment)
+                const principalPayment = repayable - interestPayment
+                setCreditUsed(prev => Math.max(0, prev - principalPayment))
+                workingCash -= repayable
+            }
+
+            setCash(workingCash)
+            setMarginCallActive(true)
+            return { marginCallActive: true, forceLiquidation: true }
+        } else if (currentMarginRatio <= CREDIT_TRADING.maintenanceMargin && !currentMarginCallActive) {
+            showNotificationCurrent('⚠️ 마진콜 경고! 담보 비율이 30% 이하입니다.', 'warning')
+            setMarginCallActive(true)
+            return { marginCallActive: true }
+        } else if (currentMarginRatio > CREDIT_TRADING.maintenanceMargin) {
+            if (currentMarginCallActive) {
+                setMarginCallActive(false)
+            }
+            return { marginCallActive: false }
+        }
+
+        return { marginCallActive: currentMarginCallActive }
+    }, [setCash, setCreditInterest, setCreditUsed, setMarginCallActive, setPortfolio])
+
+    // 공매도 이자 및 강제청산
+    const processShortPositions = useCallback((stockMap) => {
+        const currentShortPositions = shortPositionsRef.current
+        const currentCash = cashRef.current
+        const showNotificationCurrent = showNotificationRef.current
+        const playSoundCurrent = playSoundRef.current
+
+        if (Object.keys(currentShortPositions).length === 0) {
+            return { cash: currentCash, shortPositions: currentShortPositions }
+        }
+
+        let newCash = currentCash
+        const updatedShorts = {}
+        const liquidated = []
+
+        Object.entries(currentShortPositions).forEach(([stockId, position]) => {
+            const stock = stockMap.get(parseInt(stockId))
+            if (!stock) return
+
+            const interest = stock.price * position.quantity * SHORT_SELLING.interestRate
+            newCash -= interest
+
+            const pnl = (position.entryPrice - stock.price) * position.quantity
+            const marginUsed = position.entryPrice * position.quantity * SHORT_SELLING.marginRate
+
+            if (pnl < -marginUsed * 0.5) {
+                liquidated.push({ stockId, position, stock, pnl })
+            } else {
+                updatedShorts[stockId] = position
+            }
+        })
+
+        if (liquidated.length > 0) {
+            liquidated.forEach(({ position, stock, pnl }) => {
+                newCash += position.entryPrice * position.quantity + pnl
+                showNotificationCurrent(`⚠️ ${stock.name} 공매도 강제청산!`, 'error')
+                playSoundCurrent('error')
+            })
+            setShortPositions(updatedShorts)
+            setCash(newCash)
+            return { cash: newCash, shortPositions: updatedShorts }
+        }
+
+        if (newCash !== currentCash) {
+            setCash(newCash)
+        }
+
+        return { cash: newCash, shortPositions: currentShortPositions }
+    }, [setCash, setShortPositions])
+
+    // 일일 이자 계산 (새 거래일 시작 시 호출)
+    const processDailyInterest = useCallback(() => {
+        const currentCreditUsed = creditUsedRef.current
+        const formatNumberCurrent = formatNumberRef.current
+        const showNotificationCurrent = showNotificationRef.current
+
+        if (currentCreditUsed > 0) {
+            const dailyInterest = Math.floor(currentCreditUsed * CREDIT_TRADING.dailyInterestRate)
+            if (dailyInterest > 0) {
+                setCreditInterest(prev => prev + dailyInterest)
+                showNotificationCurrent(`💳 신용 이자 ${formatNumberCurrent(dailyInterest)}원 발생`, 'warning')
+            }
+            return dailyInterest
+        }
+        return 0
+    }, [setCreditInterest])
+
+    return { checkMarginCall, processShortPositions, processDailyInterest }
+}
+
+export default useCreditManager

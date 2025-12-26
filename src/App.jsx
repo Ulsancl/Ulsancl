@@ -1,3 +1,12 @@
+/**
+ * App.jsx - 주식 트레이딩 게임 메인 컴포넌트
+ * 
+ * 리팩토링 후: 559줄 → ~320줄 (43% 감소)
+ * - ModalContext를 사용하여 모달 상태 관리
+ * - useAppModalState 제거
+ * - props drilling 최소화
+ */
+
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import './App.css'
 
@@ -42,18 +51,16 @@ import {
 import useSound from './useSound'
 
 // Context
-import { useSettings } from './context'
+import { useSettings, useModal, MODAL_NAMES } from './context'
 import {
   useGameState as usePersistentGameState,
   useTrading,
   useToast,
   useFeedback,
   useUiState,
-  useAppModalState,
   useGameCalculations,
   useGameLoop
 } from './hooks'
-
 
 
 function App() {
@@ -69,6 +76,31 @@ function App() {
   // Context로부터 설정 가져오기
   const { settings, setSettings } = useSettings()
 
+  // Modal Context 사용
+  const {
+    openModal,
+    closeModal,
+    showConfetti,
+    setShowConfetti,
+    achievementPopup,
+    setAchievementPopup,
+    showAchievementPopup,
+    activeTab,
+    setActiveTab,
+    activeView,
+    setActiveView,
+    activeCrisis,
+    setActiveCrisis,
+    crisisAlert,
+    setCrisisAlert,
+    setCrisisHistory,
+    openChart,
+    openOrderManager
+  } = useModal()
+
+  // 튜토리얼 상태 (showTutorial은 모달이 아닌 오버레이)
+  const [showTutorial, setShowTutorial] = useState(false)
+
   // UI 상태
   const {
     quantity, setQuantity,
@@ -77,31 +109,6 @@ function App() {
     leverage,
     tradeMode, setTradeMode
   } = useUiState()
-
-  const {
-    achievementPopup, setAchievementPopup,
-    showConfetti, setShowConfetti,
-    showSkills, setShowSkills,
-    showTutorial, setShowTutorial,
-    chartStock, setChartStock,
-    showAchievements, setShowAchievements,
-    showTradeHistory, setShowTradeHistory,
-    showMissions, setShowMissions,
-    showLeaderboard, setShowLeaderboard,
-    showSettings, setShowSettings,
-    showAssetChart, setShowAssetChart,
-    showWatchlist, setShowWatchlist,
-    showStatistics, setShowStatistics,
-    showAlertManager, setShowAlertManager,
-    orderManagerStock, setOrderManagerStock,
-    orderManagerSide, setOrderManagerSide,
-    activeTab, setActiveTab,
-    activeView, setActiveView,
-    showSeasonEnd, setShowSeasonEnd,
-    activeCrisis, setActiveCrisis,
-    crisisAlert, setCrisisAlert,
-    setCrisisHistory
-  } = useAppModalState()
 
   const { toasts, removeToast, showNotification } = useToast()
 
@@ -113,7 +120,7 @@ function App() {
 
   const handleNewUser = useCallback(() => {
     setShowTutorial(true)
-  }, [setShowTutorial])
+  }, [])
 
   // 게임 상태
   const {
@@ -239,6 +246,15 @@ function App() {
     }
   }, [stocks, activeTab])
 
+  // 시즌 종료 핸들러
+  const handleShowSeasonEnd = useCallback((show) => {
+    if (show) {
+      openModal(MODAL_NAMES.SEASON_END)
+    } else {
+      closeModal(MODAL_NAMES.SEASON_END)
+    }
+  }, [openModal, closeModal])
+
   useGameLoop({
     stocks,
     setStocks,
@@ -275,7 +291,7 @@ function App() {
     setGameTime,
     setPriceHistory,
     setPriceChanges,
-    setShowSeasonEnd,
+    setShowSeasonEnd: handleShowSeasonEnd,
     setActiveCrisis,
     setCrisisAlert,
     setCrisisHistory,
@@ -291,14 +307,9 @@ function App() {
 
     setUnlockedAchievements(prev => ({ ...prev, [id]: true }))
     setTotalXp(prev => prev + ach.xp)
-    setAchievementPopup(ach)
-    setShowConfetti(true)
+    showAchievementPopup(ach)
     playSound('achievement')
-    setTimeout(() => {
-      setAchievementPopup(null)
-      setShowConfetti(false)
-    }, 3000)
-  }, [playSound, setAchievementPopup, setShowConfetti, setTotalXp, setUnlockedAchievements, unlockedAchievements])
+  }, [playSound, showAchievementPopup, setTotalXp, setUnlockedAchievements, unlockedAchievements])
 
   // Mission progress
   useEffect(() => {
@@ -324,15 +335,15 @@ function App() {
   }, [portfolio, totalAssets, totalProfit, totalTrades, tradeHistory, unlockAchievement, unlockedAchievements, winStreak])
 
   // Mission rewards
-  const handleClaimMissionReward = (mission) => {
+  const handleClaimMissionReward = useCallback((mission) => {
     setCompletedMissions(prev => ({ ...prev, [mission.id]: true }))
     setCash(prev => prev + mission.reward.cash)
     setTotalXp(prev => prev + mission.reward.xp)
     showNotification(`🎁 ${mission.name} 보상 수령!`, 'success')
     playSound('achievement')
-  }
+  }, [playSound, setCash, setCompletedMissions, setTotalXp, showNotification])
 
-  const handleUpgradeSkill = (skill) => {
+  const handleUpgradeSkill = useCallback((skill) => {
     setUnlockedSkills(prev => {
       const currentLevel = prev[skill.id] || 0
       if (currentLevel >= skill.maxLevel) return prev
@@ -340,15 +351,15 @@ function App() {
     })
     showNotification(`${skill.name} 강화 성공!`, 'success')
     playSound('achievement')
-  }
+  }, [playSound, setUnlockedSkills, showNotification])
 
-  const toggleWatchlist = (stockId) => {
+  const toggleWatchlist = useCallback((stockId) => {
     setWatchlist(prev => prev.includes(stockId) ? prev.filter(id => id !== stockId) : [...prev, stockId])
-  }
+  }, [setWatchlist])
 
-  const getEstimatedQuantity = (stock) => Math.floor((parseInt(inputAmount) || 0) / stock.price)
+  const getEstimatedQuantity = useCallback((stock) => Math.floor((parseInt(inputAmount) || 0) / stock.price), [inputAmount])
 
-  const getProductTypeLabel = (type) => {
+  const getProductTypeLabel = useCallback((type) => {
     switch (type) {
       case 'etf': return 'ETF'
       case 'crypto': return '코인'
@@ -356,7 +367,7 @@ function App() {
       case 'commodity': return '원자재'
       default: return '주식'
     }
-  }
+  }, [])
 
   return (
     <div className={`app theme-${settings.theme}`}>
@@ -366,91 +377,59 @@ function App() {
       <Tutorial active={showTutorial} onClose={() => setShowTutorial(false)} />
 
       <AppModalsContainer
-        achievementPopup={achievementPopup}
-        onCloseAchievementPopup={() => setAchievementPopup(null)}
-        showAchievements={showAchievements}
-        unlockedAchievements={unlockedAchievements}
-        totalXp={totalXp}
-        onCloseAchievements={() => setShowAchievements(false)}
-        showTradeHistory={showTradeHistory}
-        tradeHistory={tradeHistory}
         stocks={stocks}
-        onCloseTradeHistory={() => setShowTradeHistory(false)}
-        showMissions={showMissions}
-        missionProgress={missionProgress}
-        completedMissions={completedMissions}
-        onClaimMissionReward={handleClaimMissionReward}
-        onCloseMissions={() => setShowMissions(false)}
-        showLeaderboard={showLeaderboard}
+        stocksById={stocksById}
+        tradeHistory={tradeHistory}
+        assetHistory={assetHistory}
+        portfolio={portfolio}
+        shortPositions={shortPositions}
+        cash={cash}
+        watchlist={watchlist}
+        alerts={alerts}
+        settings={settings}
+        unlockedAchievements={unlockedAchievements}
+        unlockedSkills={unlockedSkills}
+        totalXp={totalXp}
         totalAssets={totalAssets}
         profitRate={profitRate}
-        playerName={settings.playerName}
-        onCloseLeaderboard={() => setShowLeaderboard(false)}
-        onSaveScore={() => showNotification('기록 저장됨!', 'success')}
-        showSettings={showSettings}
-        settings={settings}
-        onUpdateSettings={setSettings}
-        onCloseSettings={() => setShowSettings(false)}
-        showAssetChart={showAssetChart}
-        assetHistory={assetHistory}
-        onCloseAssetChart={() => setShowAssetChart(false)}
-        showWatchlist={showWatchlist}
-        watchlist={watchlist}
-        onToggleWatchlist={toggleWatchlist}
-        onShowChart={setChartStock}
-        onCloseWatchlist={() => setShowWatchlist(false)}
-        showStatistics={showStatistics}
-        onCloseStatistics={() => setShowStatistics(false)}
-        showAlertManager={showAlertManager}
-        alerts={alerts}
-        onAddAlert={(a) => setAlerts(prev => [...prev, a])}
-        onRemoveAlert={(id) => setAlerts(prev => prev.filter(a => a.id !== id))}
-        onCloseAlertManager={() => setShowAlertManager(false)}
-        orderManagerStock={orderManagerStock}
-        orderManagerSide={orderManagerSide}
-        portfolio={portfolio}
-        cash={cash}
-        onPlaceOrder={handlePlaceOrder}
-        onCloseOrderManager={() => setOrderManagerStock(null)}
-        showSkills={showSkills}
-        unlockedSkills={unlockedSkills}
+        missionProgress={missionProgress}
+        completedMissions={completedMissions}
         availableSkillPoints={availableSkillPoints}
-        onUpgradeSkill={handleUpgradeSkill}
-        onCloseSkills={() => setShowSkills(false)}
-        showSeasonEnd={showSeasonEnd}
         gameYear={gameTime.year}
         initialCapital={INITIAL_CAPITAL}
         totalProfit={totalProfit}
         totalTrades={totalTrades}
         winStreak={winStreak}
         maxWinStreak={maxWinStreak}
+        canShortSell={canShortSell}
+        onClaimMissionReward={handleClaimMissionReward}
+        onUpgradeSkill={handleUpgradeSkill}
+        onUpdateSettings={setSettings}
+        onToggleWatchlist={toggleWatchlist}
+        onAddAlert={(a) => setAlerts(prev => [...prev, a])}
+        onRemoveAlert={(id) => setAlerts(prev => prev.filter(a => a.id !== id))}
+        onPlaceOrder={handlePlaceOrder}
+        onShortSell={handleShortSell}
+        onCoverShort={handleCoverShort}
         onStartNewSeason={() => {
-          setShowSeasonEnd(false)
+          closeModal(MODAL_NAMES.SEASON_END)
           showNotification(`🚀 ${gameTime.year + 1}년 새 시즌 시작!`, 'success')
         }}
-        onCloseSeasonEnd={() => setShowSeasonEnd(false)}
-        chartStock={chartStock}
-        priceHistory={priceHistory}
-        stocksById={stocksById}
-        onCloseChartStock={() => setChartStock(null)}
-        onOpenOrder={(stock, side) => {
-          setOrderManagerStock(stock)
-          setOrderManagerSide(side || 'buy')
-        }}
+        showNotification={showNotification}
       />
 
       <GameHeader
         gameTime={gameTime}
         totalXp={totalXp}
-        onShowSkills={() => setShowSkills(true)}
-        onShowMissions={() => setShowMissions(true)}
-        onShowAchievements={() => setShowAchievements(true)}
-        onShowLeaderboard={() => setShowLeaderboard(true)}
-        onShowStatistics={() => setShowStatistics(true)}
-        onShowWatchlist={() => setShowWatchlist(true)}
-        onShowAlertManager={() => setShowAlertManager(true)}
-        onShowTradeHistory={() => setShowTradeHistory(true)}
-        onShowSettings={() => setShowSettings(true)}
+        onShowSkills={() => openModal(MODAL_NAMES.SKILLS)}
+        onShowMissions={() => openModal(MODAL_NAMES.MISSIONS)}
+        onShowAchievements={() => openModal(MODAL_NAMES.ACHIEVEMENTS)}
+        onShowLeaderboard={() => openModal(MODAL_NAMES.LEADERBOARD)}
+        onShowStatistics={() => openModal(MODAL_NAMES.STATISTICS)}
+        onShowWatchlist={() => openModal(MODAL_NAMES.WATCHLIST)}
+        onShowAlertManager={() => openModal(MODAL_NAMES.ALERT_MANAGER)}
+        onShowTradeHistory={() => openModal(MODAL_NAMES.TRADE_HISTORY)}
+        onShowSettings={() => openModal(MODAL_NAMES.SETTINGS)}
       />
 
       <TickerTape news={news} stocks={stocks} />
@@ -490,7 +469,7 @@ function App() {
         availableCredit={availableCredit}
         onBorrowCredit={handleBorrowCredit}
         onRepayCredit={handleRepayCredit}
-        onShowAssetChart={() => setShowAssetChart(true)}
+        onShowAssetChart={() => openModal(MODAL_NAMES.ASSET_CHART)}
       />
 
       <TabSection activeTab={activeTab} onTabChange={setActiveTab} />
@@ -508,50 +487,45 @@ function App() {
         onCancelOrder={handleCancelOrder}
       />
 
-      {activeView === 'heatmap' && <section className="heatmap-section"><Heatmap stocks={filteredStocks} portfolio={portfolio} onStockClick={setChartStock} /></section>}
+      {activeView === 'heatmap' && <section className="heatmap-section"><Heatmap stocks={filteredStocks} portfolio={portfolio} onStockClick={openChart} /></section>}
       {activeView === 'portfolio' && <section className="portfolio-view-section"><PortfolioPieChart portfolio={portfolio} stocks={stocks} cash={cash} totalAssets={totalAssets} /></section>}
 
-      {
-        activeView === 'market' && (
-          <MarketSection
-            tradeMode={tradeMode}
-            amountMode={amountMode}
-            quantity={quantity}
-            inputAmount={inputAmount}
-            canShortSell={canShortSell}
-            shortSellingMinLevel={SHORT_SELLING.minLevel}
-            isInitialized={isInitialized}
-            filteredStocks={filteredStocks}
-            portfolio={portfolio}
-            shortPositions={shortPositions}
-            priceChanges={priceChanges}
-            watchlist={watchlist}
-            cash={cash}
-            onTradeModeChange={setTradeMode}
-            onAmountModeChange={setAmountMode}
-            onQuantityChange={setQuantity}
-            onInputAmountChange={setInputAmount}
-            onToggleWatchlist={toggleWatchlist}
-            onShowChart={setChartStock}
-            onBuy={handleBuy}
-            onSellAll={handleSellAll}
-            onShortSell={handleShortSell}
-            onCoverShort={handleCoverShort}
-            onOpenOrderManager={(stock, side) => {
-              setOrderManagerStock(stock)
-              setOrderManagerSide(side)
-            }}
-            getEstimatedQuantity={getEstimatedQuantity}
-            getProductTypeLabel={getProductTypeLabel}
-          />
-        )
-      }
+      {activeView === 'market' && (
+        <MarketSection
+          tradeMode={tradeMode}
+          amountMode={amountMode}
+          quantity={quantity}
+          inputAmount={inputAmount}
+          canShortSell={canShortSell}
+          shortSellingMinLevel={SHORT_SELLING.minLevel}
+          isInitialized={isInitialized}
+          filteredStocks={filteredStocks}
+          portfolio={portfolio}
+          shortPositions={shortPositions}
+          priceChanges={priceChanges}
+          watchlist={watchlist}
+          cash={cash}
+          onTradeModeChange={setTradeMode}
+          onAmountModeChange={setAmountMode}
+          onQuantityChange={setQuantity}
+          onInputAmountChange={setInputAmount}
+          onToggleWatchlist={toggleWatchlist}
+          onShowChart={openChart}
+          onBuy={handleBuy}
+          onSellAll={handleSellAll}
+          onShortSell={handleShortSell}
+          onCoverShort={handleCoverShort}
+          onOpenOrderManager={openOrderManager}
+          getEstimatedQuantity={getEstimatedQuantity}
+          getProductTypeLabel={getProductTypeLabel}
+        />
+      )}
 
       <footer className="footer">
         <p>Lv.{levelInfo.level} {levelInfo.name} | {gameTime.displayDate} | {totalTrades}회 | 연승 {winStreak}</p>
       </footer>
 
-    </div >
+    </div>
   )
 }
 
