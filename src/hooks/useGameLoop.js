@@ -91,6 +91,7 @@ export const useGameLoop = ({
     const showNotificationRef = useRef(showNotification)
     const playSoundRef = useRef(playSound)
     const formatNumberRef = useRef(formatNumber)
+    const lastProfileRef = useRef(0)
 
     useLayoutEffect(() => {
         stocksRef.current = stocks
@@ -197,7 +198,9 @@ export const useGameLoop = ({
                 }, 0)
             }
 
-            const stockMap = new Map()
+            const shouldProfile = import.meta.env.DEV && now - lastProfileRef.current > 10000
+            let stockMap
+            let mapBuildDuration = 0
 
             // 신규 거래일 시작 체크
             if (gameDay > lastDayRef.current) {
@@ -222,9 +225,9 @@ export const useGameLoop = ({
                 playSoundCurrent('news')
             }
 
-            workingStocks.forEach(stock => {
-                stockMap.set(stock.id, stock)
-            })
+            const mapBuildStart = shouldProfile ? performance.now() : 0
+            stockMap = new Map(workingStocks.map(stock => [stock.id, stock]))
+            mapBuildDuration = shouldProfile ? performance.now() - mapBuildStart : 0
 
             // 마진콜 체크 (담보비율 30% 이하 경고, 20% 이하 강제청산)
             if (workingCreditUsed > 0) {
@@ -394,10 +397,7 @@ export const useGameLoop = ({
             })
 
             workingStocks = newStocks
-            stockMap.clear()
-            workingStocks.forEach(stock => {
-                stockMap.set(stock.id, stock)
-            })
+            stockMap = new Map(workingStocks.map(stock => [stock.id, stock]))
 
             if (workingPendingOrders.length > 0) {
                 const feeDiscountLevel = currentUnlockedSkills?.['fee_discount'] || 0
@@ -507,10 +507,16 @@ export const useGameLoop = ({
                 lastDividendTimeRef.current = now
             }
 
+            const assetCalcStart = shouldProfile ? performance.now() : 0
             const stockValueNow = calcStockValue(stockMap, workingPortfolio)
             const shortValueNow = calcShortValue(stockMap, workingShortPositions)
             const grossAssetsNow = workingCash + stockValueNow + shortValueNow
             const totalAssetsNow = grossAssetsNow - workingCreditUsed - workingCreditInterest
+            if (shouldProfile) {
+                const assetCalcDuration = performance.now() - assetCalcStart
+                console.info(`[profile] gameLoop map: ${mapBuildDuration.toFixed(2)}ms, assets: ${assetCalcDuration.toFixed(2)}ms`)
+                lastProfileRef.current = now
+            }
 
             if (now % 10000 < 1000) {
                 setAssetHistory(prev => [...prev.slice(-100), { value: totalAssetsNow, timestamp: now, day: gameDay }])
