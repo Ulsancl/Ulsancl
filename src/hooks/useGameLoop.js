@@ -3,7 +3,7 @@
  * 가격/이벤트/주문/배당 업데이트를 주기적으로 처리한다.
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import {
     updateMarketState,
     generateNews,
@@ -75,27 +75,79 @@ export const useGameLoop = ({
     const lastSeasonYearRef = useRef(2020)
     const lastDividendTimeRef = useRef(Date.now())
     const priceResetTimeoutRef = useRef(null)
+    const stocksRef = useRef(stocks)
+    const cashRef = useRef(cash)
+    const portfolioRef = useRef(portfolio)
+    const pendingOrdersRef = useRef(pendingOrders)
+    const shortPositionsRef = useRef(shortPositions)
+    const creditUsedRef = useRef(creditUsed)
+    const creditInterestRef = useRef(creditInterest)
+    const alertsRef = useRef(alerts)
+    const marketStateRef = useRef(marketState)
+    const unlockedSkillsRef = useRef(unlockedSkills)
+    const gameStartTimeRef = useRef(gameStartTime)
+    const marginCallActiveRef = useRef(marginCallActive)
+
+    useLayoutEffect(() => {
+        stocksRef.current = stocks
+        cashRef.current = cash
+        portfolioRef.current = portfolio
+        pendingOrdersRef.current = pendingOrders
+        shortPositionsRef.current = shortPositions
+        creditUsedRef.current = creditUsed
+        creditInterestRef.current = creditInterest
+        alertsRef.current = alerts
+        marketStateRef.current = marketState
+        unlockedSkillsRef.current = unlockedSkills
+        gameStartTimeRef.current = gameStartTime
+        marginCallActiveRef.current = marginCallActive
+    }, [
+        alerts,
+        cash,
+        creditInterest,
+        creditUsed,
+        gameStartTime,
+        marginCallActive,
+        marketState,
+        pendingOrders,
+        portfolio,
+        shortPositions,
+        stocks,
+        unlockedSkills
+    ])
 
     useEffect(() => {
         const interval = setInterval(() => {
             const now = Date.now()
+            const currentStocks = stocksRef.current
+            const currentCash = cashRef.current
+            const currentPortfolio = portfolioRef.current
+            const currentPendingOrders = pendingOrdersRef.current
+            const currentShortPositions = shortPositionsRef.current
+            const currentCreditUsed = creditUsedRef.current
+            const currentCreditInterest = creditInterestRef.current
+            const currentAlerts = alertsRef.current
+            const currentMarketState = marketStateRef.current
+            const currentUnlockedSkills = unlockedSkillsRef.current
+            const currentGameStartTime = gameStartTimeRef.current
+            const currentMarginCallActive = marginCallActiveRef.current
 
             // 게임 시간 업데이트
-            const newGameTime = calculateGameDate(gameStartTime, now)
+            const newGameTime = calculateGameDate(currentGameStartTime, now)
             setGameTime(newGameTime)
             const gameDay = newGameTime.day
 
-            let workingStocks = stocks
-            let workingCash = cash
-            let workingPortfolio = portfolio
-            let workingPendingOrders = pendingOrders
-            let workingShortPositions = shortPositions
-            let workingCreditUsed = creditUsed
-            let workingCreditInterest = creditInterest
+            let workingStocks = currentStocks
+            let workingCash = currentCash
+            let workingPortfolio = currentPortfolio
+            let workingPendingOrders = currentPendingOrders
+            let workingShortPositions = currentShortPositions
+            let workingCreditUsed = currentCreditUsed
+            let workingCreditInterest = currentCreditInterest
             const activeGlobalEvent = getActiveGlobalEvent()
-            let workingMarketState = updateMarketState(marketState, activeGlobalEvent)
+            let workingMarketState = updateMarketState(currentMarketState, activeGlobalEvent)
             updateNewsEffects()
-            let workingAlerts = alerts
+            let workingAlerts = currentAlerts
 
             const calcStockValue = (list, holdings) => {
                 if (!holdings) return 0
@@ -169,13 +221,13 @@ export const useGameLoop = ({
                         workingCreditUsed = Math.max(0, workingCreditUsed - principalPayment)
                         workingCash -= repayable
                     }
-                } else if (currentMarginRatio <= CREDIT_TRADING.maintenanceMargin && !marginCallActive) {
+                } else if (currentMarginRatio <= CREDIT_TRADING.maintenanceMargin && !currentMarginCallActive) {
                     showNotification('⚠️ 마진콜 경고! 담보 비율이 30% 이하입니다. 추가 입금 또는 포지션 정리를 권장합니다.', 'warning')
                     setMarginCallActive(true)
                 } else if (currentMarginRatio > CREDIT_TRADING.maintenanceMargin) {
                     setMarginCallActive(false)
                 }
-            } else if (marginCallActive) {
+            } else if (currentMarginCallActive) {
                 setMarginCallActive(false)
             }
 
@@ -309,7 +361,7 @@ export const useGameLoop = ({
 
             workingStocks = newStocks
             if (workingPendingOrders.length > 0) {
-                const feeDiscountLevel = unlockedSkills?.['fee_discount'] || 0
+                const feeDiscountLevel = currentUnlockedSkills?.['fee_discount'] || 0
                 let orderFeeRate = 0.0015
                 if (feeDiscountLevel > 0) {
                     orderFeeRate *= (1 - feeDiscountLevel * 0.05)
@@ -427,13 +479,13 @@ export const useGameLoop = ({
 
             setStocks(workingStocks)
             setMarketState(workingMarketState)
-            if (workingCash !== cash) setCash(workingCash)
-            if (workingPortfolio !== portfolio) setPortfolio(workingPortfolio)
-            if (workingPendingOrders !== pendingOrders) setPendingOrders(workingPendingOrders)
-            if (workingShortPositions !== shortPositions) setShortPositions(workingShortPositions)
-            if (workingCreditUsed !== creditUsed) setCreditUsed(workingCreditUsed)
-            if (workingCreditInterest !== creditInterest) setCreditInterest(workingCreditInterest)
-            if (workingAlerts !== alerts) setAlerts(workingAlerts)
+            if (workingCash !== currentCash) setCash(workingCash)
+            if (workingPortfolio !== currentPortfolio) setPortfolio(workingPortfolio)
+            if (workingPendingOrders !== currentPendingOrders) setPendingOrders(workingPendingOrders)
+            if (workingShortPositions !== currentShortPositions) setShortPositions(workingShortPositions)
+            if (workingCreditUsed !== currentCreditUsed) setCreditUsed(workingCreditUsed)
+            if (workingCreditInterest !== currentCreditInterest) setCreditInterest(workingCreditInterest)
+            if (workingAlerts !== currentAlerts) setAlerts(workingAlerts)
         }, updateInterval)
 
         return () => {
@@ -442,53 +494,7 @@ export const useGameLoop = ({
                 clearTimeout(priceResetTimeoutRef.current)
             }
         }
-    }, [
-        alerts,
-        cash,
-        creditInterest,
-        creditUsed,
-        formatNumber,
-        gameStartTime,
-        marginCallActive,
-        marketState,
-        pendingOrders,
-        playSound,
-        portfolio,
-        setActiveCrisis,
-        setAlerts,
-        setAssetHistory,
-        setCash,
-        setCrisisAlert,
-        setCrisisHistory,
-        setCreditInterest,
-        setCreditUsed,
-        setCurrentDay,
-        setDailyProfit,
-        setDailyTrades,
-        setGameTime,
-        setMarginCallActive,
-        setMarketState,
-        setNews,
-        setPendingOrders,
-        setPortfolio,
-        setPriceChanges,
-        setPriceHistory,
-        setShortPositions,
-        setShowSeasonEnd,
-        setStocks,
-        setTotalDividends,
-        setTotalProfit,
-        setTotalTrades,
-        setTradeHistory,
-        setWinStreak,
-        shortPositions,
-        showNotification,
-        stocks,
-        unlockedSkills,
-        updateInterval,
-        updateNewsEffects,
-        getActiveGlobalEvent
-    ])
+    }, [formatNumber, playSound, showNotification, updateInterval])
 }
 
 export default useGameLoop
