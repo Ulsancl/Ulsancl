@@ -164,7 +164,7 @@ const StockCard = memo(({
                 </div>
                 <button
                     className={styles.detailBtn}
-                    onClick={() => onOpenOrderManager(stock)}
+                    onClick={() => onOpenOrderManager(stock, tradeMode === 'long' ? 'buy' : 'short')}
                     title="상세 주문"
                 >
                     ⚙️

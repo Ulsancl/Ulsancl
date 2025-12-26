@@ -4,7 +4,6 @@ import './index.css'
 import App from './App.jsx'
 import { AppProviders } from './context'
 
-console.log('App starting...');
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => { })
 }

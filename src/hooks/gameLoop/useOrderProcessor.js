@@ -8,9 +8,6 @@ import { processOrders } from '../../engine'
 import { generateId } from '../../utils/index.js'
 
 export const useOrderProcessor = ({
-    setPendingOrders,
-    setCash,
-    setPortfolio,
     setTradeHistory,
     setTotalTrades,
     setDailyTrades,
@@ -85,15 +82,11 @@ export const useOrderProcessor = ({
                 return streak
             })
 
-            setCash(newCash)
-            setPortfolio(newPortfolio)
-            setPendingOrders(remainingOrders)
-
             return { cash: newCash, portfolio: newPortfolio, pendingOrders: remainingOrders }
         }
 
         return { cash: currentCash, portfolio: currentPortfolio, pendingOrders: currentPendingOrders || [] }
-    }, [setCash, setDailyProfit, setDailyTrades, setPendingOrders, setPortfolio, setTotalProfit, setTotalTrades, setTradeHistory, setWinStreak])
+    }, [setDailyProfit, setDailyTrades, setTotalProfit, setTotalTrades, setTradeHistory, setWinStreak])
 
     return { tick }
 }

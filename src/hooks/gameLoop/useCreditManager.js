@@ -9,17 +9,11 @@ import { calculateStockValueFromMap, calculateShortValueFromMap } from '../../ut
 
 export const useCreditManager = ({
     cash,
-    setCash,
     portfolio,
-    setPortfolio,
     creditUsed,
-    setCreditUsed,
     creditInterest,
-    setCreditInterest,
     marginCallActive,
-    setMarginCallActive,
     shortPositions,
-    setShortPositions,
     showNotification,
     playSound,
     formatNumber
@@ -57,9 +51,6 @@ export const useCreditManager = ({
         const showNotificationCurrent = showNotificationRef.current
 
         if (currentCreditUsed <= 0) {
-            if (currentMarginCallActive) {
-                setMarginCallActive(false)
-            }
             return { marginCallActive: false }
         }
 
@@ -82,23 +73,17 @@ export const useCreditManager = ({
                 }
             })
 
-            setPortfolio({})
-
             const repayable = Math.min(workingCash, currentCreditUsed + currentCreditInterest)
             let newCreditUsed = currentCreditUsed
             let newCreditInterest = currentCreditInterest
             if (repayable > 0) {
                 const interestPayment = Math.min(repayable, currentCreditInterest)
-                setCreditInterest(prev => prev - interestPayment)
                 const principalPayment = repayable - interestPayment
-                setCreditUsed(prev => Math.max(0, prev - principalPayment))
                 newCreditInterest = currentCreditInterest - interestPayment
                 newCreditUsed = Math.max(0, currentCreditUsed - principalPayment)
                 workingCash -= repayable
             }
 
-            setCash(workingCash)
-            setMarginCallActive(true)
             return {
                 marginCallActive: true,
                 forceLiquidation: true,
@@ -107,19 +92,17 @@ export const useCreditManager = ({
                 creditUsed: newCreditUsed,
                 creditInterest: newCreditInterest
             }
-        } else if (currentMarginRatio <= CREDIT_TRADING.maintenanceMargin && !currentMarginCallActive) {
-            showNotificationCurrent('⚠️ 마진콜 경고! 담보 비율이 30% 이하입니다.', 'warning')
-            setMarginCallActive(true)
+        } else if (currentMarginRatio <= CREDIT_TRADING.maintenanceMargin) {
+            if (!currentMarginCallActive) {
+                showNotificationCurrent('⚠️ 마진콜 경고! 담보 비율이 30% 이하입니다.', 'warning')
+            }
             return { marginCallActive: true }
         } else if (currentMarginRatio > CREDIT_TRADING.maintenanceMargin) {
-            if (currentMarginCallActive) {
-                setMarginCallActive(false)
-            }
             return { marginCallActive: false }
         }
 
         return { marginCallActive: currentMarginCallActive }
-    }, [setCash, setCreditInterest, setCreditUsed, setMarginCallActive, setPortfolio])
+    }, [])
 
     // 공매도 이자 및 강제청산
     const processShortPositions = useCallback((stockMap, overrides = {}) => {
@@ -162,17 +145,11 @@ export const useCreditManager = ({
                 showNotificationCurrent(`⚠️ ${stock.name} 공매도 강제청산!`, 'error')
                 playSoundCurrent('error')
             })
-            setShortPositions(updatedShorts)
-            setCash(newCash)
             return { cash: newCash, shortPositions: updatedShorts }
         }
 
-        if (newCash !== currentCash) {
-            setCash(newCash)
-        }
-
         return { cash: newCash, shortPositions: currentShortPositions }
-    }, [setCash, setShortPositions])
+    }, [])
 
     // 일일 이자 계산 (새 거래일 시작 시 호출)
     const processDailyInterest = useCallback(() => {
@@ -183,13 +160,12 @@ export const useCreditManager = ({
         if (currentCreditUsed > 0) {
             const dailyInterest = Math.floor(currentCreditUsed * CREDIT_TRADING.dailyInterestRate)
             if (dailyInterest > 0) {
-                setCreditInterest(prev => prev + dailyInterest)
                 showNotificationCurrent(`💳 신용 이자 ${formatNumberCurrent(dailyInterest)}원 발생`, 'warning')
             }
             return dailyInterest
         }
         return 0
-    }, [setCreditInterest])
+    }, [])
 
     return { checkMarginCall, processShortPositions, processDailyInterest }
 }
