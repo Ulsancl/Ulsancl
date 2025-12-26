@@ -24,7 +24,7 @@ import {
     checkAlerts
 } from '../engine'
 import { CREDIT_TRADING, DIVIDEND_RATES, SHORT_SELLING } from '../constants'
-import { generateId, calculateStockValueFromMap, calculateShortValueFromMap } from '../utils'
+import { generateId, calculateStockValueFromMap, calculateShortValueFromMap } from '../utils/index.js'
 
 export const useGameLoop = ({
     stocks,

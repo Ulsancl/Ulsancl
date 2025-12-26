@@ -99,7 +99,7 @@ export const Tooltip = ({ children, text, position = 'top' }) => (
 )
 
 // 금액 표시 (색상 자동)
-export const Amount = ({ value, showSign = true }) => {
+export const Amount = ({ value, format = 'compact', showSign = true }) => {
     const isPositive = value >= 0
     const sign = showSign ? (isPositive ? '+' : '') : ''
 
