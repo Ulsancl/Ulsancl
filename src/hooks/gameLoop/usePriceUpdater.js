@@ -3,27 +3,16 @@
  * useGameLoop에서 분리된 모듈
  */
 
-import { useCallback, useRef, useLayoutEffect } from 'react'
+import { useCallback } from 'react'
 import { calculateAllStockPrices, applyCrisisImpact } from '../../engine'
 
 export const usePriceUpdater = ({
-    stocks,
-    setStocks,
-    marketState,
     setPriceHistory,
     setPriceChanges
 }) => {
-    const stocksRef = useRef(stocks)
-    const marketStateRef = useRef(marketState)
-
-    useLayoutEffect(() => {
-        stocksRef.current = stocks
-        marketStateRef.current = marketState
-    }, [stocks, marketState])
-
-    const tick = useCallback((gameDay, gameTime) => {
-        const currentStocks = stocksRef.current
-        const currentMarketState = marketStateRef.current
+    const tick = useCallback((stocks, marketState, gameDay, gameTime) => {
+        const currentStocks = stocks
+        const currentMarketState = marketState
 
         // 가격 계산
         const calculatedResults = calculateAllStockPrices(

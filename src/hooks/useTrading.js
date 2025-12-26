@@ -36,7 +36,7 @@ export const useTrading = ({
     const handleBuy = useCallback((stock, qty) => {
         const leverageMultiplier = currentLeverage?.multiplier || 1
         const effectiveQty = qty * leverageMultiplier
-        const rawTotal = stock.price * qty
+        const notional = stock.price * effectiveQty
 
         // 수수료 계산 (기본 0.15%)
         let feeRate = 0.0015
@@ -44,23 +44,30 @@ export const useTrading = ({
         if (feeDiscountLevel > 0) {
             feeRate *= (1 - feeDiscountLevel * 0.05)
         }
-        const fee = Math.floor(rawTotal * feeRate)
-        const total = rawTotal + fee
+        const fee = Math.floor(notional * feeRate)
+        const marginRate = leverageMultiplier > 1
+            ? (currentLeverage?.marginRate ?? (1 / leverageMultiplier))
+            : 1
+        const marginRequired = notional * marginRate
+        const cashRequired = marginRequired + fee
+        const borrowed = Math.max(0, notional - marginRequired)
 
-        if (total > cash) {
+        if (cashRequired > cash) {
             showNotification('잔고가 부족합니다!', 'error')
             playSound?.('error')
             return false
         }
 
-        setCash(prev => prev - total)
+        setCash(prev => prev - cashRequired)
         setPortfolio(prev => {
-            const existing = prev[stock.id] || { quantity: 0, totalCost: 0 }
+            const existing = prev[stock.id] || { quantity: 0, totalCost: 0, borrowed: 0, margin: 0 }
             return {
                 ...prev,
                 [stock.id]: {
                     quantity: existing.quantity + effectiveQty,
-                    totalCost: existing.totalCost + total,
+                    totalCost: existing.totalCost + notional + fee,
+                    borrowed: (existing.borrowed || 0) + borrowed,
+                    margin: (existing.margin || 0) + marginRequired,
                     leverage: leverageMultiplier > 1 ? leverageMultiplier : (existing.leverage || 1),
                     firstBuyTime: existing.firstBuyTime || Date.now()
                 }
@@ -73,7 +80,7 @@ export const useTrading = ({
             stockId: stock.id,
             quantity: effectiveQty,
             price: stock.price,
-            total,
+            total: notional + fee,
             timestamp: Date.now()
         }
         setTradeHistory(prev => [...prev, trade])
@@ -82,7 +89,7 @@ export const useTrading = ({
         playSound?.('buy')
         showNotification(`${stock.name} ${effectiveQty}주 매수`, 'success')
 
-        addActionFeedback?.(`-${formatCompact(total)}`, 'loss', window.innerWidth / 2, window.innerHeight / 2)
+        addActionFeedback?.(`-${formatCompact(cashRequired)}`, 'loss', window.innerWidth / 2, window.innerHeight / 2)
         return true
     }, [cash, currentLeverage, unlockedSkills, showNotification, playSound, setCash, setPortfolio, setTradeHistory, setTotalTrades, setDailyTrades, addActionFeedback, formatCompact])
 
@@ -108,7 +115,15 @@ export const useTrading = ({
         const costBasis = avgCost * qty
         const profit = proceeds - costBasis
 
-        setCash(prev => prev + proceeds)
+        const borrowedTotal = typeof holding.borrowed === 'number' ? holding.borrowed : 0
+        const marginTotal = typeof holding.margin === 'number' ? holding.margin : 0
+        const borrowedPerShare = holding.quantity > 0 ? borrowedTotal / holding.quantity : 0
+        const marginPerShare = holding.quantity > 0 ? marginTotal / holding.quantity : 0
+        const borrowedRepayment = borrowedPerShare * qty
+        const marginReturn = marginPerShare * qty
+        const netProceeds = proceeds - borrowedRepayment
+
+        setCash(prev => prev + netProceeds)
         setPortfolio(prev => {
             const newQty = holding.quantity - qty
             if (newQty <= 0) {
@@ -120,7 +135,9 @@ export const useTrading = ({
                 [stock.id]: {
                     ...holding,
                     quantity: newQty,
-                    totalCost: holding.totalCost - costBasis
+                    totalCost: holding.totalCost - costBasis,
+                    borrowed: Math.max(0, borrowedTotal - borrowedRepayment),
+                    margin: Math.max(0, marginTotal - marginReturn)
                 }
             }
         })
@@ -295,11 +312,23 @@ export const useTrading = ({
 
     // MAX 매수
     const handleBuyMax = useCallback((stock) => {
-        const maxQty = Math.floor(cash / stock.price)
+        const leverageMultiplier = currentLeverage?.multiplier || 1
+        const marginRate = leverageMultiplier > 1
+            ? (currentLeverage?.marginRate ?? (1 / leverageMultiplier))
+            : 1
+
+        let feeRate = 0.0015
+        const feeDiscountLevel = unlockedSkills?.['fee_discount'] || 0
+        if (feeDiscountLevel > 0) {
+            feeRate *= (1 - feeDiscountLevel * 0.05)
+        }
+
+        const unitCashRequired = stock.price * leverageMultiplier * (marginRate + feeRate)
+        const maxQty = unitCashRequired > 0 ? Math.floor(cash / unitCashRequired) : 0
         if (maxQty > 0) {
             handleBuy(stock, maxQty)
         }
-    }, [cash, handleBuy])
+    }, [cash, currentLeverage, unlockedSkills, handleBuy])
 
     // 전량 매도
     const handleSellAll = useCallback((stock) => {
