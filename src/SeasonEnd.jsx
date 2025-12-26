@@ -13,7 +13,6 @@ export default function SeasonEndModal({
     maxWinStreak,
     tradeHistory,
     unlockedAchievements,
-    assetHistory,
     onStartNewSeason,
     onClose
 }) {

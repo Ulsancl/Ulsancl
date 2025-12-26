@@ -1,5 +1,5 @@
 // 컨페티 애니메이션 컴포넌트
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './Confetti.css'
 
 export default function Confetti({ trigger, duration = 3000 }) {
@@ -64,9 +64,14 @@ export default function Confetti({ trigger, duration = 3000 }) {
 // 숫자 롤링 애니메이션
 export function AnimatedNumber({ value, duration = 500, format = 'number' }) {
     const [displayValue, setDisplayValue] = useState(value)
+    const displayValueRef = useRef(value)
 
     useEffect(() => {
-        const startValue = displayValue
+        displayValueRef.current = displayValue
+    }, [displayValue])
+
+    useEffect(() => {
+        const startValue = displayValueRef.current
         const endValue = value
         const startTime = Date.now()
 
@@ -118,7 +123,7 @@ export function PriceFlash({ price, previousPrice }) {
 
         const timer = setTimeout(() => setFlash(''), 500)
         return () => clearTimeout(timer)
-    }, [price])
+    }, [isDown, isUp])
 
     return (
         <span className={`price-flash ${flash}`}>

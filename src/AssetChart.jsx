@@ -1,6 +1,6 @@
 // 자산 변동 차트 컴포넌트
 import { useMemo } from 'react'
-import { formatCompact, formatPercent, formatTime } from './utils'
+import { formatCompact, formatPercent } from './utils'
 import { INITIAL_CAPITAL } from './constants'
 import './AssetChart.css'
 

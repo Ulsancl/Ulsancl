@@ -2,7 +2,7 @@
  * GameContext - 게임 전역 상태 Context
  * prop drilling 제거 및 상태 관리 중앙화
  */
-import React, { createContext, useContext, useReducer, useMemo, useCallback } from 'react'
+import React, { createContext, useContext, useReducer, useMemo } from 'react'
 import { INITIAL_CAPITAL } from '../constants'
 
 // 액션 타입

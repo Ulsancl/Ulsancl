@@ -190,7 +190,7 @@ export const checkAndGenerateCrisis = (currentDay, marketState) => {
     // 새 위기 발생 확률 체크
     const allCrises = { ...CRISIS_TYPES, ...BOOM_EVENTS }
 
-    for (const [key, crisis] of Object.entries(allCrises)) {
+    for (const crisis of Object.values(allCrises)) {
         // 시장이 이미 불안정하면 위기 확률 증가
         const volatilityBonus = marketState.volatility > 1.5 ? 2 : 1
 
@@ -246,7 +246,7 @@ const updateCrisisPhase = (currentDay) => {
 /**
  * 위기가 주가에 미치는 영향 계산
  */
-export const calculateCrisisImpact = (stock, currentDay) => {
+export const calculateCrisisImpact = (stock, _currentDay) => {
     if (!activeCrisis) return 0
 
     let impact = activeCrisis.currentImpact

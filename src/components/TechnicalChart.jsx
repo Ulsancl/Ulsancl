@@ -297,8 +297,6 @@ const MACDChart = memo(function MACDChart({ priceHistory, width, height }) {
         return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
     }).join(' ')
 
-    const currentMACD = macd.macdLine[macd.macdLine.length - 1]
-    const currentSignal = macd.signalLine[macd.signalLine.length - 1]
     const currentHist = macd.histogram[macd.histogram.length - 1]
 
     return (

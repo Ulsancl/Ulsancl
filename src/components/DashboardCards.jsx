@@ -2,7 +2,7 @@
  * DashboardCard - 대시보드 통계 카드 컴포넌트
  */
 import React, { memo } from 'react'
-import { formatCompact, formatPercent, formatNumber } from '../utils'
+import { formatCompact, formatPercent } from '../utils'
 import { CREDIT_TRADING } from '../constants'
 
 // 통계 카드

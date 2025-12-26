@@ -284,30 +284,7 @@ function App() {
     formatNumber
   })
 
-  // Mission progress
-  useEffect(() => {
-    setMissionProgress({
-      daily_trade_3: dailyTrades,
-      daily_profit_1m: dailyProfit,
-      daily_hold_5: Object.keys(portfolio).length,
-      weekly_trade_20: totalTrades,
-      weekly_profit_10m: totalProfit,
-      weekly_streak: winStreak,
-    })
-  }, [dailyTrades, dailyProfit, portfolio, totalTrades, totalProfit, winStreak])
-
-  useEffect(() => {
-    setMaxWinStreak(prev => Math.max(prev, winStreak))
-  }, [winStreak])
-
-  // 업적 체크
-  useEffect(() => {
-    const gameState = { totalTrades, totalProfit, totalAssets, portfolio, tradeHistory, winStreak }
-    const newUnlocks = checkAchievements(gameState, unlockedAchievements, ACHIEVEMENTS)
-    newUnlocks.forEach(ach => unlockAchievement(ach.id))
-  }, [totalTrades, totalProfit, totalAssets, portfolio, winStreak])
-
-  const unlockAchievement = (id) => {
+  const unlockAchievement = useCallback((id) => {
     if (unlockedAchievements[id]) return
     const ach = ACHIEVEMENTS[id]
     if (!ach) return
@@ -321,7 +298,30 @@ function App() {
       setAchievementPopup(null)
       setShowConfetti(false)
     }, 3000)
-  }
+  }, [playSound, setAchievementPopup, setShowConfetti, setTotalXp, setUnlockedAchievements, unlockedAchievements])
+
+  // Mission progress
+  useEffect(() => {
+    setMissionProgress({
+      daily_trade_3: dailyTrades,
+      daily_profit_1m: dailyProfit,
+      daily_hold_5: Object.keys(portfolio).length,
+      weekly_trade_20: totalTrades,
+      weekly_profit_10m: totalProfit,
+      weekly_streak: winStreak,
+    })
+  }, [dailyTrades, dailyProfit, portfolio, setMissionProgress, totalTrades, totalProfit, winStreak])
+
+  useEffect(() => {
+    setMaxWinStreak(prev => Math.max(prev, winStreak))
+  }, [setMaxWinStreak, winStreak])
+
+  // 업적 체크
+  useEffect(() => {
+    const gameState = { totalTrades, totalProfit, totalAssets, portfolio, tradeHistory, winStreak }
+    const newUnlocks = checkAchievements(gameState, unlockedAchievements, ACHIEVEMENTS)
+    newUnlocks.forEach(ach => unlockAchievement(ach.id))
+  }, [portfolio, totalAssets, totalProfit, totalTrades, tradeHistory, unlockAchievement, unlockedAchievements, winStreak])
 
   // Mission rewards
   const handleClaimMissionReward = (mission) => {

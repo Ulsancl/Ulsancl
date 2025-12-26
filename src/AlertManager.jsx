@@ -101,7 +101,6 @@ export default function AlertManager({ alerts, stocks, onAddAlert, onRemoveAlert
                     ) : (
                         <div className="alerts-list">
                             {alerts.map(alert => {
-                                const stock = stocks.find(s => s.id === alert.stockId)
                                 const typeInfo = ALERT_TYPES[alert.type]
                                 return (
                                     <div key={alert.id} className={`alert-item ${alert.triggered ? 'triggered' : ''}`}>

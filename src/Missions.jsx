@@ -4,17 +4,7 @@ import { formatNumber, formatCompact } from './utils'
 import './Missions.css'
 
 export default function MissionsPanel({ missionProgress, completedMissions, onClaimReward, onClose }) {
-    const today = new Date().toDateString()
-    const weekStart = getWeekStart()
-
-    function getWeekStart() {
-        const now = new Date()
-        const day = now.getDay()
-        const diff = now.getDate() - day + (day === 0 ? -6 : 1)
-        return new Date(now.setDate(diff)).toDateString()
-    }
-
-    const renderMission = (mission, period) => {
+    const renderMission = (mission) => {
         const progress = missionProgress?.[mission.id] || 0
         const isCompleted = completedMissions?.[mission.id]
         const progressPercent = Math.min(100, (progress / mission.target) * 100)

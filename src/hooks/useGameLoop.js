@@ -542,7 +542,36 @@ export const useGameLoop = ({
                 clearTimeout(priceResetTimeoutRef.current)
             }
         }
-    }, [updateInterval])
+    }, [
+        updateInterval,
+        setActiveCrisis,
+        setAlerts,
+        setAssetHistory,
+        setCash,
+        setCreditInterest,
+        setCreditUsed,
+        setCrisisAlert,
+        setCrisisHistory,
+        setCurrentDay,
+        setDailyProfit,
+        setDailyTrades,
+        setGameTime,
+        setMarginCallActive,
+        setMarketState,
+        setNews,
+        setPendingOrders,
+        setPortfolio,
+        setPriceChanges,
+        setPriceHistory,
+        setShortPositions,
+        setShowSeasonEnd,
+        setStocks,
+        setTotalDividends,
+        setTotalProfit,
+        setTotalTrades,
+        setTradeHistory,
+        setWinStreak
+    ])
 }
 
 export default useGameLoop

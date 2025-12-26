@@ -211,7 +211,7 @@ export const useGameState = (input = {}) => {
             onNewUser()
         }
         return true // 저장 데이터 없음 = 신규 유저
-    }, [onNewUser, setSettings])
+    }, [onNewUser, setIfChanged, setSettings])
 
     // 게임 저장
     const saveGameState = useCallback(() => {
@@ -220,7 +220,7 @@ export const useGameState = (input = {}) => {
 
     // 초기화
     useEffect(() => {
-        const isNewUser = loadGameState()
+        loadGameState()
         setIfChanged(setIsInitialized, true)
         return () => { }
     }, [loadGameState, setIfChanged])

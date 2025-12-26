@@ -35,7 +35,7 @@ export function useSound(enabled = true, volume = 0.5) {
                     // 자동 재생 정책으로 실패할 수 있음 - 무시
                 })
             }
-        } catch (e) {
+        } catch {
             // 사운드 재생 실패 - 무시
         }
     }, [enabled, volume])
