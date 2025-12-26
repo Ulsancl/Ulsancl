@@ -163,7 +163,7 @@ function App() {
   // 사운드
   const { playSound } = useSound(settings.soundEnabled, settings.volume)
 
-  const stockLookup = useMemo(() => new Map(stocks.map(stock => [stock.id, stock])), [stocks])
+  const stocksById = useMemo(() => new Map(stocks.map(stock => [stock.id, stock])), [stocks])
 
   // 레벨 정보
   const levelInfo = calculateLevel(totalXp, LEVELS)
@@ -181,21 +181,21 @@ function App() {
   const stockValue = useMemo(() => {
     if (!portfolio) return 0
     return Object.entries(portfolio).reduce((total, [stockId, holding]) => {
-      const stock = stockLookup.get(parseInt(stockId))
+      const stock = stocksById.get(parseInt(stockId))
       const val = stock ? stock.price * holding.quantity : 0
       return total + (isNaN(val) ? 0 : val)
     }, 0)
-  }, [portfolio, stockLookup])
+  }, [portfolio, stocksById])
 
   const shortValue = useMemo(() => {
     if (!shortPositions) return 0
     return Object.entries(shortPositions).reduce((total, [stockId, position]) => {
-      const stock = stockLookup.get(parseInt(stockId))
+      const stock = stocksById.get(parseInt(stockId))
       if (!stock) return total
       const pnl = (position.entryPrice - stock.price) * position.quantity
       return total + (isNaN(pnl) ? 0 : pnl)
     }, 0)
-  }, [shortPositions, stockLookup])
+  }, [shortPositions, stocksById])
 
   const safeCash = isNaN(cash) ? 0 : cash
   const safeCreditUsed = isNaN(creditUsed) ? 0 : creditUsed
@@ -408,7 +408,7 @@ function App() {
       {showWatchlist && <Watchlist watchlist={watchlist} stocks={stocks} onToggleWatch={toggleWatchlist} onStockClick={setChartStock} onClose={() => setShowWatchlist(false)} />}
       {showStatistics && <StatisticsPanel tradeHistory={tradeHistory} assetHistory={assetHistory} totalAssets={totalAssets} onClose={() => setShowStatistics(false)} />}
       {showAlertManager && <AlertManager alerts={alerts} stocks={stocks} onAddAlert={(a) => setAlerts(prev => [...prev, a])} onRemoveAlert={(id) => setAlerts(prev => prev.filter(a => a.id !== id))} onClose={() => setShowAlertManager(false)} />}
-      {orderManagerStock && <OrderManager stock={orderManagerStock} currentPrice={stocks.find(s => s.id === orderManagerStock.id)?.price || orderManagerStock.price} portfolio={portfolio} cash={cash} onPlaceOrder={handlePlaceOrder} onClose={() => setOrderManagerStock(null)} initialSide={orderManagerSide} />}
+      {orderManagerStock && <OrderManager stock={orderManagerStock} currentPrice={stocksById.get(orderManagerStock.id)?.price || orderManagerStock.price} portfolio={portfolio} cash={cash} onPlaceOrder={handlePlaceOrder} onClose={() => setOrderManagerStock(null)} initialSide={orderManagerSide} />}
       {showSkills && <SkillsPanel unlockedSkills={unlockedSkills} skillPoints={availableSkillPoints} onUpgradeSkill={handleUpgradeSkill} onClose={() => setShowSkills(false)} />}
 
 
@@ -730,7 +730,7 @@ function App() {
               stock={chartStock}
               onClose={() => setChartStock(null)}
               currentPrice={
-                stocks.find(s => s.id === chartStock.id)?.price || chartStock.price
+                stocksById.get(chartStock.id)?.price || chartStock.price
               }
               tradeHistory={tradeHistory}
               history={priceHistory[chartStock.id] || []}
