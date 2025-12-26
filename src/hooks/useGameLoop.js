@@ -149,25 +149,30 @@ export const useGameLoop = ({
             updateNewsEffects()
             let workingAlerts = currentAlerts
 
-            const calcStockValue = (list, holdings) => {
+            // 성능 측정 (개발용): 필요 시 아래 console.time을 주석 해제해서 tick 비용을 측정하세요.
+            // console.time('gameLoop:tick')
+
+            const calcStockValue = (map, holdings) => {
                 if (!holdings) return 0
                 return Object.entries(holdings).reduce((total, [stockId, holding]) => {
-                    const stock = list.find(s => s.id === parseInt(stockId))
+                    const stock = map.get(parseInt(stockId))
                     if (!stock) return total
                     const val = stock.price * holding.quantity
                     return total + (isNaN(val) ? 0 : val)
                 }, 0)
             }
 
-            const calcShortValue = (list, shorts) => {
+            const calcShortValue = (map, shorts) => {
                 if (!shorts) return 0
                 return Object.entries(shorts).reduce((total, [stockId, position]) => {
-                    const stock = list.find(s => s.id === parseInt(stockId))
+                    const stock = map.get(parseInt(stockId))
                     if (!stock) return total
                     const pnl = (position.entryPrice - stock.price) * position.quantity
                     return total + (isNaN(pnl) ? 0 : pnl)
                 }, 0)
             }
+
+            const stockMap = new Map()
 
             // 신규 거래일 시작 체크
             if (gameDay > lastDayRef.current) {
@@ -192,10 +197,14 @@ export const useGameLoop = ({
                 playSound('news')
             }
 
+            workingStocks.forEach(stock => {
+                stockMap.set(stock.id, stock)
+            })
+
             // 마진콜 체크 (담보비율 30% 이하 경고, 20% 이하 강제청산)
             if (workingCreditUsed > 0) {
-                const stockValueNow = calcStockValue(workingStocks, workingPortfolio)
-                const shortValueNow = calcShortValue(workingStocks, workingShortPositions)
+                const stockValueNow = calcStockValue(stockMap, workingPortfolio)
+                const shortValueNow = calcShortValue(stockMap, workingShortPositions)
                 const grossAssetsNow = workingCash + stockValueNow + shortValueNow
                 const currentMarginRatio = grossAssetsNow / workingCreditUsed
                 if (currentMarginRatio <= CREDIT_TRADING.liquidationMargin) {
@@ -205,7 +214,7 @@ export const useGameLoop = ({
                     // 모든 주식 매도
                     Object.keys(workingPortfolio).forEach(stockId => {
                         const holding = workingPortfolio[stockId]
-                        const stock = workingStocks.find(s => s.id === parseInt(stockId))
+                        const stock = stockMap.get(parseInt(stockId))
                         if (stock && holding.quantity > 0) {
                             const saleAmount = Math.floor(stock.price * holding.quantity * 0.95) // 5% 슬리피지
                             workingCash += saleAmount
@@ -360,6 +369,11 @@ export const useGameLoop = ({
             })
 
             workingStocks = newStocks
+            stockMap.clear()
+            workingStocks.forEach(stock => {
+                stockMap.set(stock.id, stock)
+            })
+
             if (workingPendingOrders.length > 0) {
                 const feeDiscountLevel = currentUnlockedSkills?.['fee_discount'] || 0
                 let orderFeeRate = 0.0015
@@ -411,7 +425,7 @@ export const useGameLoop = ({
                 const liquidated = []
 
                 Object.entries(workingShortPositions).forEach(([stockId, position]) => {
-                    const stock = workingStocks.find(s => s.id === parseInt(stockId))
+                    const stock = stockMap.get(parseInt(stockId))
                     if (!stock) return
 
                     const interest = stock.price * position.quantity * SHORT_SELLING.interestRate
@@ -454,7 +468,7 @@ export const useGameLoop = ({
                 let dividendTotal = 0
                 Object.entries(workingPortfolio).forEach(([stockId, holding]) => {
                     const rate = DIVIDEND_RATES[parseInt(stockId)] || 0
-                    const stock = workingStocks.find(s => s.id === parseInt(stockId))
+                    const stock = stockMap.get(parseInt(stockId))
                     if (stock && rate > 0) {
                         const dividend = Math.round(stock.price * holding.quantity * (rate / 100) / 60)
                         dividendTotal += dividend
@@ -468,14 +482,16 @@ export const useGameLoop = ({
                 lastDividendTimeRef.current = now
             }
 
-            const stockValueNow = calcStockValue(workingStocks, workingPortfolio)
-            const shortValueNow = calcShortValue(workingStocks, workingShortPositions)
+            const stockValueNow = calcStockValue(stockMap, workingPortfolio)
+            const shortValueNow = calcShortValue(stockMap, workingShortPositions)
             const grossAssetsNow = workingCash + stockValueNow + shortValueNow
             const totalAssetsNow = grossAssetsNow - workingCreditUsed - workingCreditInterest
 
             if (now % 10000 < 1000) {
                 setAssetHistory(prev => [...prev.slice(-100), { value: totalAssetsNow, timestamp: now, day: gameDay }])
             }
+
+            // console.timeEnd('gameLoop:tick')
 
             setStocks(workingStocks)
             setMarketState(workingMarketState)
