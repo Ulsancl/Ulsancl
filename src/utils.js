@@ -3,7 +3,33 @@
 import { INITIAL_CAPITAL } from './constants'
 
 const SAVE_KEY = 'stockTradingGame'
-const SAVE_VERSION = 2
+
+const MIGRATIONS = [
+    {
+        version: 1,
+        defaults: {},
+        migrate: () => {}
+    },
+    {
+        version: 2,
+        defaults: {
+            shortPositions: {},
+            creditUsed: 0,
+            creditInterest: 0,
+            pendingOrders: [],
+            unlockedSkills: {},
+            maxWinStreak: 0,
+            totalDividends: 0,
+            assetHistory: [],
+            watchlist: [],
+            alerts: [],
+            currentDay: 1,
+            gameStartTime: () => Date.now()
+        },
+        migrate: () => {}
+    }
+]
+const SAVE_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version
 
 const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value)
 
@@ -15,6 +41,14 @@ const toNumber = (value, fallback = 0) => {
 const normalizeVersion = (value) => {
     const num = toNumber(value, 0)
     return Number.isFinite(num) && num >= 0 ? num : 0
+}
+
+const applyDefaults = (data, defaults) => {
+    Object.entries(defaults).forEach(([key, value]) => {
+        if (data[key] === undefined || data[key] === null) {
+            data[key] = typeof value === 'function' ? value() : value
+        }
+    })
 }
 
 const getDefaultSaveState = () => ({
@@ -86,27 +120,18 @@ const sanitizeSaveData = (data) => {
 
 const migrateSaveData = (rawData) => {
     const data = isPlainObject(rawData) ? { ...rawData } : {}
-    const version = normalizeVersion(data.version)
-    let migratedVersion = version
+    let migratedVersion = normalizeVersion(data.version)
+
+    MIGRATIONS.filter((migration) => migration.version > migratedVersion)
+        .sort((a, b) => a.version - b.version)
+        .forEach((migration) => {
+            applyDefaults(data, migration.defaults)
+            migration.migrate(data)
+            migratedVersion = migration.version
+        })
 
     if (migratedVersion < 1) {
         migratedVersion = 1
-    }
-
-    if (migratedVersion < 2) {
-        data.shortPositions = data.shortPositions ?? {}
-        data.creditUsed = data.creditUsed ?? 0
-        data.creditInterest = data.creditInterest ?? 0
-        data.pendingOrders = data.pendingOrders ?? []
-        data.unlockedSkills = data.unlockedSkills ?? {}
-        data.maxWinStreak = data.maxWinStreak ?? 0
-        data.totalDividends = data.totalDividends ?? 0
-        data.assetHistory = data.assetHistory ?? []
-        data.watchlist = data.watchlist ?? []
-        data.alerts = data.alerts ?? []
-        data.currentDay = data.currentDay ?? 1
-        data.gameStartTime = data.gameStartTime ?? Date.now()
-        migratedVersion = 2
     }
 
     data.version = migratedVersion
