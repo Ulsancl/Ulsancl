@@ -155,3 +155,16 @@ export const MARKET_EVENTS = [
     { id: 'merger', name: '기업 합병', icon: '🤝', probability: 0.002, description: '합병 소식' },
     { id: 'circuit_breaker', name: '서킷브레이커', icon: '⚡', probability: 0.001, description: '거래 일시 중단' },
 ]
+
+export const IPO_CANDIDATES = [
+    { name: '토스(비바)', code: 'TOSS', sector: 'finance', basePrice: 55000, color: '#3182F6' },
+    { name: '두나무', code: 'UPBIT', sector: 'finance', basePrice: 120000, color: '#093687' },
+    { name: '야놀자', code: 'YANO', sector: 'travel', basePrice: 45000, color: '#FF0055' }, // travel sector doesn't exist, map to entertainment or service
+    { name: '마켓컬리', code: 'KURLY', sector: 'retail', basePrice: 25000, color: '#5F0080' },
+    { name: '무신사', code: 'MUSIN', sector: 'retail', basePrice: 32000, color: '#000000' },
+    { name: '직방', code: 'ZIG', sector: 'service', basePrice: 18000, color: '#FF9700' },
+    { name: '당근마켓', code: 'KAR', sector: 'service', basePrice: 22000, color: '#FF6F0F' },
+    { name: '빗썸', code: 'BITH', sector: 'finance', basePrice: 65000, color: '#FF8000' },
+    { name: '현대오일뱅크', code: 'HOB', sector: 'energy', basePrice: 42000, color: '#004797' },
+    { name: 'CJ올리브영', code: 'OLIVE', sector: 'retail', basePrice: 85000, color: '#97C00E' },
+]

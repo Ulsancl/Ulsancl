@@ -28,7 +28,8 @@ echo [알림] 게임 서버를 시작합니다...
 echo [안내] 게임을 종료하려면 이 창을 닫으세요.
 
 :: 서버가 준비될 때까지 대기 후 브라우저 실행
-start /b cmd /c "timeout /t 5 /nobreak >nul && start \"\" \"http://localhost:7777?nocache=%random%\""
+set "GAME_URL=http://localhost:7777?nocache=%random%"
+start "" /b powershell -NoProfile -Command "Start-Sleep -Seconds 5; Start-Process '%GAME_URL%'"
 
 :: 메인 프로세스에서 npm run dev 실행 (창 유지)
 call npm run dev

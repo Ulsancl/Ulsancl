@@ -8,6 +8,8 @@ export {
     VOLATILITY_CONFIG,
     getTickSize,
     roundToTickSize,
+    getMinPrice,
+    normalizePrice,
     calculatePriceChange,
     startNewTradingDay,
     updateDailyRange
@@ -21,7 +23,9 @@ export {
     generateNews,
     generateGlobalEvent,
     applyNewsImpact,
-    resetNewsSystem
+    resetNewsSystem,
+    SEASONAL_EVENTS,
+    generateSeasonalEvent
 } from './newsSystem'
 
 // 거래 시스템
@@ -34,21 +38,28 @@ export {
 
 // 시장 상태
 export {
-    GAME_SPEED,
     SECONDS_PER_DAY,
+    GAME_START_YEAR,
+    DAYS_PER_YEAR,
+    MINUTES_PER_TICK,
+    MARKET_OPEN_HOUR,
+    MARKET_CLOSE_HOUR,
     MARKET_START_HOUR,
     MARKET_END_HOUR,
+    SEASONS,
     calculateGameDate,
     updateMarketState,
     isMarketHours
 } from './marketState'
 
-// 기존 gameEngine의 함수들 (호환성 유지)
-// 점진적 마이그레이션을 위해 기존 gameEngine에서 re-export
 export {
-    calculateAllStockPrices,
-    generateSeasonalEvent,
-    updatePricesWithCrisis,
+    calculateAllStockPrices
+} from './priceSimulation'
+
+export {
     applyCrisisImpact,
-    getActiveCrisis
-} from '../gameEngine'
+    updatePricesWithCrisis,
+    getActiveCrisis,
+    checkAndGenerateCrisis,
+    calculateCrisisImpact
+} from './crisisSystem'

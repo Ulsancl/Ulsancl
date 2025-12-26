@@ -1,15 +1,126 @@
 // 게임 저장/로드 및 유틸리티 함수
 
+import { INITIAL_CAPITAL } from './constants'
+
 const SAVE_KEY = 'stockTradingGame'
+const SAVE_VERSION = 2
+
+const isPlainObject = (value) => value && typeof value === 'object' && !Array.isArray(value)
+
+const toNumber = (value, fallback = 0) => {
+    const num = typeof value === 'string' ? Number(value) : value
+    return Number.isFinite(num) ? num : fallback
+}
+
+const normalizeVersion = (value) => {
+    const num = toNumber(value, 0)
+    return Number.isFinite(num) && num >= 0 ? num : 0
+}
+
+const getDefaultSaveState = () => ({
+    cash: INITIAL_CAPITAL,
+    portfolio: {},
+    shortPositions: {},
+    creditUsed: 0,
+    creditInterest: 0,
+    tradeHistory: [],
+    pendingOrders: [],
+    unlockedAchievements: {},
+    unlockedSkills: {},
+    totalXp: 0,
+    totalTrades: 0,
+    winStreak: 0,
+    maxWinStreak: 0,
+    totalProfit: 0,
+    news: [],
+    missionProgress: {},
+    completedMissions: {},
+    totalDividends: 0,
+    assetHistory: [],
+    watchlist: [],
+    alerts: [],
+    gameStartTime: Date.now(),
+    currentDay: 1
+})
+
+const sanitizeSaveData = (data) => {
+    const defaults = getDefaultSaveState()
+    const sanitized = {
+        ...data,
+        cash: toNumber(data.cash, defaults.cash),
+        portfolio: isPlainObject(data.portfolio) ? data.portfolio : defaults.portfolio,
+        shortPositions: isPlainObject(data.shortPositions) ? data.shortPositions : defaults.shortPositions,
+        creditUsed: toNumber(data.creditUsed, defaults.creditUsed),
+        creditInterest: toNumber(data.creditInterest, defaults.creditInterest),
+        tradeHistory: Array.isArray(data.tradeHistory) ? data.tradeHistory : defaults.tradeHistory,
+        pendingOrders: Array.isArray(data.pendingOrders) ? data.pendingOrders : defaults.pendingOrders,
+        unlockedAchievements: isPlainObject(data.unlockedAchievements) ? data.unlockedAchievements : defaults.unlockedAchievements,
+        unlockedSkills: isPlainObject(data.unlockedSkills) ? data.unlockedSkills : defaults.unlockedSkills,
+        totalXp: toNumber(data.totalXp, defaults.totalXp),
+        totalTrades: toNumber(data.totalTrades, defaults.totalTrades),
+        winStreak: toNumber(data.winStreak, defaults.winStreak),
+        maxWinStreak: toNumber(data.maxWinStreak, defaults.maxWinStreak),
+        totalProfit: toNumber(data.totalProfit, defaults.totalProfit),
+        news: Array.isArray(data.news) ? data.news : defaults.news,
+        missionProgress: isPlainObject(data.missionProgress) ? data.missionProgress : defaults.missionProgress,
+        completedMissions: isPlainObject(data.completedMissions) ? data.completedMissions : defaults.completedMissions,
+        totalDividends: toNumber(data.totalDividends, defaults.totalDividends),
+        assetHistory: Array.isArray(data.assetHistory) ? data.assetHistory : defaults.assetHistory,
+        watchlist: Array.isArray(data.watchlist) ? data.watchlist : defaults.watchlist,
+        alerts: Array.isArray(data.alerts) ? data.alerts : defaults.alerts,
+        gameStartTime: toNumber(data.gameStartTime, defaults.gameStartTime),
+        currentDay: Math.max(1, Math.floor(toNumber(data.currentDay, defaults.currentDay))),
+        savedAt: toNumber(data.savedAt, Date.now()),
+        version: SAVE_VERSION
+    }
+
+    if (!Array.isArray(data.stocks) || data.stocks.length === 0) {
+        delete sanitized.stocks
+    }
+    if (!isPlainObject(data.settings)) {
+        delete sanitized.settings
+    }
+
+    return sanitized
+}
+
+const migrateSaveData = (rawData) => {
+    const data = isPlainObject(rawData) ? { ...rawData } : {}
+    const version = normalizeVersion(data.version)
+    let migratedVersion = version
+
+    if (migratedVersion < 1) {
+        migratedVersion = 1
+    }
+
+    if (migratedVersion < 2) {
+        data.shortPositions = data.shortPositions ?? {}
+        data.creditUsed = data.creditUsed ?? 0
+        data.creditInterest = data.creditInterest ?? 0
+        data.pendingOrders = data.pendingOrders ?? []
+        data.unlockedSkills = data.unlockedSkills ?? {}
+        data.maxWinStreak = data.maxWinStreak ?? 0
+        data.totalDividends = data.totalDividends ?? 0
+        data.assetHistory = data.assetHistory ?? []
+        data.watchlist = data.watchlist ?? []
+        data.alerts = data.alerts ?? []
+        data.currentDay = data.currentDay ?? 1
+        data.gameStartTime = data.gameStartTime ?? Date.now()
+        migratedVersion = 2
+    }
+
+    data.version = migratedVersion
+    return data
+}
 
 // 게임 상태 저장
 export const saveGame = (gameState) => {
     try {
-        const saveData = {
+        const saveData = sanitizeSaveData({
             ...gameState,
             savedAt: Date.now(),
-            version: '1.0'
-        }
+            version: SAVE_VERSION
+        })
         localStorage.setItem(SAVE_KEY, JSON.stringify(saveData))
         return true
     } catch (error) {
@@ -24,7 +135,9 @@ export const loadGame = () => {
         const saved = localStorage.getItem(SAVE_KEY)
         if (!saved) return null
 
-        const data = JSON.parse(saved)
+        let data = JSON.parse(saved)
+        if (!isPlainObject(data)) return null
+        data = sanitizeSaveData(migrateSaveData(data))
         console.log('게임 로드 성공:', new Date(data.savedAt).toLocaleString())
         return data
     } catch (error) {

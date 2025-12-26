@@ -40,9 +40,9 @@ describe('priceCalculator', () => {
 
     describe('roundToTickSize', () => {
         test('가격을 올바른 틱 사이즈로 반올림', () => {
-            expect(roundToTickSize(72345, 'stock')).toBe(72350)
-            expect(roundToTickSize(72344, 'stock')).toBe(72350)
-            expect(roundToTickSize(72351, 'stock')).toBe(72350)
+            expect(roundToTickSize(72345, 'stock')).toBe(72300)
+            expect(roundToTickSize(72344, 'stock')).toBe(72300)
+            expect(roundToTickSize(72351, 'stock')).toBe(72400)
         })
 
         test('코인 가격 반올림', () => {

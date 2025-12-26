@@ -13,7 +13,7 @@ export const useTrading = ({
     shortPositions, setShortPositions,
     creditUsed, setCreditUsed,
     creditInterest, setCreditInterest,
-    tradeHistory, setTradeHistory,
+    setTradeHistory,
     totalTrades, setTotalTrades,
     dailyTrades, setDailyTrades,
     dailyProfit, setDailyProfit,
@@ -22,8 +22,9 @@ export const useTrading = ({
     unlockedSkills,
     currentLeverage,
     canUseCredit,
+    canShortSell,
     availableCredit,
-    grossAssets,
+    setPendingOrders,
     showNotification,
     playSound,
     addActionFeedback,
@@ -154,6 +155,85 @@ export const useTrading = ({
         return true
     }, [portfolio, unlockedSkills, showNotification, playSound, setCash, setPortfolio, setTradeHistory, setTotalTrades, setDailyTrades, setTotalProfit, setDailyProfit, setWinStreak, addActionFeedback, formatCompact])
 
+    // 공매도
+    const handleShortSell = useCallback((stock, qty) => {
+        if (!canShortSell) {
+            showNotification(`공매도는 Lv.${SHORT_SELLING.minLevel} 이상 필요!`, 'error')
+            playSound?.('error')
+            return false
+        }
+
+        const marginRequired = stock.price * qty * SHORT_SELLING.marginRate
+        if (marginRequired > cash) {
+            showNotification('증거금이 부족합니다!', 'error')
+            playSound?.('error')
+            return false
+        }
+
+        setCash(prev => prev - marginRequired)
+        setShortPositions(prev => {
+            const existing = prev[stock.id]
+            if (existing) {
+                const totalQty = existing.quantity + qty
+                const avgPrice = (existing.entryPrice * existing.quantity + stock.price * qty) / totalQty
+                return {
+                    ...prev,
+                    [stock.id]: { quantity: totalQty, entryPrice: avgPrice, margin: existing.margin + marginRequired, openTime: existing.openTime }
+                }
+            }
+            return {
+                ...prev,
+                [stock.id]: { quantity: qty, entryPrice: stock.price, margin: marginRequired, openTime: Date.now() }
+            }
+        })
+
+        const trade = { id: generateId(), type: 'short', stockId: stock.id, quantity: qty, price: stock.price, total: marginRequired, timestamp: Date.now() }
+        setTradeHistory(prev => [...prev, trade])
+        setTotalTrades(prev => prev + 1)
+        setDailyTrades(prev => prev + 1)
+        playSound?.('sell')
+        showNotification(`🐻 ${stock.name} ${qty}주 공매도`, 'info')
+        return true
+    }, [canShortSell, cash, showNotification, playSound, setCash, setShortPositions, setTradeHistory, setTotalTrades, setDailyTrades])
+
+    // 공매도 청산
+    const handleCoverShort = useCallback((stock, qty) => {
+        const position = shortPositions[stock.id]
+        if (!position || qty > position.quantity) {
+            showNotification('공매도 포지션이 부족합니다!', 'error')
+            playSound?.('error')
+            return false
+        }
+
+        const pnl = (position.entryPrice - stock.price) * qty
+        const marginReturn = (position.margin / position.quantity) * qty
+
+        setCash(prev => prev + marginReturn + pnl)
+        setShortPositions(prev => {
+            const remainingQty = position.quantity - qty
+            if (remainingQty <= 0) {
+                const updated = { ...prev }
+                delete updated[stock.id]
+                return updated
+            }
+            return {
+                ...prev,
+                [stock.id]: { ...position, quantity: remainingQty, margin: position.margin - marginReturn }
+            }
+        })
+
+        setTotalTrades(prev => prev + 1)
+        setTotalProfit(prev => prev + pnl)
+        setDailyProfit(prev => prev + pnl)
+
+        if (pnl > 0) setWinStreak(prev => prev + 1)
+        else setWinStreak(0)
+
+        playSound?.('buy')
+        showNotification(`🐻 ${stock.name} 청산 (${pnl >= 0 ? '+' : ''}${formatCompact(pnl)})`, pnl >= 0 ? 'success' : 'error')
+        return true
+    }, [shortPositions, showNotification, playSound, setCash, setShortPositions, setTotalTrades, setTotalProfit, setDailyProfit, setWinStreak, formatCompact])
+
     // 신용 거래 - 대출
     const handleBorrowCredit = useCallback((amount) => {
         if (!canUseCredit) {
@@ -229,11 +309,25 @@ export const useTrading = ({
         }
     }, [portfolio, handleSell])
 
+    const handlePlaceOrder = useCallback((order) => {
+        setPendingOrders(prev => [...prev, { ...order, id: generateId() }])
+        showNotification(`${order.type} 주문 등록됨`, 'info')
+    }, [setPendingOrders, showNotification])
+
+    const handleCancelOrder = useCallback((order) => {
+        setPendingOrders(prev => prev.filter(o => o.id !== order.id))
+        showNotification('주문 취소됨', 'info')
+    }, [setPendingOrders, showNotification])
+
     return {
         handleBuy,
         handleSell,
         handleBuyMax,
         handleSellAll,
+        handleShortSell,
+        handleCoverShort,
+        handlePlaceOrder,
+        handleCancelOrder,
         handleBorrowCredit,
         handleRepayCredit
     }

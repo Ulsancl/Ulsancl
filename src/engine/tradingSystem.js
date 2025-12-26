@@ -5,17 +5,11 @@
 
 import { ACHIEVEMENTS, MARKET_EVENTS, IPO_CANDIDATES } from '../constants'
 import { randomChoice, generateId } from '../utils'
-import { VOLATILITY_CONFIG, roundToTickSize } from './priceCalculator'
+import { VOLATILITY_CONFIG, roundToTickSize, getMinPrice, normalizePrice } from './priceCalculator'
 
 /**
  * 주문 처리
  */
-const getOrderMinPrice = (stockType) => (
-    stockType === 'crypto'
-        ? 0.01
-        : (stockType === 'bond' ? 90000 : (stockType === 'commodity' ? 1 : 100))
-)
-
 const getOrderSlippageRate = (stockType) => {
     const config = VOLATILITY_CONFIG[stockType] || VOLATILITY_CONFIG.stock
     return Math.min(0.01, Math.max(0.0005, config.base * 2))
@@ -23,7 +17,7 @@ const getOrderSlippageRate = (stockType) => {
 
 const getOrderExecutionPrice = (order, stock, normalizedTargetPrice) => {
     const stockType = stock.type || 'stock'
-    const minPrice = getOrderMinPrice(stockType)
+    const minPrice = getMinPrice(stockType)
     const basePrice = stock.price
     let executionPrice = basePrice
 
@@ -77,10 +71,7 @@ export const processOrders = (orders, stocks, cash, portfolio, options = {}) => 
 
         const stockType = stock.type || 'stock'
         const rawTargetPrice = typeof order.targetPrice === 'number' ? order.targetPrice : stock.price
-        const normalizedTargetPrice = Math.max(
-            getOrderMinPrice(stockType),
-            roundToTickSize(rawTargetPrice, stockType)
-        )
+        const normalizedTargetPrice = normalizePrice(rawTargetPrice, stockType)
         const normalizedOrder = order.targetPrice === normalizedTargetPrice
             ? order
             : { ...order, targetPrice: normalizedTargetPrice }

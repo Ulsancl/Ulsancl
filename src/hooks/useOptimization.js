@@ -27,26 +27,30 @@ export const useDebouncedValue = (value, delay = 300) => {
  * 지정된 시간 간격으로만 실행
  */
 export const useThrottle = (callback, delay = 100) => {
-    const lastRun = useRef(Date.now())
+    const lastRun = useRef(null)
     const timeoutRef = useRef(null)
 
     return useCallback((...args) => {
         const now = Date.now()
-        const timeSinceLastRun = now - lastRun.current
-
-        if (timeSinceLastRun >= delay) {
-            lastRun.current = now
-            callback(...args)
-        } else {
-            // 마지막 호출을 예약
+        if (lastRun.current === null || now - lastRun.current >= delay) {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current)
+                timeoutRef.current = null
             }
-            timeoutRef.current = setTimeout(() => {
-                lastRun.current = Date.now()
-                callback(...args)
-            }, delay - timeSinceLastRun)
+            lastRun.current = now
+            callback(...args)
+            return
         }
+
+        const timeSinceLastRun = now - lastRun.current
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current)
+        }
+        timeoutRef.current = setTimeout(() => {
+            lastRun.current = Date.now()
+            timeoutRef.current = null
+            callback(...args)
+        }, delay - timeSinceLastRun)
     }, [callback, delay])
 }
 

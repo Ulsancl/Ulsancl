@@ -1,211 +1,494 @@
 /**
  * useGameLoop - 게임 루프 로직 훅
- * 가격 업데이트, 뉴스 생성, 시간 관리 등 게임 진행 로직
+ * 가격/이벤트/주문/배당 업데이트를 주기적으로 처리한다.
  */
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import {
-    calculatePriceChange,
     updateMarketState,
     generateNews,
     applyNewsImpact,
     processOrders,
+    generateMarketEvent,
+    applyEventEffect,
     startNewTradingDay,
-    updateDailyRange,
     calculateGameDate,
-    SECONDS_PER_DAY,
-    generateGlobalEvent
-} from '../gameEngine'
+    generateGlobalEvent,
+    generateSeasonalEvent,
+    calculateAllStockPrices,
+    applyCrisisImpact,
+    updatePricesWithCrisis,
+    getActiveCrisis,
+    updateNewsEffects,
+    getActiveGlobalEvent
+} from '../engine'
+import { CREDIT_TRADING, DIVIDEND_RATES, SHORT_SELLING } from '../constants'
+import { generateId } from '../utils'
+import { checkAlerts } from '../AlertManager'
 
-/**
- * 게임 루프 훅
- * @param {Object} options - 게임 루프 옵션
- */
-export function useGameLoop({
+export const useGameLoop = ({
     stocks,
     setStocks,
-    marketState,
-    setMarketState,
-    gameStartTime,
-    currentDay,
-    setCurrentDay,
-    setGameTime,
-    setPriceHistory,
-    setPriceChanges,
-    news,
-    setNews,
-    pendingOrders,
-    setPendingOrders,
     cash,
     setCash,
     portfolio,
     setPortfolio,
-    isPlaying = true,
-    updateInterval = 1000,
-    onDayChange,
-    onNewsGenerated,
-    onOrderExecuted,
-    onPriceUpdate
-}) {
-    const lastDayRef = useRef(currentDay)
-    const animationFrameRef = useRef(null)
-    const lastUpdateRef = useRef(Date.now())
+    shortPositions,
+    setShortPositions,
+    creditUsed,
+    setCreditUsed,
+    creditInterest,
+    setCreditInterest,
+    marginCallActive,
+    setMarginCallActive,
+    setTradeHistory,
+    pendingOrders,
+    setPendingOrders,
+    setTotalTrades,
+    setDailyTrades,
+    setDailyProfit,
+    setTotalProfit,
+    setWinStreak,
+    setNews,
+    alerts,
+    setAlerts,
+    setAssetHistory,
+    setTotalDividends,
+    unlockedSkills,
+    gameStartTime,
+    setCurrentDay,
+    marketState,
+    setMarketState,
+    setGameTime,
+    setPriceHistory,
+    setPriceChanges,
+    setShowSeasonEnd,
+    setActiveCrisis,
+    setCrisisAlert,
+    setCrisisHistory,
+    showNotification,
+    playSound,
+    formatNumber,
+    updateInterval = 1000
+}) => {
+    const lastDayRef = useRef(1)
+    const lastSeasonYearRef = useRef(2020)
+    const lastDividendTimeRef = useRef(Date.now())
+    const priceResetTimeoutRef = useRef(null)
 
-    // 가격 업데이트
-    const updatePrices = useCallback(() => {
-        if (!stocks || stocks.length === 0) return
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = Date.now()
 
-        setStocks(prevStocks => {
-            const newStocks = prevStocks.map(stock => {
-                const newPrice = calculatePriceChange(stock, marketState, currentDay)
-                return { ...stock, price: newPrice }
-            })
+            // 게임 시간 업데이트
+            const newGameTime = calculateGameDate(gameStartTime, now)
+            setGameTime(newGameTime)
+            const gameDay = newGameTime.day
 
-            // 가격 변화 방향 기록
-            const changes = {}
-            newStocks.forEach((stock, i) => {
-                if (stock.price > prevStocks[i].price) {
-                    changes[stock.id] = 'up'
-                } else if (stock.price < prevStocks[i].price) {
-                    changes[stock.id] = 'down'
-                } else {
-                    changes[stock.id] = 'same'
+            let workingStocks = stocks
+            let workingCash = cash
+            let workingPortfolio = portfolio
+            let workingPendingOrders = pendingOrders
+            let workingShortPositions = shortPositions
+            let workingCreditUsed = creditUsed
+            let workingCreditInterest = creditInterest
+            const activeGlobalEvent = getActiveGlobalEvent()
+            let workingMarketState = updateMarketState(marketState, activeGlobalEvent)
+            updateNewsEffects()
+            let workingAlerts = alerts
+
+            const calcStockValue = (list, holdings) => {
+                if (!holdings) return 0
+                return Object.entries(holdings).reduce((total, [stockId, holding]) => {
+                    const stock = list.find(s => s.id === parseInt(stockId))
+                    if (!stock) return total
+                    const val = stock.price * holding.quantity
+                    return total + (isNaN(val) ? 0 : val)
+                }, 0)
+            }
+
+            const calcShortValue = (list, shorts) => {
+                if (!shorts) return 0
+                return Object.entries(shorts).reduce((total, [stockId, position]) => {
+                    const stock = list.find(s => s.id === parseInt(stockId))
+                    if (!stock) return total
+                    const pnl = (position.entryPrice - stock.price) * position.quantity
+                    return total + (isNaN(pnl) ? 0 : pnl)
+                }, 0)
+            }
+
+            // 신규 거래일 시작 체크
+            if (gameDay > lastDayRef.current) {
+                lastDayRef.current = gameDay
+                setCurrentDay(gameDay)
+
+                // 신규 거래일 dailyOpen 리셋
+                workingStocks = startNewTradingDay(workingStocks)
+                setDailyTrades(0)
+                setDailyProfit(0)
+
+                // 신용 거래 일일 이자 계산
+                if (workingCreditUsed > 0) {
+                    const dailyInterest = Math.floor(workingCreditUsed * CREDIT_TRADING.dailyInterestRate)
+                    workingCreditInterest += dailyInterest
+                    if (dailyInterest > 0) {
+                        showNotification(`💳 신용 이자 ${formatNumber(dailyInterest)}원 발생`, 'warning')
+                    }
+                }
+
+                showNotification(`📅 ${newGameTime.displayDate} 거래일 시작!`, 'info')
+                playSound('news')
+            }
+
+            // 마진콜 체크 (담보비율 30% 이하 경고, 20% 이하 강제청산)
+            if (workingCreditUsed > 0) {
+                const stockValueNow = calcStockValue(workingStocks, workingPortfolio)
+                const shortValueNow = calcShortValue(workingStocks, workingShortPositions)
+                const grossAssetsNow = workingCash + stockValueNow + shortValueNow
+                const currentMarginRatio = grossAssetsNow / workingCreditUsed
+                if (currentMarginRatio <= CREDIT_TRADING.liquidationMargin) {
+                    // 강제 청산
+                    showNotification('⚠️ 마진콜! 담보 부족으로 포지션 강제 청산됩니다!', 'error')
+                    setMarginCallActive(true)
+                    // 모든 주식 매도
+                    Object.keys(workingPortfolio).forEach(stockId => {
+                        const holding = workingPortfolio[stockId]
+                        const stock = workingStocks.find(s => s.id === parseInt(stockId))
+                        if (stock && holding.quantity > 0) {
+                            const saleAmount = Math.floor(stock.price * holding.quantity * 0.95) // 5% 슬리피지
+                            workingCash += saleAmount
+                        }
+                    })
+                    workingPortfolio = {}
+                    // 대출금 상환 (가능한 만큼)
+                    const repayable = Math.min(workingCash, workingCreditUsed + workingCreditInterest)
+                    if (repayable > 0) {
+                        const interestPayment = Math.min(repayable, workingCreditInterest)
+                        workingCreditInterest -= interestPayment
+                        const principalPayment = repayable - interestPayment
+                        workingCreditUsed = Math.max(0, workingCreditUsed - principalPayment)
+                        workingCash -= repayable
+                    }
+                } else if (currentMarginRatio <= CREDIT_TRADING.maintenanceMargin && !marginCallActive) {
+                    showNotification('⚠️ 마진콜 경고! 담보 비율이 30% 이하입니다. 추가 입금 또는 포지션 정리를 권장합니다.', 'warning')
+                    setMarginCallActive(true)
+                } else if (currentMarginRatio > CREDIT_TRADING.maintenanceMargin) {
+                    setMarginCallActive(false)
+                }
+            } else if (marginCallActive) {
+                setMarginCallActive(false)
+            }
+
+            // 뉴스 생성 (3% 확률)
+            const newNews = generateNews(workingStocks, 0.03)
+            if (newNews) {
+                setNews(prev => [newNews, ...prev].slice(0, 50))
+                showNotification(`📰 ${newNews.text}`, newNews.type === 'positive' ? 'success' : newNews.type === 'negative' ? 'error' : 'info')
+                playSound('news')
+
+                const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(workingStocks, newNews, workingMarketState)
+                workingStocks = impactedStocks
+                workingMarketState = impactedMarket
+            }
+
+            // 글로벌 특별 이벤트 체크 (매우 희귀)
+            const globalEvent = generateGlobalEvent()
+            if (globalEvent) {
+                setNews(prev => [globalEvent, ...prev].slice(0, 50))
+                const notifType = globalEvent.type === 'positive' ? 'success' : globalEvent.type === 'negative' ? 'error' : 'info'
+                showNotification(`${globalEvent.icon} 속보: ${globalEvent.text}`, notifType)
+                playSound('news')
+
+                // 글로벌 이벤트는 전체 시장에 영향
+                const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(workingStocks, globalEvent, workingMarketState)
+                workingStocks = impactedStocks
+                workingMarketState = impactedMarket
+            }
+
+            // 계절별 특별 이벤트 (1% 확률)
+            const seasonalEvent = generateSeasonalEvent(newGameTime.season, 0.01)
+            if (seasonalEvent) {
+                setNews(prev => [seasonalEvent, ...prev].slice(0, 50))
+                const notifType = seasonalEvent.type === 'positive' ? 'success' : 'error'
+                showNotification(`${seasonalEvent.icon} 계절 뉴스: ${seasonalEvent.text}`, notifType)
+                playSound('news')
+
+                const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(workingStocks, seasonalEvent, workingMarketState)
+                workingStocks = impactedStocks
+                workingMarketState = impactedMarket
+            }
+
+            // 시즌 종료 체크 (1년 경과)
+            if (newGameTime.isYearEnd && lastSeasonYearRef.current < newGameTime.year) {
+                lastSeasonYearRef.current = newGameTime.year
+                setShowSeasonEnd(true)
+                playSound('levelUp')
+            }
+
+            // 마켓 이벤트 체크
+            const event = generateMarketEvent(workingStocks)
+            if (event) {
+                const { stocks: eventStocks, cash: eventCash, portfolio: eventPortfolio, message } =
+                    applyEventEffect(event, workingStocks, workingCash, workingPortfolio)
+                workingStocks = eventStocks
+                workingCash = eventCash
+                workingPortfolio = eventPortfolio
+                if (message) {
+                    showNotification(`${event.icon} ${message}`, 'info')
+                }
+            }
+
+            // 위기 이벤트 체크 (CrisisEvents 시스템 연동)
+            const crisisResult = updatePricesWithCrisis(workingStocks, workingMarketState, gameDay)
+            if (crisisResult.crisisEvent) {
+                const { type, crisis } = crisisResult.crisisEvent
+
+                if (type === 'crisis_started') {
+                    // 위기 발생
+                    setCrisisAlert(crisis)
+                    setActiveCrisis(crisis)
+                    setCrisisHistory(prev => [...prev, { ...crisis, startDay: gameDay }])
+
+                    const isPositive = crisis.baseImpact && crisis.baseImpact[0] > 0
+                    showNotification(
+                        `${crisis.icon} ${isPositive ? '호재' : '위기'} 발생: ${crisis.name}`,
+                        isPositive ? 'success' : 'error'
+                    )
+                    playSound('news')
+                } else if (type === 'crisis_ended') {
+                    // 위기 종료
+                    setActiveCrisis(null)
+                    showNotification(`✅ ${crisis.name} 종료, 시장 정상화`, 'info')
+                } else if (type === 'crisis_update') {
+                    // 위기 진행 업데이트
+                    setActiveCrisis(crisisResult.activeCrisis)
+                }
+            } else {
+                // 활성 위기 상태 유지
+                const currentCrisis = crisisResult.activeCrisis || getActiveCrisis(gameDay)
+                setActiveCrisis(currentCrisis)
+            }
+
+            // 가격 변동 (시장 시간 체크 포함)
+            const previousStocks = workingStocks
+            const calculatedResults = calculateAllStockPrices(previousStocks, workingMarketState, gameDay, newGameTime)
+
+            let newStocks = previousStocks.map(stock => {
+                const result = calculatedResults[stock.id]
+                const newPrice = result ? result.newPrice : stock.price
+
+                return {
+                    ...stock,
+                    price: newPrice,
+                    momentum: (stock.momentum || 0) * 0.95,
+                    dailyHigh: Math.max(stock.dailyHigh || newPrice, newPrice),
+                    dailyLow: Math.min(stock.dailyLow || newPrice, newPrice)
                 }
             })
-            setPriceChanges(changes)
+            newStocks = applyCrisisImpact(newStocks, gameDay)
 
-            // 가격 히스토리 업데이트
+            const previousPriceMap = new Map(previousStocks.map(stock => [stock.id, stock.price]))
+            const newChanges = {}
+            newStocks.forEach(stock => {
+                const prevPrice = previousPriceMap.get(stock.id) ?? stock.price
+                newChanges[stock.id] = stock.price > prevPrice ? 'up' : stock.price < prevPrice ? 'down' : 'same'
+            })
+            setPriceChanges(newChanges)
+            if (priceResetTimeoutRef.current) {
+                clearTimeout(priceResetTimeoutRef.current)
+            }
+            priceResetTimeoutRef.current = setTimeout(() => setPriceChanges({}), 500)
+
             setPriceHistory(prev => {
                 const newHistory = { ...prev }
                 newStocks.forEach(stock => {
-                    if (!newHistory[stock.id]) {
-                        newHistory[stock.id] = []
-                    }
-                    newHistory[stock.id] = [...newHistory[stock.id].slice(-499), stock.price]
+                    newHistory[stock.id] = [...(newHistory[stock.id] || []).slice(-29), stock.price]
                 })
                 return newHistory
             })
 
-            // 일일 고가/저가 업데이트
-            return updateDailyRange(newStocks)
-        })
+            workingStocks = newStocks
+            if (workingPendingOrders.length > 0) {
+                const feeDiscountLevel = unlockedSkills?.['fee_discount'] || 0
+                let orderFeeRate = 0.0015
+                if (feeDiscountLevel > 0) {
+                    orderFeeRate *= (1 - feeDiscountLevel * 0.05)
+                }
 
-        onPriceUpdate?.()
-    }, [stocks, marketState, currentDay, setStocks, setPriceChanges, setPriceHistory, onPriceUpdate])
+                const { executedOrders, remainingOrders, cash: newCash, portfolio: newPortfolio } =
+                    processOrders(workingPendingOrders, workingStocks, workingCash, workingPortfolio, { feeRate: orderFeeRate })
 
-    // 시장 상태 업데이트
-    const updateMarket = useCallback(() => {
-        setMarketState(prev => updateMarketState(prev))
-    }, [setMarketState])
+                if (executedOrders.length > 0) {
+                    workingCash = newCash
+                    workingPortfolio = newPortfolio
+                    workingPendingOrders = remainingOrders
+                    const tradeCount = executedOrders.length
+                    let profitDelta = 0
 
-    // 뉴스 생성
-    const generateNewsIfNeeded = useCallback(() => {
-        const newsItem = generateNews(stocks, 0.03)
-        if (newsItem) {
-            setNews(prev => [newsItem, ...prev].slice(0, 50))
-            onNewsGenerated?.(newsItem)
-
-            // 뉴스 영향 적용
-            const result = applyNewsImpact(stocks, newsItem, marketState)
-            setStocks(result.stocks)
-            setMarketState(result.marketState)
-        }
-    }, [stocks, marketState, setNews, setStocks, setMarketState, onNewsGenerated])
-
-    // 글로벌 이벤트 체크
-    const checkGlobalEvents = useCallback(() => {
-        const event = generateGlobalEvent()
-        if (event) {
-            setNews(prev => [event, ...prev].slice(0, 50))
-        }
-    }, [setNews])
-
-    // 주문 처리
-    const processActiveOrders = useCallback(() => {
-        if (pendingOrders.length === 0) return
-
-        const result = processOrders(pendingOrders, stocks, cash, portfolio)
-
-        if (result.executedOrders.length > 0) {
-            setPendingOrders(result.remainingOrders)
-            setCash(result.cash)
-            setPortfolio(result.portfolio)
-            result.executedOrders.forEach(order => {
-                onOrderExecuted?.(order)
-            })
-        }
-    }, [pendingOrders, stocks, cash, portfolio, setPendingOrders, setCash, setPortfolio, onOrderExecuted])
-
-    // 시간 업데이트
-    const updateGameTime = useCallback(() => {
-        const gameDate = calculateGameDate(gameStartTime, Date.now())
-        setGameTime(gameDate)
-
-        // 새 날 체크
-        if (gameDate.day !== lastDayRef.current) {
-            lastDayRef.current = gameDate.day
-            setCurrentDay(gameDate.day)
-
-            // 새 거래일 시작
-            setStocks(prev => startNewTradingDay(prev))
-            onDayChange?.(gameDate.day)
-        }
-
-        return gameDate
-    }, [gameStartTime, setGameTime, setCurrentDay, setStocks, onDayChange])
-
-    // 메인 게임 루프
-    useEffect(() => {
-        if (!isPlaying) return
-
-        const gameLoop = () => {
-            const now = Date.now()
-            const elapsed = now - lastUpdateRef.current
-
-            if (elapsed >= updateInterval) {
-                lastUpdateRef.current = now
-
-                // 시간 업데이트
-                const gameDate = updateGameTime()
-
-                // 시장 시간에만 가격 업데이트
-                if (gameDate.isMarketOpen !== false) {
-                    updatePrices()
-                    updateMarket()
-                    generateNewsIfNeeded()
-                    checkGlobalEvents()
-                    processActiveOrders()
+                    executedOrders.forEach(order => {
+                        showNotification(`🔔 ${order.stockName} ${order.type} 주문 체결!`, 'success')
+                        playSound(order.side === 'buy' ? 'buy' : 'sell')
+                        setTradeHistory(prev => [...prev, { ...order, type: order.side, id: generateId(), timestamp: now }])
+                        if (order.side === 'sell' && typeof order.profit === 'number') {
+                            profitDelta += order.profit
+                        }
+                    })
+                    setTotalTrades(prev => prev + tradeCount)
+                    setDailyTrades(prev => prev + tradeCount)
+                    if (profitDelta !== 0) {
+                        setTotalProfit(prev => prev + profitDelta)
+                        setDailyProfit(prev => prev + profitDelta)
+                    }
+                    setWinStreak(prev => {
+                        let streak = prev
+                        executedOrders.forEach(order => {
+                            if (order.side !== 'sell') return
+                            const profit = typeof order.profit === 'number' ? order.profit : 0
+                            if (profit > 0) streak += 1
+                            else streak = 0
+                        })
+                        return streak
+                    })
                 }
             }
 
-            animationFrameRef.current = requestAnimationFrame(gameLoop)
-        }
+            // 공매도 이자 및 강제청산
+            if (Object.keys(workingShortPositions).length > 0) {
+                let newCash = workingCash
+                const updatedShorts = {}
+                const liquidated = []
 
-        animationFrameRef.current = requestAnimationFrame(gameLoop)
+                Object.entries(workingShortPositions).forEach(([stockId, position]) => {
+                    const stock = workingStocks.find(s => s.id === parseInt(stockId))
+                    if (!stock) return
+
+                    const interest = stock.price * position.quantity * SHORT_SELLING.interestRate
+                    newCash -= interest
+
+                    const pnl = (position.entryPrice - stock.price) * position.quantity
+                    const marginUsed = position.entryPrice * position.quantity * SHORT_SELLING.marginRate
+
+                    if (pnl < -marginUsed * 0.5) {
+                        liquidated.push({ stockId, position, stock, pnl })
+                    } else {
+                        updatedShorts[stockId] = position
+                    }
+                })
+
+                if (liquidated.length > 0) {
+                    liquidated.forEach(({ position, stock, pnl }) => {
+                        newCash += position.entryPrice * position.quantity + pnl
+                        showNotification(`⚠️ ${stock.name} 공매도 강제청산!`, 'error')
+                        playSound('error')
+                    })
+                    workingShortPositions = updatedShorts
+                }
+
+                if (newCash !== workingCash) workingCash = newCash
+            }
+
+            // 알림 체크
+            const triggeredAlerts = checkAlerts(workingAlerts, workingStocks, workingPortfolio)
+            if (triggeredAlerts.length > 0) {
+                const triggeredIds = new Set(triggeredAlerts.map(alert => alert.id))
+                triggeredAlerts.forEach(alert => {
+                    showNotification(`Alert: ${alert.stockName}`, 'info')
+                    playSound('news')
+                })
+                workingAlerts = workingAlerts.map(a => triggeredIds.has(a.id) ? { ...a, triggered: true } : a)
+            }
+
+            if (now - lastDividendTimeRef.current > 60000) {
+                let dividendTotal = 0
+                Object.entries(workingPortfolio).forEach(([stockId, holding]) => {
+                    const rate = DIVIDEND_RATES[parseInt(stockId)] || 0
+                    const stock = workingStocks.find(s => s.id === parseInt(stockId))
+                    if (stock && rate > 0) {
+                        const dividend = Math.round(stock.price * holding.quantity * (rate / 100) / 60)
+                        dividendTotal += dividend
+                    }
+                })
+                if (dividendTotal > 0) {
+                    workingCash += dividendTotal
+                    setTotalDividends(prev => prev + dividendTotal)
+                    showNotification(`💰 배당금 ${formatNumber(dividendTotal)}원`, 'success')
+                }
+                lastDividendTimeRef.current = now
+            }
+
+            const stockValueNow = calcStockValue(workingStocks, workingPortfolio)
+            const shortValueNow = calcShortValue(workingStocks, workingShortPositions)
+            const grossAssetsNow = workingCash + stockValueNow + shortValueNow
+            const totalAssetsNow = grossAssetsNow - workingCreditUsed - workingCreditInterest
+
+            if (now % 10000 < 1000) {
+                setAssetHistory(prev => [...prev.slice(-100), { value: totalAssetsNow, timestamp: now, day: gameDay }])
+            }
+
+            setStocks(workingStocks)
+            setMarketState(workingMarketState)
+            if (workingCash !== cash) setCash(workingCash)
+            if (workingPortfolio !== portfolio) setPortfolio(workingPortfolio)
+            if (workingPendingOrders !== pendingOrders) setPendingOrders(workingPendingOrders)
+            if (workingShortPositions !== shortPositions) setShortPositions(workingShortPositions)
+            if (workingCreditUsed !== creditUsed) setCreditUsed(workingCreditUsed)
+            if (workingCreditInterest !== creditInterest) setCreditInterest(workingCreditInterest)
+            if (workingAlerts !== alerts) setAlerts(workingAlerts)
+        }, updateInterval)
 
         return () => {
-            if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current)
+            clearInterval(interval)
+            if (priceResetTimeoutRef.current) {
+                clearTimeout(priceResetTimeoutRef.current)
             }
         }
     }, [
-        isPlaying,
+        alerts,
+        cash,
+        creditInterest,
+        creditUsed,
+        formatNumber,
+        gameStartTime,
+        marginCallActive,
+        marketState,
+        pendingOrders,
+        playSound,
+        portfolio,
+        setActiveCrisis,
+        setAlerts,
+        setAssetHistory,
+        setCash,
+        setCrisisAlert,
+        setCrisisHistory,
+        setCreditInterest,
+        setCreditUsed,
+        setCurrentDay,
+        setDailyProfit,
+        setDailyTrades,
+        setGameTime,
+        setMarginCallActive,
+        setMarketState,
+        setNews,
+        setPendingOrders,
+        setPortfolio,
+        setPriceChanges,
+        setPriceHistory,
+        setShortPositions,
+        setShowSeasonEnd,
+        setStocks,
+        setTotalDividends,
+        setTotalProfit,
+        setTotalTrades,
+        setTradeHistory,
+        setWinStreak,
+        shortPositions,
+        showNotification,
+        stocks,
+        unlockedSkills,
         updateInterval,
-        updateGameTime,
-        updatePrices,
-        updateMarket,
-        generateNewsIfNeeded,
-        checkGlobalEvents,
-        processActiveOrders
+        updateNewsEffects,
+        getActiveGlobalEvent
     ])
-
-    return {
-        updatePrices,
-        updateMarket,
-        generateNewsIfNeeded,
-        processActiveOrders,
-        updateGameTime
-    }
 }
 
 export default useGameLoop

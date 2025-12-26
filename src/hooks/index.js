@@ -13,6 +13,7 @@ export { useGameState } from './useGameState'
 export { useToast } from './useToast'
 export { useFeedback } from './useFeedback'
 export { useModals, MODAL_TYPES } from './useModals'
+export { useUiState } from './useUiState'
 
 // 성능 최적화
 export { useDebounce, useDebouncedCallback, useThrottle, useThrottledValue } from './useDebounce'

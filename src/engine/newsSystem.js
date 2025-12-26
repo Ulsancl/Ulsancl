@@ -5,6 +5,8 @@
 
 import { NEWS_TEMPLATES, SECTORS, GLOBAL_CRISIS_EVENTS, GLOBAL_EVENT_PROBABILITY } from '../constants'
 import { randomRange, randomChoice, generateId, randomInt } from '../utils'
+import { VOLATILITY_CONFIG, normalizePrice } from './priceCalculator'
+import { SEASONS } from './marketState'
 
 // 모듈 내부 상태
 let activeNewsEffects = []
@@ -214,9 +216,6 @@ export const generateGlobalEvent = () => {
 export const applyNewsImpact = (stocks, news, marketState) => {
     if (!news) return { stocks, marketState }
 
-    const { VOLATILITY_CONFIG } = require('./priceCalculator')
-    const { roundToTickSize } = require('./priceCalculator')
-
     const newStocks = stocks.map(stock => {
         let priceChange = 0
         let momentumBoost = 0
@@ -249,15 +248,11 @@ export const applyNewsImpact = (stocks, news, marketState) => {
 
             if (Math.abs(dailyChange) <= config.maxDaily) {
                 const stockType = stock.type || 'stock'
-                newPrice = roundToTickSize(newPrice, stockType)
-
-                const minPrice = stockType === 'crypto'
-                    ? 0.01
-                    : (stockType === 'bond' ? 90000 : (stockType === 'commodity' ? 1 : 100))
+                newPrice = normalizePrice(newPrice, stockType)
 
                 return {
                     ...stock,
-                    price: Math.max(minPrice, newPrice),
+                    price: newPrice,
                     momentum: (stock.momentum || 0) + momentumBoost,
                     dailyHigh: Math.max(stock.dailyHigh || newPrice, newPrice),
                     dailyLow: Math.min(stock.dailyLow || newPrice, newPrice)
@@ -302,5 +297,60 @@ export const resetNewsSystem = () => {
         lastType: null,
         trendStreak: 0,
         sectorMomentum: {}
+    }
+}
+
+export const SEASONAL_EVENTS = {
+    spring: [
+        { id: 'cherry_blossom', text: '🌸 전국 벚꽃 축제 시작, 여행/레저 업종 수혜', impact: [0.03, 0.08], sectors: { entertainment: 0.1, retail: 0.05 } },
+        { id: 'spring_rain', text: '🌧️ 봄비 지속으로 야외 활동 위축', impact: [-0.02, -0.05], sectors: { retail: -0.05 } },
+        { id: 'new_semester', text: '🎓 새 학기 시즌, 교육/문구 관련주 상승', impact: [0.02, 0.05], sectors: { retail: 0.05 } },
+        { id: 'spring_fashion', text: '👗 봄 패션 시즌, 의류/화장품 업종 호황', impact: [0.02, 0.06], sectors: { retail: 0.08 } },
+    ],
+    summer: [
+        { id: 'heatwave', text: '🔥 기록적인 폭염, 에어컨/냉방 업종 급등', impact: [0.04, 0.10], sectors: { energy: 0.08, retail: 0.05 } },
+        { id: 'monsoon_flood', text: '🌊 집중호우로 건설/보험주 급락', impact: [-0.05, -0.12], sectors: { construction: -0.15, finance: -0.05 } },
+        { id: 'vacation_boom', text: '🏖️ 여름 휴가 시즌 본격화, 항공/여행주 상승', impact: [0.04, 0.09], sectors: { entertainment: 0.12 } },
+        { id: 'summer_blackout', text: '⚡ 전력 수요 폭증, 전력주 변동', impact: [-0.03, -0.07], sectors: { energy: -0.05 } },
+        { id: 'ice_cream_sales', text: '🍦 아이스크림 판매 호조', impact: [0.02, 0.05], sectors: { retail: 0.06 } },
+    ],
+    autumn: [
+        { id: 'fall_foliage', text: '🍁 단풍 시즌 개막, 관광업 특수', impact: [0.02, 0.06], sectors: { entertainment: 0.08 } },
+        { id: 'hit_drama', text: '🎬 인기 드라마 흥행, 콘텐츠 업종 급등', impact: [0.05, 0.12], sectors: { entertainment: 0.15, tech: 0.05 } },
+        { id: 'chuseok', text: '🧧 추석 연휴 소비 증가, 유통주 상승', impact: [0.03, 0.07], sectors: { retail: 0.10 } },
+        { id: 'harvest_festival', text: '🌾 풍년 예상, 농산물 가격 안정', impact: [0.01, 0.03], sectors: {} },
+        { id: 'iphone_release', text: '📱 신형 스마트폰 출시, IT 부품주 급등', impact: [0.04, 0.10], sectors: { tech: 0.12, semiconductor: 0.08 } },
+    ],
+    winter: [
+        { id: 'heavy_snow', text: '❄️ 전국 폭설, 교통 마비로 물류 차질', impact: [-0.04, -0.08], sectors: { auto: -0.08, construction: -0.05 } },
+        { id: 'christmas', text: '🎄 크리스마스 쇼핑 시즌, 유통주 상승', impact: [0.04, 0.09], sectors: { retail: 0.12, entertainment: 0.06 } },
+        { id: 'year_end_rally', text: '🎉 연말 랠리 기대감 증시 상승 모드', impact: [0.03, 0.08], sectors: {} },
+        { id: 'flu_outbreak', text: '🧪 독감 유행, 제약/바이오주 급등', impact: [0.03, 0.08], sectors: { bio: 0.15 } },
+        { id: 'heating_demand', text: '♨️ 난방비 급등, 에너지주 상승', impact: [0.02, 0.06], sectors: { energy: 0.10 } },
+        { id: 'ski_season', text: '🎿 스키 시즌 개막, 레저 업종 호황', impact: [0.02, 0.05], sectors: { entertainment: 0.06 } },
+    ]
+}
+
+export const generateSeasonalEvent = (season, probability = 0.01) => {
+    if (Math.random() > probability) return null
+
+    const events = SEASONAL_EVENTS[season]
+    if (!events || events.length === 0) return null
+
+    const event = events[Math.floor(Math.random() * events.length)]
+    const impact = event.impact[0] + Math.random() * (event.impact[1] - event.impact[0])
+    const icon = SEASONS[season]?.icon
+
+    return {
+        id: generateId(),
+        text: event.text,
+        type: impact >= 0 ? 'positive' : 'negative',
+        impact,
+        isSeasonal: true,
+        season,
+        sectors: event.sectors || {},
+        timestamp: Date.now(),
+        read: false,
+        icon
     }
 }

@@ -58,7 +58,7 @@ export default defineConfig({
         },
         {
             name: 'webkit',
-            use: { ...devices['Desktop Safari'] },
+            use: { ...devices['Desktop Safari'], video: 'off' },
         },
         // 모바일 테스트
         {
@@ -67,7 +67,7 @@ export default defineConfig({
         },
         {
             name: 'Mobile Safari',
-            use: { ...devices['iPhone 12'] },
+            use: { ...devices['iPhone 12'], video: 'off' },
         },
     ],
 

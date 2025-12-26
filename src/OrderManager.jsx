@@ -1,21 +1,15 @@
 // 주문 관리 컴포넌트
 import { useState } from 'react'
 import { formatNumber } from './utils'
-import { getTickSize, roundToTickSize } from './engine/priceCalculator'
+import { getTickSize, getMinPrice, normalizePrice } from './engine'
 import './OrderManager.css'
-
-const getOrderMinPrice = (stockType) => (
-    stockType === 'crypto'
-        ? 0.01
-        : (stockType === 'bond' ? 90000 : (stockType === 'commodity' ? 1 : 100))
-)
 
 export default function OrderManager({ stock, currentPrice, portfolio, cash, onPlaceOrder, onClose, initialSide = 'buy' }) {
     const stockType = stock.type || 'stock'
-    const minPrice = getOrderMinPrice(stockType)
+    const minPrice = getMinPrice(stockType)
     const normalizeTargetPrice = (value) => {
         const numeric = Number.isFinite(value) ? value : minPrice
-        return roundToTickSize(Math.max(minPrice, numeric), stockType)
+        return normalizePrice(numeric, stockType)
     }
     const normalizedInitialSide = initialSide === 'buy' ? 'buy' : 'sell'
 

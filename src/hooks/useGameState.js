@@ -20,6 +20,7 @@ const INITIAL_STATE = {
     totalXp: 0,
     totalTrades: 0,
     winStreak: 0,
+    maxWinStreak: 0,
     totalProfit: 0,
     news: [],
     missionProgress: {},
@@ -31,7 +32,13 @@ const INITIAL_STATE = {
     currentDay: 1
 }
 
-export const useGameState = (allProducts) => {
+export const useGameState = (input = {}) => {
+    const isLegacy = Array.isArray(input)
+    const allProducts = isLegacy ? input : (input.allProducts || [])
+    const settings = isLegacy ? undefined : input.settings
+    const setSettings = isLegacy ? undefined : input.setSettings
+    const onNewUser = isLegacy ? undefined : input.onNewUser
+
     // 게임 로드 상태
     const [isInitialized, setIsInitialized] = useState(false)
 
@@ -60,6 +67,7 @@ export const useGameState = (allProducts) => {
     // 통계
     const [totalTrades, setTotalTrades] = useState(0)
     const [winStreak, setWinStreak] = useState(0)
+    const [maxWinStreak, setMaxWinStreak] = useState(0)
     const [totalProfit, setTotalProfit] = useState(0)
     const [dailyTrades, setDailyTrades] = useState(0)
     const [dailyProfit, setDailyProfit] = useState(0)
@@ -101,29 +109,44 @@ export const useGameState = (allProducts) => {
             setMissionProgress(saved.missionProgress ?? {})
             setCompletedMissions(saved.completedMissions ?? {})
             setTotalDividends(saved.totalDividends ?? 0)
+            setMaxWinStreak(saved.maxWinStreak ?? 0)
             setAssetHistory(saved.assetHistory ?? [])
             setWatchlist(saved.watchlist ?? [])
             setAlerts(saved.alerts ?? [])
             setGameStartTime(saved.gameStartTime ?? Date.now())
             setCurrentDay(saved.currentDay ?? 1)
-            return saved.totalTrades === 0 // 신규 유저 여부
+            if (saved.settings && typeof setSettings === 'function') {
+                setSettings(prev => ({ ...prev, ...saved.settings }))
+            }
+            const isNewUser = (saved.totalTrades ?? 0) === 0
+            if (isNewUser && typeof onNewUser === 'function') {
+                onNewUser()
+            }
+            return isNewUser // 신규 유저 여부
+        }
+        if (typeof onNewUser === 'function') {
+            onNewUser()
         }
         return true // 저장 데이터 없음 = 신규 유저
-    }, [])
+    }, [onNewUser, setSettings])
 
     // 게임 저장
     const saveGameState = useCallback(() => {
-        saveGame({
+        const payload = {
             stocks, cash, portfolio, shortPositions,
             creditUsed, creditInterest,
             tradeHistory, pendingOrders,
             unlockedAchievements, unlockedSkills, totalXp,
-            totalTrades, winStreak, totalProfit,
+            totalTrades, winStreak, maxWinStreak, totalProfit,
             news, missionProgress, completedMissions,
             totalDividends, assetHistory,
             watchlist, alerts, gameStartTime, currentDay
-        })
-    }, [stocks, cash, portfolio, shortPositions, creditUsed, creditInterest, tradeHistory, pendingOrders, unlockedAchievements, unlockedSkills, totalXp, totalTrades, winStreak, totalProfit, news, missionProgress, completedMissions, totalDividends, assetHistory, watchlist, alerts, gameStartTime, currentDay])
+        }
+        if (settings !== undefined) {
+            payload.settings = settings
+        }
+        saveGame(payload)
+    }, [stocks, cash, portfolio, shortPositions, creditUsed, creditInterest, tradeHistory, pendingOrders, unlockedAchievements, unlockedSkills, totalXp, totalTrades, winStreak, maxWinStreak, totalProfit, news, missionProgress, completedMissions, totalDividends, assetHistory, watchlist, alerts, gameStartTime, currentDay, settings])
 
     // 초기화
     useEffect(() => {
@@ -156,6 +179,7 @@ export const useGameState = (allProducts) => {
         totalXp, setTotalXp,
         totalTrades, setTotalTrades,
         winStreak, setWinStreak,
+        maxWinStreak, setMaxWinStreak,
         totalProfit, setTotalProfit,
         dailyTrades, setDailyTrades,
         dailyProfit, setDailyProfit,

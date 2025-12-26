@@ -34,17 +34,29 @@ export {
     THEMES,
     BOT_STRATEGIES,
     TIME_ATTACK_MODES,
-    MARKET_EVENTS
+    MARKET_EVENTS,
+    IPO_CANDIDATES
 } from './trading'
 
-// 하위 호환성: 기존 constants.js에서 나머지 export
-// NEWS_TEMPLATES, ETF_PRODUCTS, CRYPTO_PRODUCTS 등은
-// 아직 기존 파일에서 import 필요 (추후 마이그레이션)
+// 뉴스/매크로/스킬/파생상품
 export {
     NEWS_TEMPLATES,
+    GLOBAL_CRISIS_EVENTS,
+    GLOBAL_EVENT_PROBABILITY
+} from './news'
+
+export {
     ETF_PRODUCTS,
     CRYPTO_PRODUCTS,
     BOND_PRODUCTS,
-    COMMODITY_PRODUCTS,
-    GLOBAL_CRISIS_EVENTS
-} from '../constants'
+    COMMODITY_PRODUCTS
+} from './products'
+
+export {
+    MACRO_CONFIG,
+    MACRO_EVENTS
+} from './macro'
+
+export {
+    SKILLS
+} from './skills'

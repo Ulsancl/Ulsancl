@@ -69,12 +69,18 @@ export interface Trade {
 export interface Order {
     id: string
     stockId: number
-    type: 'limit' | 'stop' | 'stop-limit'
+    stockName?: string
+    type: 'limit' | 'stopLoss' | 'takeProfit' | 'market'
     side: 'buy' | 'sell'
-    price: number
     quantity: number
-    stopPrice?: number
+    targetPrice?: number
+    price?: number
+    executedPrice?: number
+    total?: number
+    fee?: number
+    profit?: number
     createdAt: number
+    executedAt?: number
     expiresAt?: number
 }
 

@@ -85,6 +85,23 @@ export const roundToTickSize = (price, type = 'stock') => {
 }
 
 /**
+ * 최소 가격 규칙
+ */
+export const getMinPrice = (type = 'stock') => {
+    if (type === 'crypto') return 0.01
+    if (type === 'bond') return 90000
+    if (type === 'commodity') return 1
+    return 100
+}
+
+/**
+ * 틱/최소가격 규칙 적용
+ */
+export const normalizePrice = (price, type = 'stock') => {
+    return Math.max(getMinPrice(type), roundToTickSize(price, type))
+}
+
+/**
  * 현실적인 가격 변동 계산
  */
 export const calculatePriceChange = (
@@ -187,8 +204,7 @@ export const calculatePriceChange = (
         newPrice = roundedPrice
     }
 
-    const minPrice = type === 'crypto' ? 0.01 : (type === 'bond' ? 90000 : (type === 'commodity' ? 1 : 100))
-    return Math.max(minPrice, newPrice)
+    return Math.max(getMinPrice(type), newPrice)
 }
 
 /**

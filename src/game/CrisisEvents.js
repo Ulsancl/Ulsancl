@@ -281,12 +281,15 @@ export const calculateCrisisImpact = (stock, currentDay) => {
 /**
  * 현재 활성 위기 정보
  */
-export const getActiveCrisis = () => {
+export const getActiveCrisis = (currentDay = null) => {
     if (!activeCrisis) return null
+    const daysRemaining = typeof currentDay === 'number'
+        ? Math.max(0, crisisEndDay - currentDay)
+        : Math.max(0, crisisEndDay - activeCrisis.startDay)
     return {
         ...activeCrisis,
         phase: crisisPhase,
-        daysRemaining: Math.max(0, crisisEndDay - activeCrisis.startDay)
+        daysRemaining
     }
 }
 

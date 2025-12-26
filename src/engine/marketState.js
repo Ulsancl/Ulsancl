@@ -1,80 +1,102 @@
 /**
- * marketState.js - 시장 상태 모듈
- * 시장 트렌드, 거시경제 지표, 시간 관리
+ * marketState.js - market state and game time utilities
  */
 
-import { SECTORS, MACRO_CONFIG, MARKET_HOURS } from '../constants'
+import { SECTORS, MACRO_CONFIG } from '../constants'
 
-// 시간 상수
-export const GAME_SPEED = 60 // 실제 1초 = 게임 60초 (1분)
-export const SECONDS_PER_MINUTE = 60
-export const MINUTES_PER_HOUR = 60
-export const HOURS_PER_DAY = 24
-export const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR
-export const SECONDS_PER_DAY = SECONDS_PER_HOUR * HOURS_PER_DAY
+export const SECONDS_PER_DAY = 300
+export const GAME_START_YEAR = 2020
+export const DAYS_PER_YEAR = 365
+export const MINUTES_PER_TICK = 10
 
-// 시장 시간
-export const MARKET_START_HOUR = MARKET_HOURS?.start || 9
-export const MARKET_END_HOUR = MARKET_HOURS?.end || 15.5
+export const MARKET_OPEN_HOUR = 9
+export const MARKET_CLOSE_HOUR = 16
+export const MARKET_START_HOUR = MARKET_OPEN_HOUR
+export const MARKET_END_HOUR = MARKET_CLOSE_HOUR
 
-// 계절 정보
-const SEASONS = ['봄', '여름', '가을', '겨울']
-const SEASON_ICONS = ['🌸', '☀️', '🍂', '❄️']
+export const SEASONS = {
+    spring: { months: [3, 4, 5], name: '봄', icon: '🌸' },
+    summer: { months: [6, 7, 8], name: '여름', icon: '☀️' },
+    autumn: { months: [9, 10, 11], name: '가을', icon: '🍂' },
+    winter: { months: [12, 1, 2], name: '겨울', icon: '❄️' }
+}
 
-/**
- * 게임 날짜/시간 계산
- */
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
 export const calculateGameDate = (gameStartTime, currentTime) => {
     const elapsedSeconds = Math.floor((currentTime - gameStartTime) / 1000)
-    const gameSeconds = elapsedSeconds * GAME_SPEED
+    const totalDays = Math.floor(elapsedSeconds / SECONDS_PER_DAY)
+    const secondsInDay = elapsedSeconds % SECONDS_PER_DAY
 
-    const day = Math.floor(gameSeconds / SECONDS_PER_DAY) + 1
-    const daySeconds = gameSeconds % SECONDS_PER_DAY
-    const hour = Math.floor(daySeconds / SECONDS_PER_HOUR)
-    const minute = Math.floor((daySeconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE)
+    let remainingDays = totalDays
+    let year = GAME_START_YEAR
+    let month = 1
+    let day = 1
 
-    // 시장 시간 체크
-    const marketHour = hour + minute / 60
-    const isMarketOpen = marketHour >= MARKET_START_HOUR && marketHour < MARKET_END_HOUR
+    while (remainingDays >= DAYS_PER_YEAR) {
+        remainingDays -= DAYS_PER_YEAR
+        year++
+    }
 
-    // 년도 및 계절 계산 (1년 = 365일)
-    const year = 2020 + Math.floor((day - 1) / 365)
-    const dayOfYear = ((day - 1) % 365) + 1
-    const month = Math.ceil(dayOfYear / 30)
-    const seasonIndex = Math.floor((month - 1) / 3) % 4
+    for (let m = 0; m < 12; m++) {
+        const daysInMonth = DAYS_IN_MONTH[m]
+        if (remainingDays < daysInMonth) {
+            month = m + 1
+            day = remainingDays + 1
+            break
+        }
+        remainingDays -= daysInMonth
+    }
 
-    // 연말 체크 (12월 마지막 주)
-    const isYearEnd = dayOfYear >= 355
+    const tradingHours = MARKET_CLOSE_HOUR - MARKET_OPEN_HOUR
+    const tradingMinutes = tradingHours * 60
+    const totalTicks = tradingMinutes / MINUTES_PER_TICK
+
+    const currentTick = Math.floor((secondsInDay / SECONDS_PER_DAY) * totalTicks)
+    const elapsedMinutes = currentTick * MINUTES_PER_TICK
+    const hour = MARKET_OPEN_HOUR + Math.floor(elapsedMinutes / 60)
+    const minute = elapsedMinutes % 60
+
+    let season = 'winter'
+    for (const [seasonKey, seasonData] of Object.entries(SEASONS)) {
+        if (seasonData.months.includes(month)) {
+            season = seasonKey
+            break
+        }
+    }
+
+    const isMarketOpen = hour >= MARKET_OPEN_HOUR && hour < MARKET_CLOSE_HOUR
+    const isMarketClosing = hour === 15 && minute >= 50
+    const isYearEnd = month === 12 && day === 31 && hour >= 15 && minute >= 50
+    const dayOfYear = totalDays % DAYS_PER_YEAR
 
     return {
-        day,
-        hour,
-        minute,
-        isMarketOpen,
+        day: totalDays + 1,
+        totalDays: totalDays + 1,
         year,
         month,
-        dayOfYear,
-        season: SEASONS[seasonIndex],
-        seasonIcon: SEASON_ICONS[seasonIndex],
+        dayOfMonth: day,
+        dayOfYear: dayOfYear + 1,
+        hour: Math.min(MARKET_CLOSE_HOUR, hour),
+        minute,
+        season,
+        seasonInfo: SEASONS[season],
+        isMarketOpen,
+        isMarketClosing,
         isYearEnd,
-        displayDate: `D+${day}`,
-        displayTime: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-        displaySeason: `${SEASON_ICONS[seasonIndex]} ${year}년 ${month}월`
+        displayDate: `${year % 100}년 ${month}월 ${day}일`,
+        displayTime: `${hour.toString().padStart(2, '0')}:${(Math.floor(minute / 10) * 10).toString().padStart(2, '0')}`,
+        displaySeason: SEASONS[season].icon + SEASONS[season].name
     }
 }
 
-/**
- * 시장 상태 업데이트
- */
 export const updateMarketState = (prevState, activeGlobalEvent = null) => {
-    // 거시 경제 지표 업데이트
     const macro = prevState.macro || {
         interestRate: MACRO_CONFIG.interestRate.base,
         inflation: MACRO_CONFIG.inflation.base,
         gdpGrowth: MACRO_CONFIG.gdpGrowth.base
     }
 
-    // 확률적 변화 (0.1% 확률)
     if (Math.random() < 0.001) {
         macro.interestRate += (Math.random() - 0.5) * MACRO_CONFIG.interestRate.volatility
         macro.interestRate = Math.max(MACRO_CONFIG.interestRate.min, Math.min(MACRO_CONFIG.interestRate.max, macro.interestRate))
@@ -88,7 +110,6 @@ export const updateMarketState = (prevState, activeGlobalEvent = null) => {
         macro.gdpGrowth = Math.max(MACRO_CONFIG.gdpGrowth.min, Math.min(MACRO_CONFIG.gdpGrowth.max, macro.gdpGrowth))
     }
 
-    // 거시 경제 영향 계산
     let macroTrendBoost = 0
     macroTrendBoost += (MACRO_CONFIG.interestRate.base - macro.interestRate) * 0.02
     macroTrendBoost += (macro.gdpGrowth - MACRO_CONFIG.gdpGrowth.base) * 0.03
@@ -99,24 +120,19 @@ export const updateMarketState = (prevState, activeGlobalEvent = null) => {
 
     let newVolatility = prevState.volatility * 0.95 + 1 * 0.05 + (Math.random() - 0.5) * 0.1
 
-    // 글로벌 이벤트 영향
     if (activeGlobalEvent?.volatilityBoost) {
         newVolatility *= activeGlobalEvent.volatilityBoost
     }
 
-    // 인플레이션 영향
     if (macro.inflation > 4.0) {
         newVolatility *= 1.2
     }
 
     newVolatility = Math.max(0.5, Math.min(2.5, newVolatility))
 
-    // 섹터 트렌드
     const sectorTrends = { ...prevState.sectorTrends }
     Object.keys(SECTORS).forEach(sector => {
         let current = sectorTrends[sector] || 0
-
-        // 섹터별 거시경제 민감도
         let sensitivity = 0
         if (sector === 'tech' || sector === 'bio') {
             sensitivity -= (macro.interestRate - MACRO_CONFIG.interestRate.base) * 0.05
@@ -133,10 +149,7 @@ export const updateMarketState = (prevState, activeGlobalEvent = null) => {
     return { trend: newTrend, volatility: newVolatility, sectorTrends, macro }
 }
 
-/**
- * 시장 시간 내 여부 체크
- */
 export const isMarketHours = (hour, minute = 0) => {
     const currentHour = hour + minute / 60
-    return currentHour >= MARKET_START_HOUR && currentHour < MARKET_END_HOUR
+    return currentHour >= MARKET_OPEN_HOUR && currentHour < MARKET_CLOSE_HOUR
 }
