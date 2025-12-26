@@ -163,6 +163,8 @@ function App() {
   // 사운드
   const { playSound } = useSound(settings.soundEnabled, settings.volume)
 
+  const stockLookup = useMemo(() => new Map(stocks.map(stock => [stock.id, stock])), [stocks])
+
   // 레벨 정보
   const levelInfo = calculateLevel(totalXp, LEVELS)
   const canShortSell = levelInfo.level >= SHORT_SELLING.minLevel
@@ -179,21 +181,21 @@ function App() {
   const stockValue = useMemo(() => {
     if (!portfolio) return 0
     return Object.entries(portfolio).reduce((total, [stockId, holding]) => {
-      const stock = stocks.find(s => s.id === parseInt(stockId))
+      const stock = stockLookup.get(parseInt(stockId))
       const val = stock ? stock.price * holding.quantity : 0
       return total + (isNaN(val) ? 0 : val)
     }, 0)
-  }, [portfolio, stocks])
+  }, [portfolio, stockLookup])
 
   const shortValue = useMemo(() => {
     if (!shortPositions) return 0
     return Object.entries(shortPositions).reduce((total, [stockId, position]) => {
-      const stock = stocks.find(s => s.id === parseInt(stockId))
+      const stock = stockLookup.get(parseInt(stockId))
       if (!stock) return total
       const pnl = (position.entryPrice - stock.price) * position.quantity
       return total + (isNaN(pnl) ? 0 : pnl)
     }, 0)
-  }, [shortPositions, stocks])
+  }, [shortPositions, stockLookup])
 
   const safeCash = isNaN(cash) ? 0 : cash
   const safeCreditUsed = isNaN(creditUsed) ? 0 : creditUsed
