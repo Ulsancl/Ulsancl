@@ -19,6 +19,9 @@ const TabSection = memo(function TabSection({ activeTab, onTabChange }) {
                     <button
                         key={tab.id}
                         className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+                        data-testid="tab-btn"
+                        data-active={activeTab === tab.id ? 'true' : undefined}
+                        aria-selected={activeTab === tab.id}
                         onClick={() => onTabChange(tab.id)}
                     >
                         {tab.label}
