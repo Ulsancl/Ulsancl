@@ -2,9 +2,11 @@
  * useGameState - 게임 상태 저장/로드 관리 커스텀 훅
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { saveGame, loadGame } from '../utils'
 import { INITIAL_CAPITAL } from '../constants'
+
+const AUTO_SAVE_INTERVAL = 5000
 
 // 초기 게임 상태
 const INITIAL_STATE = {
@@ -41,6 +43,9 @@ export const useGameState = (input = {}) => {
 
     // 게임 로드 상태
     const [isInitialized, setIsInitialized] = useState(false)
+    const isInitializedRef = useRef(false)
+    const gameStateRef = useRef({ ...INITIAL_STATE, stocks: allProducts })
+    const persistGameStateRef = useRef(null)
 
     // 주식 데이터
     const [stocks, setStocks] = useState(allProducts)
@@ -87,6 +92,16 @@ export const useGameState = (input = {}) => {
     const [gameStartTime, setGameStartTime] = useState(Date.now())
     const [currentDay, setCurrentDay] = useState(1)
 
+    const persistGameState = useCallback((context) => {
+        if (!isInitializedRef.current) return false
+        const result = saveGame(gameStateRef.current)
+        if (!result) {
+            // 저장 실패 시 콘솔 경고만 남기고 UI 알림은 추가하지 않는다.
+            console.warn(`게임 저장 실패: ${context}`)
+        }
+        return result
+    }, [])
+
     // 게임 로드
     const loadGameState = useCallback(() => {
         const saved = loadGame()
@@ -132,7 +147,26 @@ export const useGameState = (input = {}) => {
 
     // 게임 저장
     const saveGameState = useCallback(() => {
-        const payload = {
+        return persistGameState('수동 저장')
+    }, [persistGameState])
+
+    // 초기화
+    useEffect(() => {
+        const isNewUser = loadGameState()
+        setIsInitialized(true)
+        return () => { }
+    }, [loadGameState])
+
+    useEffect(() => {
+        isInitializedRef.current = isInitialized
+    }, [isInitialized])
+
+    useEffect(() => {
+        persistGameStateRef.current = persistGameState
+    }, [persistGameState])
+
+    useEffect(() => {
+        const nextState = {
             stocks, cash, portfolio, shortPositions,
             creditUsed, creditInterest,
             tradeHistory, pendingOrders,
@@ -143,24 +177,39 @@ export const useGameState = (input = {}) => {
             watchlist, alerts, gameStartTime, currentDay
         }
         if (settings !== undefined) {
-            payload.settings = settings
+            nextState.settings = settings
         }
-        saveGame(payload)
+        gameStateRef.current = nextState
     }, [stocks, cash, portfolio, shortPositions, creditUsed, creditInterest, tradeHistory, pendingOrders, unlockedAchievements, unlockedSkills, totalXp, totalTrades, winStreak, maxWinStreak, totalProfit, news, missionProgress, completedMissions, totalDividends, assetHistory, watchlist, alerts, gameStartTime, currentDay, settings])
-
-    // 초기화
-    useEffect(() => {
-        const isNewUser = loadGameState()
-        setIsInitialized(true)
-        return () => { }
-    }, [loadGameState])
 
     // 자동 저장 (5초마다)
     useEffect(() => {
-        if (!isInitialized) return
-        const timer = setInterval(saveGameState, 5000)
+        const timer = setInterval(() => {
+            if (persistGameStateRef.current) {
+                persistGameStateRef.current('자동 저장')
+            }
+        }, AUTO_SAVE_INTERVAL)
         return () => clearInterval(timer)
-    }, [isInitialized, saveGameState])
+    }, [AUTO_SAVE_INTERVAL])
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                persistGameState('탭 비활성화 저장')
+            }
+        }
+
+        const handleBeforeUnload = () => {
+            persistGameState('탭 종료 저장')
+        }
+
+        window.addEventListener('visibilitychange', handleVisibilityChange)
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        return () => {
+            window.removeEventListener('visibilitychange', handleVisibilityChange)
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+        }
+    }, [persistGameState])
 
     return {
         // 상태
