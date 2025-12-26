@@ -62,7 +62,11 @@ export function useLocalStorage(key, initialValue) {
     // 다른 탭의 변경 감지
     useEffect(() => {
         const handleStorageChange = (event) => {
-            if (event.key === key && event.newValue) {
+            if (event.key === null || event.key === key) {
+                if (event.newValue == null) {
+                    setStoredValue(initialValue)
+                    return
+                }
                 setStoredValue(JSON.parse(event.newValue))
             }
         }

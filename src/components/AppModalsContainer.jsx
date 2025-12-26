@@ -252,6 +252,9 @@ const AppModalsContainer = ({
             stock={chartStock}
             onClose={() => closeModal(MODAL_NAMES.CHART)}
             currentPrice={stocksById.get(chartStock.id)?.price || chartStock.price}
+            portfolio={portfolio}
+            shortPositions={shortPositions}
+            canShortSell={canShortSell}
             onOpenOrder={openOrderManager}
           />
         </ErrorBoundary>

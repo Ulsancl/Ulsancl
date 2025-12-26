@@ -163,7 +163,6 @@ export const loadGame = () => {
         let data = JSON.parse(saved)
         if (!isPlainObject(data)) return null
         data = sanitizeSaveData(migrateSaveData(data))
-        console.log('게임 로드 성공:', new Date(data.savedAt).toLocaleString())
         return data
     } catch (error) {
         console.error('게임 로드 실패:', error)

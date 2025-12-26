@@ -88,6 +88,7 @@ export const useGameLoop = ({
     const lastDayRef = useRef(1)
     const lastSeasonYearRef = useRef(2020)
     const priceResetTimeoutRef = useRef(null)
+    const lastAssetHistoryRef = useRef(0)
     const gameTimeRef = useRef(null)
     const gameStartTimeRef = useRef(gameStartTime)
     const stocksRef = useRef(stocks)
@@ -99,6 +100,7 @@ export const useGameLoop = ({
     const shortPositionsRef = useRef(shortPositions)
     const creditUsedRef = useRef(creditUsed)
     const creditInterestRef = useRef(creditInterest)
+    const marginCallActiveRef = useRef(marginCallActive)
     const unlockedSkillsRef = useRef(unlockedSkills)
     const showNotificationRef = useRef(showNotification)
     const playSoundRef = useRef(playSound)
@@ -114,10 +116,11 @@ export const useGameLoop = ({
         shortPositionsRef.current = shortPositions
         creditUsedRef.current = creditUsed
         creditInterestRef.current = creditInterest
+        marginCallActiveRef.current = marginCallActive
         unlockedSkillsRef.current = unlockedSkills
         showNotificationRef.current = showNotification
         playSoundRef.current = playSound
-    }, [gameStartTime, stocks, alerts, pendingOrders, marketState, cash, portfolio, shortPositions, creditUsed, creditInterest, unlockedSkills, showNotification, playSound])
+    }, [gameStartTime, stocks, alerts, pendingOrders, marketState, cash, portfolio, shortPositions, creditUsed, creditInterest, marginCallActive, unlockedSkills, showNotification, playSound])
 
     // 서브 모듈 초기화
     const priceUpdater = usePriceUpdater({
@@ -129,17 +132,16 @@ export const useGameLoop = ({
     })
 
     const orderProcessor = useOrderProcessor({
-        setPendingOrders, setCash,
-        setPortfolio, setTradeHistory,
+        setTradeHistory,
         setTotalTrades, setDailyTrades, setTotalProfit, setDailyProfit, setWinStreak,
         showNotification, playSound
     })
 
     const creditManager = useCreditManager({
-        cash, setCash, portfolio, setPortfolio,
-        creditUsed, setCreditUsed, creditInterest, setCreditInterest,
-        marginCallActive, setMarginCallActive,
-        shortPositions, setShortPositions,
+        cash, portfolio,
+        creditUsed, creditInterest,
+        marginCallActive,
+        shortPositions,
         showNotification, playSound, formatNumber
     })
 
@@ -163,6 +165,7 @@ export const useGameLoop = ({
             const currentShortPositions = shortPositionsRef.current
             const currentCreditUsed = creditUsedRef.current
             const currentCreditInterest = creditInterestRef.current
+            const currentMarginCallActive = marginCallActiveRef.current
             const currentPendingOrders = pendingOrdersRef.current
             const currentUnlockedSkills = unlockedSkillsRef.current
             const showNotificationCurrent = showNotificationRef.current
@@ -174,6 +177,7 @@ export const useGameLoop = ({
             let workingShortPositions = currentShortPositions
             let workingCreditUsed = currentCreditUsed
             let workingCreditInterest = currentCreditInterest
+            let workingMarginCallActive = currentMarginCallActive
             let workingPendingOrders = currentPendingOrders
 
             // 1. 게임 시간 업데이트
@@ -214,8 +218,12 @@ export const useGameLoop = ({
                 portfolio: workingPortfolio,
                 shortPositions: workingShortPositions,
                 creditUsed: workingCreditUsed,
-                creditInterest: workingCreditInterest
+                creditInterest: workingCreditInterest,
+                marginCallActive: workingMarginCallActive
             })
+            if (marginResult?.marginCallActive !== undefined) {
+                workingMarginCallActive = marginResult.marginCallActive
+            }
             if (marginResult?.forceLiquidation) {
                 if (marginResult.cash !== undefined) workingCash = marginResult.cash
                 if (marginResult.portfolio !== undefined) workingPortfolio = marginResult.portfolio
@@ -245,11 +253,9 @@ export const useGameLoop = ({
                 workingStocks = eventStocks
                 if (eventCash !== workingCash) {
                     workingCash = eventCash
-                    setCash(eventCash)
                 }
                 if (eventPortfolio !== workingPortfolio) {
                     workingPortfolio = eventPortfolio
-                    setPortfolio(eventPortfolio)
                 }
                 if (message) showNotificationCurrent(`${event.icon} ${message}`, 'info')
             }
@@ -307,7 +313,8 @@ export const useGameLoop = ({
             }
 
             // 15. 자산 기록 (10초마다)
-            if (now % ASSET_HISTORY_INTERVAL < updateInterval) {
+            if (now - lastAssetHistoryRef.current >= ASSET_HISTORY_INTERVAL) {
+                lastAssetHistoryRef.current = now
                 const stockValueNow = calculateStockValueFromMap(stockMap, workingPortfolio)
                 const shortValueNow = calculateShortValueFromMap(stockMap, workingShortPositions)
                 const grossAssetsNow = workingCash + stockValueNow + shortValueNow
@@ -319,6 +326,13 @@ export const useGameLoop = ({
             // 16. 상태 업데이트
             if (workingStocks !== currentStocks) setStocks(workingStocks)
             if (workingMarketState !== currentMarketState) setMarketState(workingMarketState)
+            if (workingCash !== currentCash) setCash(workingCash)
+            if (workingPortfolio !== currentPortfolio) setPortfolio(workingPortfolio)
+            if (workingShortPositions !== currentShortPositions) setShortPositions(workingShortPositions)
+            if (workingPendingOrders !== currentPendingOrders) setPendingOrders(workingPendingOrders)
+            if (workingCreditUsed !== currentCreditUsed) setCreditUsed(workingCreditUsed)
+            if (workingCreditInterest !== currentCreditInterest) setCreditInterest(workingCreditInterest)
+            if (workingMarginCallActive !== currentMarginCallActive) setMarginCallActive(workingMarginCallActive)
 
         }, updateInterval)
 
@@ -329,9 +343,9 @@ export const useGameLoop = ({
     }, [
         updateInterval,
         priceUpdater, newsGenerator, orderProcessor, creditManager, dividendManager, crisisManager,
-        setActiveCrisis, setAlerts, setAssetHistory, setCash, setCrisisAlert, setCrisisHistory,
-        setCurrentDay, setDailyProfit, setDailyTrades, setGameTime, setMarketState, setNews,
-        setPortfolio, setPriceChanges, setShowSeasonEnd, setStocks, setTotalDividends
+        setActiveCrisis, setAlerts, setAssetHistory, setCash, setCreditInterest, setCreditUsed, setCrisisAlert, setCrisisHistory,
+        setCurrentDay, setDailyProfit, setDailyTrades, setGameTime, setMarketState, setNews, setPendingOrders,
+        setPortfolio, setPriceChanges, setShortPositions, setShowSeasonEnd, setStocks, setTotalDividends, setMarginCallActive
     ])
 }
 

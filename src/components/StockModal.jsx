@@ -121,7 +121,7 @@ function CandlestickChart({ data, width, height, currentPrice }) {
     )
 }
 
-// 시간프레임별 틱 수 (1틱 = 1초 기준)
+// 시간프레임별 틱 수 (짧은 구간은 초 단위, 장기 구간은 시간 단위로 축약)
 const TIMEFRAME_TICKS = {
     'tick-1': 1,
     'tick-3': 3,
@@ -135,13 +135,13 @@ const TIMEFRAME_TICKS = {
     'min-15': 900,
     'min-30': 1800,
     'min-60': 3600,
-    'day-1': 86400,
-    'day-3': 259200,
-    'day-5': 432000,
-    'week-1': 604800,
-    'week-3': 1814400,
-    'month-1': 2592000,
-    'month-3': 7776000,
+    'day-1': 24,
+    'day-3': 72,
+    'day-5': 120,
+    'week-1': 168,
+    'week-3': 504,
+    'month-1': 720,
+    'month-3': 2160,
 }
 
 const TIMEFRAME_LABELS = {
@@ -229,7 +229,15 @@ function aggregateTicksToCandles(ticks, ticksPerCandle, maxCandles = 60) {
     return candles
 }
 
-export default function StockModal({ stock, onClose, currentPrice, onOpenOrder }) {
+export default function StockModal({
+    stock,
+    onClose,
+    currentPrice,
+    onOpenOrder,
+    portfolio,
+    shortPositions,
+    canShortSell
+}) {
     const [category, setCategory] = useState('min')
     const [subOption, setSubOption] = useState(1)
     const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
@@ -334,6 +342,9 @@ export default function StockModal({ stock, onClose, currentPrice, onOpenOrder }
     const change = currentPrice - startPrice
     const changeRate = startPrice ? (change / startPrice) * 100 : 0
     const isUp = change >= 0
+
+    const holdingQty = portfolio?.[stock.id]?.quantity || 0
+    const shortQty = shortPositions?.[stock.id]?.quantity || 0
 
     return (
         <div className="chart-modal-overlay" onClick={onClose}>
@@ -452,9 +463,23 @@ export default function StockModal({ stock, onClose, currentPrice, onOpenOrder }
                             <button className="modal-buy-btn" onClick={() => onOpenOrder && onOpenOrder(stock, 'buy')}>
                                 매수
                             </button>
-                            <button className="modal-sell-btn" onClick={() => onOpenOrder && onOpenOrder(stock, 'sell')}>
+                            <button
+                                className="modal-sell-btn"
+                                onClick={() => onOpenOrder && onOpenOrder(stock, 'sell')}
+                                disabled={holdingQty === 0}
+                            >
                                 매도
                             </button>
+                            {canShortSell && (
+                                <button className="modal-sell-btn" onClick={() => onOpenOrder && onOpenOrder(stock, 'short')}>
+                                    공매도
+                                </button>
+                            )}
+                            {shortQty > 0 && (
+                                <button className="modal-buy-btn" onClick={() => onOpenOrder && onOpenOrder(stock, 'cover')}>
+                                    청산
+                                </button>
+                            )}
                         </div>
                     </div>
 
