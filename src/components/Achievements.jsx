@@ -1,6 +1,6 @@
 // 업적 시스템 컴포넌트
-import { ACHIEVEMENTS, LEVELS } from './constants'
-import { calculateLevel } from './utils'
+import { ACHIEVEMENTS, LEVELS } from '../constants'
+import { calculateLevel } from '../utils'
 import './Achievements.css'
 
 // 레벨 표시 컴포넌트

@@ -2,37 +2,11 @@
  * useGameState - 게임 상태 저장/로드 관리 커스텀 훅
  */
 
-import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
-import { saveGame, loadGame } from '../utils'
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import { saveGame, loadGame, getDefaultSaveState } from '../utils'
 import { INITIAL_CAPITAL } from '../constants'
 
 const AUTO_SAVE_INTERVAL = 5000
-
-// 초기 게임 상태
-const INITIAL_STATE = {
-    cash: INITIAL_CAPITAL,
-    portfolio: {},
-    shortPositions: {},
-    creditUsed: 0,
-    creditInterest: 0,
-    tradeHistory: [],
-    pendingOrders: [],
-    unlockedAchievements: {},
-    unlockedSkills: {},
-    totalXp: 0,
-    totalTrades: 0,
-    winStreak: 0,
-    maxWinStreak: 0,
-    totalProfit: 0,
-    news: [],
-    missionProgress: {},
-    completedMissions: {},
-    totalDividends: 0,
-    assetHistory: [],
-    watchlist: [],
-    alerts: [],
-    currentDay: 1
-}
 
 export const useGameState = (input = {}) => {
     const isLegacy = Array.isArray(input)
@@ -40,11 +14,12 @@ export const useGameState = (input = {}) => {
     const settings = isLegacy ? undefined : input.settings
     const setSettings = isLegacy ? undefined : input.setSettings
     const onNewUser = isLegacy ? undefined : input.onNewUser
+    const defaultState = useMemo(() => getDefaultSaveState(), [])
 
     // 게임 로드 상태
     const [isInitialized, setIsInitialized] = useState(false)
     const isInitializedRef = useRef(false)
-    const gameStateRef = useRef({ ...INITIAL_STATE, stocks: allProducts })
+    const gameStateRef = useRef({ ...defaultState, stocks: allProducts })
     const persistGameStateRef = useRef(null)
     const settingsRef = useRef(settings)
 
@@ -53,39 +28,39 @@ export const useGameState = (input = {}) => {
     const stocksRef = useRef(stocks)
 
     // 자금 관련
-    const [cash, setCash] = useState(INITIAL_CAPITAL)
-    const [portfolio, setPortfolio] = useState({})
-    const [shortPositions, setShortPositions] = useState({})
+    const [cash, setCash] = useState(defaultState.cash)
+    const [portfolio, setPortfolio] = useState(defaultState.portfolio)
+    const [shortPositions, setShortPositions] = useState(defaultState.shortPositions)
     const cashRef = useRef(cash)
     const portfolioRef = useRef(portfolio)
     const shortPositionsRef = useRef(shortPositions)
 
     // 신용 거래
-    const [creditUsed, setCreditUsed] = useState(0)
-    const [creditInterest, setCreditInterest] = useState(0)
+    const [creditUsed, setCreditUsed] = useState(defaultState.creditUsed)
+    const [creditInterest, setCreditInterest] = useState(defaultState.creditInterest)
     const [marginCallActive, setMarginCallActive] = useState(false)
     const creditUsedRef = useRef(creditUsed)
     const creditInterestRef = useRef(creditInterest)
 
     // 거래 기록
-    const [tradeHistory, setTradeHistory] = useState([])
-    const [pendingOrders, setPendingOrders] = useState([])
+    const [tradeHistory, setTradeHistory] = useState(defaultState.tradeHistory)
+    const [pendingOrders, setPendingOrders] = useState(defaultState.pendingOrders)
     const tradeHistoryRef = useRef(tradeHistory)
     const pendingOrdersRef = useRef(pendingOrders)
 
     // 업적/레벨
-    const [unlockedAchievements, setUnlockedAchievements] = useState({})
-    const [unlockedSkills, setUnlockedSkills] = useState({})
-    const [totalXp, setTotalXp] = useState(0)
+    const [unlockedAchievements, setUnlockedAchievements] = useState(defaultState.unlockedAchievements)
+    const [unlockedSkills, setUnlockedSkills] = useState(defaultState.unlockedSkills)
+    const [totalXp, setTotalXp] = useState(defaultState.totalXp)
     const unlockedAchievementsRef = useRef(unlockedAchievements)
     const unlockedSkillsRef = useRef(unlockedSkills)
     const totalXpRef = useRef(totalXp)
 
     // 통계
-    const [totalTrades, setTotalTrades] = useState(0)
-    const [winStreak, setWinStreak] = useState(0)
-    const [maxWinStreak, setMaxWinStreak] = useState(0)
-    const [totalProfit, setTotalProfit] = useState(0)
+    const [totalTrades, setTotalTrades] = useState(defaultState.totalTrades)
+    const [winStreak, setWinStreak] = useState(defaultState.winStreak)
+    const [maxWinStreak, setMaxWinStreak] = useState(defaultState.maxWinStreak)
+    const [totalProfit, setTotalProfit] = useState(defaultState.totalProfit)
     const [dailyTrades, setDailyTrades] = useState(0)
     const [dailyProfit, setDailyProfit] = useState(0)
     const totalTradesRef = useRef(totalTrades)
@@ -96,17 +71,17 @@ export const useGameState = (input = {}) => {
     const dailyProfitRef = useRef(dailyProfit)
 
     // 미션
-    const [missionProgress, setMissionProgress] = useState({})
-    const [completedMissions, setCompletedMissions] = useState({})
+    const [missionProgress, setMissionProgress] = useState(defaultState.missionProgress)
+    const [completedMissions, setCompletedMissions] = useState(defaultState.completedMissions)
     const missionProgressRef = useRef(missionProgress)
     const completedMissionsRef = useRef(completedMissions)
 
     // 기타
-    const [news, setNews] = useState([])
-    const [assetHistory, setAssetHistory] = useState([])
-    const [watchlist, setWatchlist] = useState([])
-    const [alerts, setAlerts] = useState([])
-    const [totalDividends, setTotalDividends] = useState(0)
+    const [news, setNews] = useState(defaultState.news)
+    const [assetHistory, setAssetHistory] = useState(defaultState.assetHistory)
+    const [watchlist, setWatchlist] = useState(defaultState.watchlist)
+    const [alerts, setAlerts] = useState(defaultState.alerts)
+    const [totalDividends, setTotalDividends] = useState(defaultState.totalDividends)
     const newsRef = useRef(news)
     const assetHistoryRef = useRef(assetHistory)
     const watchlistRef = useRef(watchlist)
@@ -114,8 +89,8 @@ export const useGameState = (input = {}) => {
     const totalDividendsRef = useRef(totalDividends)
 
     // 시간 관련
-    const [gameStartTime, setGameStartTime] = useState(Date.now())
-    const [currentDay, setCurrentDay] = useState(1)
+    const [gameStartTime, setGameStartTime] = useState(defaultState.gameStartTime)
+    const [currentDay, setCurrentDay] = useState(defaultState.currentDay)
     const gameStartTimeRef = useRef(gameStartTime)
     const currentDayRef = useRef(currentDay)
 

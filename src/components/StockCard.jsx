@@ -6,7 +6,7 @@
 import React, { memo } from 'react'
 import styles from './StockCard.module.css'
 import { formatNumber, formatPercent, formatCompact } from '../utils'
-import { WatchButton } from '../Watchlist'
+import { WatchButton } from './Watchlist'
 import { SHORT_SELLING } from '../constants'
 
 // 상품 타입 라벨

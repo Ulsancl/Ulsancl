@@ -3,7 +3,7 @@
  * React.memo로 최적화되어 해당 주식의 props가 변경될 때만 리렌더링
  */
 import React, { memo, useCallback } from 'react'
-import { WatchButton } from '../Watchlist'
+import { WatchButton } from './Watchlist'
 import { formatNumber, formatPercent, formatCompact } from '../utils'
 import { SHORT_SELLING } from '../constants'
 

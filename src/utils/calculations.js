@@ -39,6 +39,40 @@ export const calculateShortValue = (shortPositions, stocks) => {
 }
 
 /**
+ * Map 기반 주식 가치 계산
+ * @param {Map<number, Object>} stockMap - 주식 Map (id -> stock)
+ * @param {Object} portfolio - 보유 수량 맵
+ * @returns {number}
+ */
+export const calculateStockValueFromMap = (stockMap, portfolio) => {
+    if (!portfolio || !stockMap) return 0
+
+    return Object.entries(portfolio).reduce((total, [stockId, holding]) => {
+        const stock = stockMap.get(parseInt(stockId))
+        if (!stock) return total
+        const value = stock.price * holding.quantity
+        return total + (isNaN(value) ? 0 : value)
+    }, 0)
+}
+
+/**
+ * Map 기반 공매도 손익 계산
+ * @param {Map<number, Object>} stockMap - 주식 Map (id -> stock)
+ * @param {Object} shortPositions - 공매도 포지션 맵
+ * @returns {number}
+ */
+export const calculateShortValueFromMap = (stockMap, shortPositions) => {
+    if (!shortPositions || !stockMap) return 0
+
+    return Object.entries(shortPositions).reduce((total, [stockId, position]) => {
+        const stock = stockMap.get(parseInt(stockId))
+        if (!stock) return total
+        const pnl = (position.entryPrice - stock.price) * position.quantity
+        return total + (isNaN(pnl) ? 0 : pnl)
+    }, 0)
+}
+
+/**
  * 안전한 숫자 반환 (NaN 방지)
  * @param {number} value - 숫자 값
  * @param {number} defaultValue - 기본값
@@ -117,6 +151,8 @@ export const formatProfitRate = (rate) => {
 export default {
     calculateStockValue,
     calculateShortValue,
+    calculateStockValueFromMap,
+    calculateShortValueFromMap,
     calculateAssets,
     safeNumber,
     formatProfitRate

@@ -30,6 +30,8 @@ export {
 export {
     calculateStockValue,
     calculateShortValue,
+    calculateStockValueFromMap,
+    calculateShortValueFromMap,
     calculateAssets,
     safeNumber,
     formatProfitRate

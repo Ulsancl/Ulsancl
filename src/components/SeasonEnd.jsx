@@ -1,6 +1,6 @@
 // 시즌 종료 모달 - 1년 트레이딩 리포트
-import { formatNumber, formatPercent } from './utils'
-import { ACHIEVEMENTS } from './constants'
+import { formatNumber, formatPercent } from '../utils'
+import { ACHIEVEMENTS } from '../constants'
 import './SeasonEnd.css'
 
 export default function SeasonEndModal({

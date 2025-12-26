@@ -185,7 +185,7 @@ export const generateSmartAlerts = (portfolio, stocks, priceHistory) => {
     Object.entries(portfolio).forEach(([stockId]) => {
         const stock = stocks.find(s => s.id === parseInt(stockId))
         if (!stock) return
-// 자동 익절선 (15%)
+        // 자동 익절선 (15%)
         smartAlerts.push(createAlert({
             stockId: stock.id,
             type: 'PROFIT_TARGET',

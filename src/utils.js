@@ -51,7 +51,7 @@ const applyDefaults = (data, defaults) => {
     })
 }
 
-const getDefaultSaveState = () => ({
+export const getDefaultSaveState = () => ({
     cash: INITIAL_CAPITAL,
     portfolio: {},
     shortPositions: {},

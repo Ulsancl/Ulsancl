@@ -1,5 +1,5 @@
 // 설정 패널 컴포넌트
-import { THEMES } from './constants'
+import { THEMES } from '../constants'
 import './Settings.css'
 
 export default function SettingsPanel({ settings, onUpdateSettings, onClose }) {

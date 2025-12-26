@@ -1,7 +1,7 @@
 // 고급 통계 컴포넌트
 import { useMemo } from 'react'
-import { formatPercent, formatCompact } from './utils'
-import { INITIAL_CAPITAL } from './constants'
+import { formatPercent, formatCompact } from '../utils'
+import { INITIAL_CAPITAL } from '../constants'
 import './Statistics.css'
 
 export default function StatisticsPanel({ tradeHistory, assetHistory, totalAssets, onClose }) {

@@ -1,7 +1,7 @@
 // 자산 변동 차트 컴포넌트
 import { useMemo } from 'react'
-import { formatCompact, formatPercent } from './utils'
-import { INITIAL_CAPITAL } from './constants'
+import { formatCompact, formatPercent } from '../utils'
+import { INITIAL_CAPITAL } from '../constants'
 import './AssetChart.css'
 
 export default function AssetChart({ assetHistory, onClose }) {

@@ -1,6 +1,6 @@
 // 미션 시스템 컴포넌트
-import { MISSIONS } from './constants'
-import { formatNumber, formatCompact } from './utils'
+import { MISSIONS } from '../constants'
+import { formatNumber, formatCompact } from '../utils'
 import './Missions.css'
 
 export default function MissionsPanel({ missionProgress, completedMissions, onClaimReward, onClose }) {
@@ -50,13 +50,13 @@ export default function MissionsPanel({ missionProgress, completedMissions, onCl
                     <section className="mission-section">
                         <h3>🌅 일일 미션</h3>
                         <p className="mission-reset">매일 자정에 리셋됩니다</p>
-                        {MISSIONS.daily.map(m => renderMission(m, 'daily'))}
+                        {MISSIONS.daily.map(m => renderMission(m))}
                     </section>
 
                     <section className="mission-section">
                         <h3>📅 주간 미션</h3>
                         <p className="mission-reset">매주 월요일에 리셋됩니다</p>
-                        {MISSIONS.weekly.map(m => renderMission(m, 'weekly'))}
+                        {MISSIONS.weekly.map(m => renderMission(m))}
                     </section>
                 </div>
             </div>

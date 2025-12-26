@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import './AnalystReport.css'
-import { formatNumber } from './utils'
+import { formatNumber } from '../utils'
 
 const AnalystReport = ({ stocks, marketState, onClose }) => {
     // 리포트를 한 번만 생성하고 고정 (모달이 열릴 때 초기값으로 계산)

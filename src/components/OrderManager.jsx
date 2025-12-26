@@ -1,7 +1,7 @@
 // 주문 관리 컴포넌트
 import { useState } from 'react'
-import { formatNumber } from './utils'
-import { getTickSize, getMinPrice, normalizePrice } from './engine'
+import { formatNumber } from '../utils'
+import { getTickSize, getMinPrice, normalizePrice } from '../engine'
 import './OrderManager.css'
 
 export default function OrderManager({ stock, currentPrice, portfolio, cash, onPlaceOrder, onClose, initialSide = 'buy' }) {
