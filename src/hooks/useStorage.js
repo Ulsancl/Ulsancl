@@ -2,11 +2,11 @@
  * useLocalStorage - 로컬 스토리지 동기화 훅
  * 자동 직렬화/역직렬화 및 에러 핸들링
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 
 export function useLocalStorage(key, initialValue) {
-    // 초기값 가져오기
-    const readValue = useCallback(() => {
+    // 초기값 lazy 초기화
+    const [storedValue, setStoredValue] = useState(() => {
         if (typeof window === 'undefined') {
             return initialValue
         }
@@ -18,11 +18,15 @@ export function useLocalStorage(key, initialValue) {
             console.warn(`Error reading localStorage key "${key}":`, error)
             return initialValue
         }
-    }, [key, initialValue])
+    })
 
-    const [storedValue, setStoredValue] = useState(readValue)
+    // ref로 최신 값 추적 (의존성 문제 해결)
+    const storedValueRef = useRef(storedValue)
+    useLayoutEffect(() => {
+        storedValueRef.current = storedValue
+    }, [storedValue])
 
-    // 값 저장
+    // 값 저장 - storedValue 의존성 제거로 안정적인 참조 보장
     const setValue = useCallback((value) => {
         if (typeof window === 'undefined') {
             console.warn('localStorage is not available')
@@ -30,7 +34,8 @@ export function useLocalStorage(key, initialValue) {
         }
 
         try {
-            const valueToStore = value instanceof Function ? value(storedValue) : value
+            // ref에서 최신 값 읽기
+            const valueToStore = value instanceof Function ? value(storedValueRef.current) : value
             setStoredValue(valueToStore)
             window.localStorage.setItem(key, JSON.stringify(valueToStore))
 
@@ -42,7 +47,7 @@ export function useLocalStorage(key, initialValue) {
         } catch (error) {
             console.warn(`Error setting localStorage key "${key}":`, error)
         }
-    }, [key, storedValue])
+    }, [key])
 
     // 값 삭제
     const removeValue = useCallback(() => {
@@ -73,26 +78,33 @@ export function useLocalStorage(key, initialValue) {
  * useSessionStorage - 세션 스토리지 훅
  */
 export function useSessionStorage(key, initialValue) {
-    const readValue = useCallback(() => {
+    // 초기값 lazy 초기화
+    const [storedValue, setStoredValue] = useState(() => {
         try {
             const item = window.sessionStorage.getItem(key)
             return item ? JSON.parse(item) : initialValue
         } catch {
             return initialValue
         }
-    }, [key, initialValue])
+    })
 
-    const [storedValue, setStoredValue] = useState(readValue)
+    // ref로 최신 값 추적 (의존성 문제 해결)
+    const storedValueRef = useRef(storedValue)
+    useLayoutEffect(() => {
+        storedValueRef.current = storedValue
+    }, [storedValue])
 
     const setValue = useCallback((value) => {
         try {
-            const valueToStore = value instanceof Function ? value(storedValue) : value
+            // ref에서 최신 값 읽기
+            const valueToStore = value instanceof Function ? value(storedValueRef.current) : value
             setStoredValue(valueToStore)
             window.sessionStorage.setItem(key, JSON.stringify(valueToStore))
         } catch (error) {
             console.warn(`Error setting sessionStorage key "${key}":`, error)
         }
-    }, [key, storedValue])
+    }, [key])
+
 
     return [storedValue, setValue]
 }

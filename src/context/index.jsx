@@ -17,17 +17,28 @@ export {
     useSoundSettings
 } from './SettingsContext'
 
+export {
+    ModalProvider,
+    useModal,
+    useModalState,
+    MODAL_NAMES
+} from './ModalContext'
+
 // 복합 Provider 컴포넌트
 import React from 'react'
 import { GameProvider } from './GameContext'
 import { SettingsProvider } from './SettingsContext'
+import { ModalProvider } from './ModalContext'
 
 export function AppProviders({ children }) {
     return (
         <SettingsProvider>
-            <GameProvider>
-                {children}
-            </GameProvider>
+            <ModalProvider>
+                <GameProvider>
+                    {children}
+                </GameProvider>
+            </ModalProvider>
         </SettingsProvider>
     )
 }
+
