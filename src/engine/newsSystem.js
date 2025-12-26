@@ -226,6 +226,9 @@ export const applyNewsImpact = (stocks, news, marketState) => {
         if (news.marketWide || news.isGlobal) {
             priceChange = news.impact * (news.isGlobal ? 1 : 0.5)
             momentumBoost = news.impact * 0.5
+        } else if (news.sectors && news.sectors[stock.sector] !== undefined) {
+            priceChange = news.impact + news.sectors[stock.sector]
+            momentumBoost = priceChange * 0.5
         } else if (news.targetSector && stock.sector === news.targetSector) {
             priceChange = news.impact * 0.7
             momentumBoost = news.impact * 0.5
@@ -246,16 +249,18 @@ export const applyNewsImpact = (stocks, news, marketState) => {
 
             if (Math.abs(dailyChange) <= config.maxDaily) {
                 const stockType = stock.type || 'stock'
-                if (stockType === 'stock' || stockType === 'etf') {
-                    newPrice = roundToTickSize(newPrice)
-                } else {
-                    newPrice = Math.round(newPrice)
-                }
+                newPrice = roundToTickSize(newPrice, stockType)
+
+                const minPrice = stockType === 'crypto'
+                    ? 0.01
+                    : (stockType === 'bond' ? 90000 : (stockType === 'commodity' ? 1 : 100))
 
                 return {
                     ...stock,
-                    price: Math.max(100, newPrice),
-                    momentum: (stock.momentum || 0) + momentumBoost
+                    price: Math.max(minPrice, newPrice),
+                    momentum: (stock.momentum || 0) + momentumBoost,
+                    dailyHigh: Math.max(stock.dailyHigh || newPrice, newPrice),
+                    dailyLow: Math.min(stock.dailyLow || newPrice, newPrice)
                 }
             }
         }
@@ -265,6 +270,14 @@ export const applyNewsImpact = (stocks, news, marketState) => {
     let newMarketState = { ...marketState }
     if (news.marketWide || news.isGlobal) {
         newMarketState.trend = Math.max(-0.5, Math.min(0.5, newMarketState.trend + news.impact))
+    } else if (news.sectors) {
+        const updatedTrends = { ...newMarketState.sectorTrends }
+        Object.entries(news.sectors).forEach(([sector, impact]) => {
+            updatedTrends[sector] = Math.max(-0.5, Math.min(0.5,
+                (updatedTrends[sector] || 0) + impact * 2
+            ))
+        })
+        newMarketState.sectorTrends = updatedTrends
     } else if (news.targetSector) {
         newMarketState.sectorTrends = {
             ...newMarketState.sectorTrends,

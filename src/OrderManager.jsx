@@ -1,16 +1,33 @@
 // 주문 관리 컴포넌트
 import { useState } from 'react'
 import { formatNumber } from './utils'
+import { getTickSize, roundToTickSize } from './engine/priceCalculator'
 import './OrderManager.css'
 
-export default function OrderManager({ stock, currentPrice, portfolio, cash, onPlaceOrder, onClose, initialSide = 'buy' }) {
-    const [orderType, setOrderType] = useState('limit')
-    const [side, setSide] = useState(initialSide)
-    const [quantity, setQuantity] = useState(1)
-    const [targetPrice, setTargetPrice] = useState(currentPrice)
+const getOrderMinPrice = (stockType) => (
+    stockType === 'crypto'
+        ? 0.01
+        : (stockType === 'bond' ? 90000 : (stockType === 'commodity' ? 1 : 100))
+)
 
+export default function OrderManager({ stock, currentPrice, portfolio, cash, onPlaceOrder, onClose, initialSide = 'buy' }) {
+    const stockType = stock.type || 'stock'
+    const minPrice = getOrderMinPrice(stockType)
+    const normalizeTargetPrice = (value) => {
+        const numeric = Number.isFinite(value) ? value : minPrice
+        return roundToTickSize(Math.max(minPrice, numeric), stockType)
+    }
+    const normalizedInitialSide = initialSide === 'buy' ? 'buy' : 'sell'
+
+    const [orderType, setOrderType] = useState('limit')
+    const [side, setSide] = useState(normalizedInitialSide)
+    const [quantity, setQuantity] = useState(1)
+    const [targetPrice, setTargetPrice] = useState(() => normalizeTargetPrice(currentPrice))
+
+    const normalizedTargetPrice = normalizeTargetPrice(targetPrice)
     const holding = portfolio?.[stock.id]
-    const maxBuyQty = Math.floor(cash / currentPrice)
+    const buyPriceBasis = orderType === 'limit' ? normalizedTargetPrice : currentPrice
+    const maxBuyQty = Math.floor(cash / Math.max(buyPriceBasis, minPrice))
     const maxSellQty = holding?.quantity || 0
 
     const handleSubmit = () => {
@@ -24,7 +41,7 @@ export default function OrderManager({ stock, currentPrice, portfolio, cash, onP
             type: orderType,
             side,
             quantity,
-            targetPrice: Math.round(targetPrice),
+            targetPrice: normalizedTargetPrice,
             createdAt: Date.now()
         })
 
@@ -103,17 +120,26 @@ export default function OrderManager({ stock, currentPrice, portfolio, cash, onP
                             {orderType === 'takeProfit' && '익절가 (이상 시 매도)'}
                         </label>
                         <div className="price-input-group">
-                            <button onClick={() => setTargetPrice(p => Math.max(100, p - 1000))}>-</button>
+                            <button onClick={() => setTargetPrice(p => normalizeTargetPrice(p - getTickSize(Math.max(p, minPrice), stockType)))}>-</button>
                             <input
                                 type="number"
-                                value={targetPrice}
-                                onChange={(e) => setTargetPrice(Math.max(100, parseInt(e.target.value) || 0))}
+                                min={minPrice}
+                                step={getTickSize(Math.max(normalizedTargetPrice, minPrice), stockType)}
+                                value={normalizedTargetPrice}
+                                onChange={(e) => {
+                                    const next = parseFloat(e.target.value)
+                                    if (Number.isNaN(next)) {
+                                        setTargetPrice(minPrice)
+                                        return
+                                    }
+                                    setTargetPrice(normalizeTargetPrice(next))
+                                }}
                             />
-                            <button onClick={() => setTargetPrice(p => p + 1000)}>+</button>
+                            <button onClick={() => setTargetPrice(p => normalizeTargetPrice(p + getTickSize(Math.max(p, minPrice), stockType)))}>+</button>
                             <span className="price-unit">원</span>
                         </div>
                         <div className="price-diff">
-                            현재가 대비: {((targetPrice - currentPrice) / currentPrice * 100).toFixed(2)}%
+                            현재가 대비: {((normalizedTargetPrice - currentPrice) / currentPrice * 100).toFixed(2)}%
                         </div>
                     </div>
 
@@ -138,7 +164,7 @@ export default function OrderManager({ stock, currentPrice, portfolio, cash, onP
                     {/* 예상 금액 */}
                     <div className="order-summary">
                         <span>예상 {side === 'buy' ? '매수' : '매도'} 금액</span>
-                        <span className="summary-value">{formatNumber(targetPrice * quantity)}원</span>
+                        <span className="summary-value">{formatNumber(normalizedTargetPrice * quantity)}원</span>
                     </div>
 
                     <button

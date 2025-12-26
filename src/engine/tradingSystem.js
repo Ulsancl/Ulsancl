@@ -5,15 +5,68 @@
 
 import { ACHIEVEMENTS, MARKET_EVENTS, IPO_CANDIDATES } from '../constants'
 import { randomChoice, generateId } from '../utils'
+import { VOLATILITY_CONFIG, roundToTickSize } from './priceCalculator'
 
 /**
  * 주문 처리
  */
-export const processOrders = (orders, stocks, cash, portfolio) => {
+const getOrderMinPrice = (stockType) => (
+    stockType === 'crypto'
+        ? 0.01
+        : (stockType === 'bond' ? 90000 : (stockType === 'commodity' ? 1 : 100))
+)
+
+const getOrderSlippageRate = (stockType) => {
+    const config = VOLATILITY_CONFIG[stockType] || VOLATILITY_CONFIG.stock
+    return Math.min(0.01, Math.max(0.0005, config.base * 2))
+}
+
+const getOrderExecutionPrice = (order, stock, normalizedTargetPrice) => {
+    const stockType = stock.type || 'stock'
+    const minPrice = getOrderMinPrice(stockType)
+    const basePrice = stock.price
+    let executionPrice = basePrice
+
+    if (order.type === 'limit' || order.type === 'takeProfit') {
+        if (order.side === 'buy') {
+            executionPrice = Math.min(basePrice, normalizedTargetPrice)
+        } else if (order.side === 'sell') {
+            executionPrice = Math.max(basePrice, normalizedTargetPrice)
+        } else {
+            return null
+        }
+    } else if (order.type === 'stopLoss' || order.type === 'market') {
+        const slippageRate = getOrderSlippageRate(stockType)
+        if (order.side === 'buy') {
+            executionPrice = basePrice * (1 + slippageRate)
+        } else if (order.side === 'sell') {
+            executionPrice = basePrice * (1 - slippageRate)
+        } else {
+            return null
+        }
+    } else {
+        return null
+    }
+
+    executionPrice = roundToTickSize(executionPrice, stockType)
+
+    if (order.type === 'limit' || order.type === 'takeProfit') {
+        if (order.side === 'buy') {
+            executionPrice = Math.min(executionPrice, normalizedTargetPrice)
+        } else {
+            executionPrice = Math.max(executionPrice, normalizedTargetPrice)
+        }
+    }
+
+    return Math.max(minPrice, executionPrice)
+}
+
+export const processOrders = (orders, stocks, cash, portfolio, options = {}) => {
     const executedOrders = []
     const remainingOrders = []
     let newCash = cash
     let newPortfolio = { ...portfolio }
+    const feeRate = options.feeRate ?? 0
 
     orders.forEach(order => {
         const stock = stocks.find(s => s.id === order.stockId)
@@ -22,45 +75,83 @@ export const processOrders = (orders, stocks, cash, portfolio) => {
             return
         }
 
+        const stockType = stock.type || 'stock'
+        const rawTargetPrice = typeof order.targetPrice === 'number' ? order.targetPrice : stock.price
+        const normalizedTargetPrice = Math.max(
+            getOrderMinPrice(stockType),
+            roundToTickSize(rawTargetPrice, stockType)
+        )
+        const normalizedOrder = order.targetPrice === normalizedTargetPrice
+            ? order
+            : { ...order, targetPrice: normalizedTargetPrice }
         let shouldExecute = false
 
         switch (order.type) {
             case 'limit':
-                if (order.side === 'buy' && stock.price <= order.targetPrice) {
+                if (order.side === 'buy' && stock.price <= normalizedTargetPrice) {
                     shouldExecute = true
-                } else if (order.side === 'sell' && stock.price >= order.targetPrice) {
+                } else if (order.side === 'sell' && stock.price >= normalizedTargetPrice) {
                     shouldExecute = true
                 }
                 break
             case 'stopLoss':
-                if (stock.price <= order.targetPrice) shouldExecute = true
+                if (order.side === 'buy' && stock.price >= normalizedTargetPrice) {
+                    shouldExecute = true
+                } else if (order.side !== 'buy' && stock.price <= normalizedTargetPrice) {
+                    shouldExecute = true
+                }
                 break
             case 'takeProfit':
-                if (stock.price >= order.targetPrice) shouldExecute = true
+                if (order.side === 'buy' && stock.price <= normalizedTargetPrice) {
+                    shouldExecute = true
+                } else if (order.side !== 'buy' && stock.price >= normalizedTargetPrice) {
+                    shouldExecute = true
+                }
+                break
+            case 'market':
+                shouldExecute = true
                 break
         }
 
         if (shouldExecute) {
-            const totalValue = stock.price * order.quantity
+            const executionPrice = getOrderExecutionPrice(order, stock, normalizedTargetPrice)
+            if (executionPrice === null) {
+                remainingOrders.push(normalizedOrder)
+                return
+            }
+
+            const rawTotal = executionPrice * order.quantity
+            const fee = Math.floor(rawTotal * feeRate)
 
             if (order.side === 'buy') {
-                if (totalValue <= newCash) {
-                    newCash -= totalValue
+                const totalCost = rawTotal + fee
+                if (totalCost <= newCash) {
+                    newCash -= totalCost
                     const existing = newPortfolio[order.stockId] || { quantity: 0, totalCost: 0 }
                     newPortfolio[order.stockId] = {
                         quantity: existing.quantity + order.quantity,
-                        totalCost: existing.totalCost + totalValue
+                        totalCost: existing.totalCost + totalCost
                     }
-                    executedOrders.push({ ...order, executedPrice: stock.price, executedAt: Date.now() })
+                    executedOrders.push({
+                        ...order,
+                        targetPrice: normalizedTargetPrice,
+                        executedPrice: executionPrice,
+                        price: executionPrice,
+                        total: totalCost,
+                        fee,
+                        executedAt: Date.now()
+                    })
                 } else {
-                    remainingOrders.push(order)
+                    remainingOrders.push(normalizedOrder)
                 }
             } else if (order.side === 'sell') {
                 const holding = newPortfolio[order.stockId]
                 if (holding && holding.quantity >= order.quantity) {
-                    newCash += totalValue
+                    const netTotal = rawTotal - fee
+                    newCash += netTotal
                     const avgPrice = holding.totalCost / holding.quantity
                     const remainingQty = holding.quantity - order.quantity
+                    const profit = netTotal - (avgPrice * order.quantity)
 
                     if (remainingQty <= 0) {
                         delete newPortfolio[order.stockId]
@@ -70,13 +161,24 @@ export const processOrders = (orders, stocks, cash, portfolio) => {
                             totalCost: avgPrice * remainingQty
                         }
                     }
-                    executedOrders.push({ ...order, executedPrice: stock.price, executedAt: Date.now() })
+                    executedOrders.push({
+                        ...order,
+                        targetPrice: normalizedTargetPrice,
+                        executedPrice: executionPrice,
+                        price: executionPrice,
+                        total: netTotal,
+                        fee,
+                        profit,
+                        executedAt: Date.now()
+                    })
                 } else {
-                    remainingOrders.push(order)
+                    remainingOrders.push(normalizedOrder)
                 }
+            } else {
+                remainingOrders.push(normalizedOrder)
             }
         } else {
-            remainingOrders.push(order)
+            remainingOrders.push(normalizedOrder)
         }
     })
 

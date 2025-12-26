@@ -18,7 +18,7 @@ import {
   applyNewsImpact, processOrders, checkAchievements, generateMarketEvent, applyEventEffect,
   startNewTradingDay, calculateGameDate, generateGlobalEvent,
   generateSeasonalEvent, calculateAllStockPrices,
-  updatePricesWithCrisis, getActiveCrisis
+  applyCrisisImpact, updatePricesWithCrisis, getActiveCrisis
 } from './gameEngine'
 
 // 분리된 UI 컴포넌트
@@ -240,7 +240,7 @@ function App() {
       })
     }, 5000)
     return () => clearInterval(timer)
-  }, [stocks, cash, portfolio, shortPositions, tradeHistory, pendingOrders, unlockedAchievements, totalXp, totalTrades, winStreak, totalProfit, news, missionProgress, completedMissions, totalDividends, settings, assetHistory, watchlist, alerts, isInitialized, gameStartTime, currentDay, creditUsed, creditInterest])
+  }, [stocks, cash, portfolio, shortPositions, tradeHistory, pendingOrders, unlockedAchievements, unlockedSkills, totalXp, totalTrades, winStreak, maxWinStreak, totalProfit, news, missionProgress, completedMissions, totalDividends, settings, assetHistory, watchlist, alerts, isInitialized, gameStartTime, currentDay, creditUsed, creditInterest])
 
   // 계산된 값들
   // 계산된 값들 (안전장치 추가)
@@ -299,21 +299,52 @@ function App() {
       // 게임 시간 업데이트
       const newGameTime = calculateGameDate(gameStartTime, now)
       setGameTime(newGameTime)
+      const gameDay = newGameTime.day
+
+      let workingStocks = stocks
+      let workingCash = cash
+      let workingPortfolio = portfolio
+      let workingPendingOrders = pendingOrders
+      let workingShortPositions = shortPositions
+      let workingCreditUsed = creditUsed
+      let workingCreditInterest = creditInterest
+      let workingMarketState = updateMarketState(marketState)
+      let workingAlerts = alerts
+
+      const calcStockValue = (list, holdings) => {
+        if (!holdings) return 0
+        return Object.entries(holdings).reduce((total, [stockId, holding]) => {
+          const stock = list.find(s => s.id === parseInt(stockId))
+          if (!stock) return total
+          const val = stock.price * holding.quantity
+          return total + (isNaN(val) ? 0 : val)
+        }, 0)
+      }
+
+      const calcShortValue = (list, shorts) => {
+        if (!shorts) return 0
+        return Object.entries(shorts).reduce((total, [stockId, position]) => {
+          const stock = list.find(s => s.id === parseInt(stockId))
+          if (!stock) return total
+          const pnl = (position.entryPrice - stock.price) * position.quantity
+          return total + (isNaN(pnl) ? 0 : pnl)
+        }, 0)
+      }
 
       // 새 거래일 시작 체크
-      if (newGameTime.day > lastDayRef.current) {
-        lastDayRef.current = newGameTime.day
-        setCurrentDay(newGameTime.day)
+      if (gameDay > lastDayRef.current) {
+        lastDayRef.current = gameDay
+        setCurrentDay(gameDay)
 
         // 새 거래일: dailyOpen 리셋
-        setStocks(prev => startNewTradingDay(prev))
+        workingStocks = startNewTradingDay(workingStocks)
         setDailyTrades(0)
         setDailyProfit(0)
 
         // 신용 거래 일일 이자 계산
-        if (creditUsed > 0) {
-          const dailyInterest = Math.floor(creditUsed * CREDIT_TRADING.dailyInterestRate)
-          setCreditInterest(prev => prev + dailyInterest)
+        if (workingCreditUsed > 0) {
+          const dailyInterest = Math.floor(workingCreditUsed * CREDIT_TRADING.dailyInterestRate)
+          workingCreditInterest += dailyInterest
           if (dailyInterest > 0) {
             showNotification(`💳 신용 이자 ${formatNumber(dailyInterest)}원 발생`, 'warning')
           }
@@ -324,49 +355,55 @@ function App() {
       }
 
       // 마진콜 체크 (담보비율 30% 이하시 경고, 20% 이하시 강제청산)
-      if (creditUsed > 0) {
-        const currentMarginRatio = grossAssets / creditUsed
+      if (workingCreditUsed > 0) {
+        const stockValueNow = calcStockValue(workingStocks, workingPortfolio)
+        const shortValueNow = calcShortValue(workingStocks, workingShortPositions)
+        const grossAssetsNow = workingCash + stockValueNow + shortValueNow
+        const currentMarginRatio = grossAssetsNow / workingCreditUsed
         if (currentMarginRatio <= CREDIT_TRADING.liquidationMargin) {
           // 강제 청산
           showNotification('⚠️ 마진콜! 담보 부족으로 포지션 강제 청산됩니다!', 'error')
           setMarginCallActive(true)
           // 모든 주식 매도
-          Object.keys(portfolio).forEach(stockId => {
-            const holding = portfolio[stockId]
-            const stock = stocks.find(s => s.id === parseInt(stockId))
+          Object.keys(workingPortfolio).forEach(stockId => {
+            const holding = workingPortfolio[stockId]
+            const stock = workingStocks.find(s => s.id === parseInt(stockId))
             if (stock && holding.quantity > 0) {
               const saleAmount = Math.floor(stock.price * holding.quantity * 0.95) // 5% 슬리피지
-              setCash(prev => prev + saleAmount)
+              workingCash += saleAmount
             }
           })
-          setPortfolio({})
+          workingPortfolio = {}
           // 대출금 상환 (가능한 만큼)
-          setCash(prev => {
-            const repayable = Math.min(prev, creditUsed + creditInterest)
-            setCreditUsed(u => Math.max(0, u - (repayable - creditInterest)))
-            setCreditInterest(0)
-            return prev - repayable
-          })
+          const repayable = Math.min(workingCash, workingCreditUsed + workingCreditInterest)
+          if (repayable > 0) {
+            const interestPayment = Math.min(repayable, workingCreditInterest)
+            workingCreditInterest -= interestPayment
+            const principalPayment = repayable - interestPayment
+            workingCreditUsed = Math.max(0, workingCreditUsed - principalPayment)
+            workingCash -= repayable
+          }
         } else if (currentMarginRatio <= CREDIT_TRADING.maintenanceMargin && !marginCallActive) {
           showNotification('⚠️ 마진콜 경고! 담보 비율이 30% 이하입니다. 추가 입금 또는 포지션 정리를 권장합니다.', 'warning')
           setMarginCallActive(true)
         } else if (currentMarginRatio > CREDIT_TRADING.maintenanceMargin) {
           setMarginCallActive(false)
         }
+      } else if (marginCallActive) {
+        setMarginCallActive(false)
       }
 
-      setMarketState(prev => updateMarketState(prev))
 
       // 뉴스 생성 (3% 확률)
-      const newNews = generateNews(stocks, 0.03)
+      const newNews = generateNews(workingStocks, 0.03)
       if (newNews) {
         setNews(prev => [newNews, ...prev].slice(0, 50))
         showNotification(`📰 ${newNews.text}`, newNews.type === 'positive' ? 'success' : newNews.type === 'negative' ? 'error' : 'info')
         playSound('news')
 
-        const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(stocks, newNews, marketState)
-        setStocks(impactedStocks)
-        setMarketState(impactedMarket)
+        const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(workingStocks, newNews, workingMarketState)
+        workingStocks = impactedStocks
+        workingMarketState = impactedMarket
       }
 
       // 🌍 글로벌 특별 이벤트 체크 (매우 드물게)
@@ -378,9 +415,9 @@ function App() {
         playSound('news')
 
         // 글로벌 이벤트는 전체 시장에 영향
-        const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(stocks, globalEvent, marketState)
-        setStocks(impactedStocks)
-        setMarketState(impactedMarket)
+        const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(workingStocks, globalEvent, workingMarketState)
+        workingStocks = impactedStocks
+        workingMarketState = impactedMarket
       }
 
       // 🌸☀️🍂❄️ 계절별 특별 이벤트 (1% 확률)
@@ -391,9 +428,9 @@ function App() {
         showNotification(`${seasonalEvent.icon} 계절 뉴스: ${seasonalEvent.text}`, notifType)
         playSound('news')
 
-        const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(stocks, seasonalEvent, marketState)
-        setStocks(impactedStocks)
-        setMarketState(impactedMarket)
+        const { stocks: impactedStocks, marketState: impactedMarket } = applyNewsImpact(workingStocks, seasonalEvent, workingMarketState)
+        workingStocks = impactedStocks
+        workingMarketState = impactedMarket
       }
 
       // 🎉 시즌 종료 체크 (1년 경과)
@@ -404,20 +441,20 @@ function App() {
       }
 
       // 마켓 이벤트 체크
-      const event = generateMarketEvent(stocks)
+      const event = generateMarketEvent(workingStocks)
       if (event) {
         const { stocks: eventStocks, cash: eventCash, portfolio: eventPortfolio, message } =
-          applyEventEffect(event, stocks, cash, portfolio)
-        setStocks(eventStocks)
-        setCash(eventCash)
-        setPortfolio(eventPortfolio)
+          applyEventEffect(event, workingStocks, workingCash, workingPortfolio)
+        workingStocks = eventStocks
+        workingCash = eventCash
+        workingPortfolio = eventPortfolio
         if (message) {
           showNotification(`${event.icon} ${message}`, 'info')
         }
       }
 
       // 🚨 위기 이벤트 체크 (CrisisEvents 시스템 연동)
-      const crisisResult = updatePricesWithCrisis(stocks, marketState, currentDay)
+      const crisisResult = updatePricesWithCrisis(workingStocks, workingMarketState, gameDay)
       if (crisisResult.crisisEvent) {
         const { type, crisis } = crisisResult.crisisEvent
 
@@ -425,7 +462,7 @@ function App() {
           // 새 위기 발생
           setCrisisAlert(crisis)
           setActiveCrisis(crisis)
-          setCrisisHistory(prev => [...prev, { ...crisis, startDay: currentDay }])
+          setCrisisHistory(prev => [...prev, { ...crisis, startDay: gameDay }])
 
           const isPositive = crisis.baseImpact && crisis.baseImpact[0] > 0
           showNotification(
@@ -443,73 +480,98 @@ function App() {
         }
       } else {
         // 활성 위기 상태 동기화
-        const currentCrisis = getActiveCrisis()
+        const currentCrisis = crisisResult.activeCrisis || getActiveCrisis()
         setActiveCrisis(currentCrisis)
       }
 
       // 가격 변동 (시장 시간 체크 포함)
-      setStocks(prevStocks => {
-        const newChanges = {}
-        // 일괄 계산 (ETF 연동 포함, 시장 시간 적용)
-        const calculatedResults = calculateAllStockPrices(prevStocks, marketState, currentDay, newGameTime)
+      const previousStocks = workingStocks
+      const calculatedResults = calculateAllStockPrices(previousStocks, workingMarketState, gameDay, newGameTime)
 
-        const newStocks = prevStocks.map(stock => {
-          const result = calculatedResults[stock.id]
-          const newPrice = result ? result.newPrice : stock.price
+      let newStocks = previousStocks.map(stock => {
+        const result = calculatedResults[stock.id]
+        const newPrice = result ? result.newPrice : stock.price
 
-          newChanges[stock.id] = newPrice > stock.price ? 'up' : newPrice < stock.price ? 'down' : 'same'
-          return {
-            ...stock,
-            price: newPrice,
-            momentum: (stock.momentum || 0) * 0.95,
-            dailyHigh: Math.max(stock.dailyHigh || newPrice, newPrice),
-            dailyLow: Math.min(stock.dailyLow || newPrice, newPrice)
-          }
+        return {
+          ...stock,
+          price: newPrice,
+          momentum: (stock.momentum || 0) * 0.95,
+          dailyHigh: Math.max(stock.dailyHigh || newPrice, newPrice),
+          dailyLow: Math.min(stock.dailyLow || newPrice, newPrice)
+        }
+      })
+      newStocks = applyCrisisImpact(newStocks, gameDay)
+
+      const previousPriceMap = new Map(previousStocks.map(stock => [stock.id, stock.price]))
+      const newChanges = {}
+      newStocks.forEach(stock => {
+        const prevPrice = previousPriceMap.get(stock.id) ?? stock.price
+        newChanges[stock.id] = stock.price > prevPrice ? 'up' : stock.price < prevPrice ? 'down' : 'same'
+      })
+      setPriceChanges(newChanges)
+      setTimeout(() => setPriceChanges({}), 500)
+
+      setPriceHistory(prev => {
+        const newHistory = { ...prev }
+        newStocks.forEach(stock => {
+          newHistory[stock.id] = [...(newHistory[stock.id] || []).slice(-29), stock.price]
         })
-        setPriceChanges(newChanges)
-        setTimeout(() => setPriceChanges({}), 500)
-
-        setPriceHistory(prev => {
-          const newHistory = { ...prev }
-          newStocks.forEach(stock => {
-            newHistory[stock.id] = [...(newHistory[stock.id] || []).slice(-29), stock.price]
-          })
-          return newHistory
-        })
-
-        return newStocks
+        return newHistory
       })
 
-      // 자산 기록 (10초마다)
-      if (now % 10000 < 1000) {
-        setAssetHistory(prev => [...prev.slice(-100), { value: totalAssets, timestamp: now, day: currentDay }])
-      }
+      workingStocks = newStocks
+      if (workingPendingOrders.length > 0) {
+        const feeDiscountLevel = unlockedSkills['fee_discount'] || 0
+        let orderFeeRate = 0.0015
+        if (feeDiscountLevel > 0) {
+          orderFeeRate *= (1 - feeDiscountLevel * 0.05)
+        }
 
-      // 예약 주문 처리
-      if (pendingOrders.length > 0) {
         const { executedOrders, remainingOrders, cash: newCash, portfolio: newPortfolio } =
-          processOrders(pendingOrders, stocks, cash, portfolio)
+          processOrders(workingPendingOrders, workingStocks, workingCash, workingPortfolio, { feeRate: orderFeeRate })
 
         if (executedOrders.length > 0) {
-          setCash(newCash)
-          setPortfolio(newPortfolio)
-          setPendingOrders(remainingOrders)
+          workingCash = newCash
+          workingPortfolio = newPortfolio
+          workingPendingOrders = remainingOrders
+          const tradeCount = executedOrders.length
+          let profitDelta = 0
+
           executedOrders.forEach(order => {
             showNotification(`🔔 ${order.stockName} ${order.type} 주문 체결!`, 'success')
-            playSound('buy')
+            playSound(order.side === 'buy' ? 'buy' : 'sell')
             setTradeHistory(prev => [...prev, { ...order, type: order.side, id: generateId(), timestamp: now }])
+            if (order.side === 'sell' && typeof order.profit === 'number') {
+              profitDelta += order.profit
+            }
+          })
+          setTotalTrades(prev => prev + tradeCount)
+          setDailyTrades(prev => prev + tradeCount)
+          if (profitDelta !== 0) {
+            setTotalProfit(prev => prev + profitDelta)
+            setDailyProfit(prev => prev + profitDelta)
+          }
+          setWinStreak(prev => {
+            let streak = prev
+            executedOrders.forEach(order => {
+              if (order.side !== 'sell') return
+              const profit = typeof order.profit === 'number' ? order.profit : 0
+              if (profit > 0) streak += 1
+              else streak = 0
+            })
+            return streak
           })
         }
       }
 
       // 공매도 이자 및 강제청산
-      if (Object.keys(shortPositions).length > 0) {
-        let newCash = cash
+      if (Object.keys(workingShortPositions).length > 0) {
+        let newCash = workingCash
         const updatedShorts = {}
         const liquidated = []
 
-        Object.entries(shortPositions).forEach(([stockId, position]) => {
-          const stock = stocks.find(s => s.id === parseInt(stockId))
+        Object.entries(workingShortPositions).forEach(([stockId, position]) => {
+          const stock = workingStocks.find(s => s.id === parseInt(stockId))
           if (!stock) return
 
           const interest = stock.price * position.quantity * SHORT_SELLING.interestRate
@@ -531,42 +593,62 @@ function App() {
             showNotification(`⚠️ ${stock.name} 공매도 강제청산!`, 'error')
             playSound('error')
           })
-          setShortPositions(updatedShorts)
+          workingShortPositions = updatedShorts
         }
 
-        if (newCash !== cash) setCash(newCash)
+        if (newCash !== workingCash) workingCash = newCash
       }
 
       // 알림 체크
-      const triggeredAlerts = checkAlerts(alerts, stocks, portfolio)
-      triggeredAlerts.forEach(alert => {
-        showNotification(`🔔 ${alert.stockName} 알림!`, 'info')
-        playSound('news')
-        setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, triggered: true } : a))
-      })
-
-      // 배당금 (60초마다)
+      const triggeredAlerts = checkAlerts(workingAlerts, workingStocks, workingPortfolio)
+      if (triggeredAlerts.length > 0) {
+        const triggeredIds = new Set(triggeredAlerts.map(alert => alert.id))
+        triggeredAlerts.forEach(alert => {
+          showNotification(`Alert: ${alert.stockName}`, 'info')
+          playSound('news')
+        })
+        workingAlerts = workingAlerts.map(a => triggeredIds.has(a.id) ? { ...a, triggered: true } : a)
+      }
       if (now - lastDividendTime > 60000) {
         let dividendTotal = 0
-        Object.entries(portfolio).forEach(([stockId, holding]) => {
+        Object.entries(workingPortfolio).forEach(([stockId, holding]) => {
           const rate = DIVIDEND_RATES[parseInt(stockId)] || 0
-          const stock = stocks.find(s => s.id === parseInt(stockId))
+          const stock = workingStocks.find(s => s.id === parseInt(stockId))
           if (stock && rate > 0) {
             const dividend = Math.round(stock.price * holding.quantity * (rate / 100) / 60)
             dividendTotal += dividend
           }
         })
         if (dividendTotal > 0) {
-          setCash(prev => prev + dividendTotal)
+          workingCash += dividendTotal
           setTotalDividends(prev => prev + dividendTotal)
           showNotification(`💰 배당금 ${formatNumber(dividendTotal)}원`, 'success')
         }
         setLastDividendTime(now)
       }
+
+      const stockValueNow = calcStockValue(workingStocks, workingPortfolio)
+      const shortValueNow = calcShortValue(workingStocks, workingShortPositions)
+      const grossAssetsNow = workingCash + stockValueNow + shortValueNow
+      const totalAssetsNow = grossAssetsNow - workingCreditUsed - workingCreditInterest
+
+      if (now % 10000 < 1000) {
+        setAssetHistory(prev => [...prev.slice(-100), { value: totalAssetsNow, timestamp: now, day: gameDay }])
+      }
+
+      setStocks(workingStocks)
+      setMarketState(workingMarketState)
+      if (workingCash !== cash) setCash(workingCash)
+      if (workingPortfolio !== portfolio) setPortfolio(workingPortfolio)
+      if (workingPendingOrders !== pendingOrders) setPendingOrders(workingPendingOrders)
+      if (workingShortPositions !== shortPositions) setShortPositions(workingShortPositions)
+      if (workingCreditUsed !== creditUsed) setCreditUsed(workingCreditUsed)
+      if (workingCreditInterest !== creditInterest) setCreditInterest(workingCreditInterest)
+      if (workingAlerts !== alerts) setAlerts(workingAlerts)
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [stocks, marketState, pendingOrders, cash, portfolio, shortPositions, totalAssets, lastDividendTime, playSound, alerts, gameStartTime, currentDay])
+  }, [stocks, marketState, pendingOrders, cash, portfolio, shortPositions, creditUsed, creditInterest, marginCallActive, lastDividendTime, playSound, alerts, gameStartTime, currentDay, unlockedSkills])
 
   // 미션 진행도
   useEffect(() => {

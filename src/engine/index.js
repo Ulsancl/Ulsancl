@@ -49,5 +49,6 @@ export {
     calculateAllStockPrices,
     generateSeasonalEvent,
     updatePricesWithCrisis,
+    applyCrisisImpact,
     getActiveCrisis
 } from '../gameEngine'

@@ -520,6 +520,9 @@ export const applyNewsImpact = (stocks, news, marketState) => {
         if (news.marketWide || news.isGlobal) {
             priceChange = news.impact * (news.isGlobal ? 1 : 0.5)
             momentumBoost = news.impact * 0.5
+        } else if (news.sectors && news.sectors[stock.sector] !== undefined) {
+            priceChange = news.impact + news.sectors[stock.sector]
+            momentumBoost = priceChange * 0.5
         } else if (news.targetSector && stock.sector === news.targetSector) {
             priceChange = news.impact * 0.7
             momentumBoost = news.impact * 0.5
@@ -543,18 +546,19 @@ export const applyNewsImpact = (stocks, news, marketState) => {
             const dailyChange = (newPrice - dailyOpen) / dailyOpen
 
             if (Math.abs(dailyChange) <= config.maxDaily) {
-                // 호가 단위 적용
                 const stockType = stock.type || 'stock'
-                if (stockType === 'stock' || stockType === 'etf') {
-                    newPrice = roundToTickSize(newPrice)
-                } else {
-                    newPrice = Math.round(newPrice)
-                }
+                newPrice = roundToTickSize(newPrice, stockType)
+
+                const minPrice = stockType === 'crypto'
+                    ? 0.01
+                    : (stockType === 'bond' ? 90000 : (stockType === 'commodity' ? 1 : 100))
 
                 return {
                     ...stock,
-                    price: Math.max(100, newPrice),
-                    momentum: (stock.momentum || 0) + momentumBoost
+                    price: Math.max(minPrice, newPrice),
+                    momentum: (stock.momentum || 0) + momentumBoost,
+                    dailyHigh: Math.max(stock.dailyHigh || newPrice, newPrice),
+                    dailyLow: Math.min(stock.dailyLow || newPrice, newPrice)
                 }
             }
         }
@@ -564,6 +568,14 @@ export const applyNewsImpact = (stocks, news, marketState) => {
     let newMarketState = { ...marketState }
     if (news.marketWide || news.isGlobal) {
         newMarketState.trend = Math.max(-0.5, Math.min(0.5, newMarketState.trend + news.impact))
+    } else if (news.sectors) {
+        const updatedTrends = { ...newMarketState.sectorTrends }
+        Object.entries(news.sectors).forEach(([sector, impact]) => {
+            updatedTrends[sector] = Math.max(-0.5, Math.min(0.5,
+                (updatedTrends[sector] || 0) + impact * 2
+            ))
+        })
+        newMarketState.sectorTrends = updatedTrends
     } else if (news.targetSector) {
         newMarketState.sectorTrends = {
             ...newMarketState.sectorTrends,
@@ -689,12 +701,64 @@ export const applyEventEffect = (event, stocks, cash, portfolio) => {
     return { stocks: newStocks, cash: newCash, portfolio: newPortfolio, message }
 }
 
+const getOrderMinPrice = (stockType) => (
+    stockType === 'crypto'
+        ? 0.01
+        : (stockType === 'bond' ? 90000 : (stockType === 'commodity' ? 1 : 100))
+)
+
+const getOrderSlippageRate = (stockType) => {
+    const config = VOLATILITY_CONFIG[stockType] || VOLATILITY_CONFIG.stock
+    return Math.min(0.01, Math.max(0.0005, config.base * 2))
+}
+
+const getOrderExecutionPrice = (order, stock, normalizedTargetPrice) => {
+    const stockType = stock.type || 'stock'
+    const minPrice = getOrderMinPrice(stockType)
+    const basePrice = stock.price
+    let executionPrice = basePrice
+
+    if (order.type === 'limit' || order.type === 'takeProfit') {
+        if (order.side === 'buy') {
+            executionPrice = Math.min(basePrice, normalizedTargetPrice)
+        } else if (order.side === 'sell') {
+            executionPrice = Math.max(basePrice, normalizedTargetPrice)
+        } else {
+            return null
+        }
+    } else if (order.type === 'stopLoss' || order.type === 'market') {
+        const slippageRate = getOrderSlippageRate(stockType)
+        if (order.side === 'buy') {
+            executionPrice = basePrice * (1 + slippageRate)
+        } else if (order.side === 'sell') {
+            executionPrice = basePrice * (1 - slippageRate)
+        } else {
+            return null
+        }
+    } else {
+        return null
+    }
+
+    executionPrice = roundToTickSize(executionPrice, stockType)
+
+    if (order.type === 'limit' || order.type === 'takeProfit') {
+        if (order.side === 'buy') {
+            executionPrice = Math.min(executionPrice, normalizedTargetPrice)
+        } else {
+            executionPrice = Math.max(executionPrice, normalizedTargetPrice)
+        }
+    }
+
+    return Math.max(minPrice, executionPrice)
+}
+
 // 주문 처리
-export const processOrders = (orders, stocks, cash, portfolio) => {
+export const processOrders = (orders, stocks, cash, portfolio, options = {}) => {
     const executedOrders = []
     const remainingOrders = []
     let newCash = cash
     let newPortfolio = { ...portfolio }
+    const feeRate = options.feeRate ?? 0
 
     orders.forEach(order => {
         const stock = stocks.find(s => s.id === order.stockId)
@@ -703,45 +767,83 @@ export const processOrders = (orders, stocks, cash, portfolio) => {
             return
         }
 
+        const stockType = stock.type || 'stock'
+        const rawTargetPrice = typeof order.targetPrice === 'number' ? order.targetPrice : stock.price
+        const normalizedTargetPrice = Math.max(
+            getOrderMinPrice(stockType),
+            roundToTickSize(rawTargetPrice, stockType)
+        )
+        const normalizedOrder = order.targetPrice === normalizedTargetPrice
+            ? order
+            : { ...order, targetPrice: normalizedTargetPrice }
         let shouldExecute = false
 
         switch (order.type) {
             case 'limit':
-                if (order.side === 'buy' && stock.price <= order.targetPrice) {
+                if (order.side === 'buy' && stock.price <= normalizedTargetPrice) {
                     shouldExecute = true
-                } else if (order.side === 'sell' && stock.price >= order.targetPrice) {
+                } else if (order.side === 'sell' && stock.price >= normalizedTargetPrice) {
                     shouldExecute = true
                 }
                 break
             case 'stopLoss':
-                if (stock.price <= order.targetPrice) shouldExecute = true
+                if (order.side === 'buy' && stock.price >= normalizedTargetPrice) {
+                    shouldExecute = true
+                } else if (order.side !== 'buy' && stock.price <= normalizedTargetPrice) {
+                    shouldExecute = true
+                }
                 break
             case 'takeProfit':
-                if (stock.price >= order.targetPrice) shouldExecute = true
+                if (order.side === 'buy' && stock.price <= normalizedTargetPrice) {
+                    shouldExecute = true
+                } else if (order.side !== 'buy' && stock.price >= normalizedTargetPrice) {
+                    shouldExecute = true
+                }
+                break
+            case 'market':
+                shouldExecute = true
                 break
         }
 
         if (shouldExecute) {
-            const totalValue = stock.price * order.quantity
+            const executionPrice = getOrderExecutionPrice(order, stock, normalizedTargetPrice)
+            if (executionPrice === null) {
+                remainingOrders.push(normalizedOrder)
+                return
+            }
+
+            const rawTotal = executionPrice * order.quantity
+            const fee = Math.floor(rawTotal * feeRate)
 
             if (order.side === 'buy') {
-                if (totalValue <= newCash) {
-                    newCash -= totalValue
+                const totalCost = rawTotal + fee
+                if (totalCost <= newCash) {
+                    newCash -= totalCost
                     const existing = newPortfolio[order.stockId] || { quantity: 0, totalCost: 0 }
                     newPortfolio[order.stockId] = {
                         quantity: existing.quantity + order.quantity,
-                        totalCost: existing.totalCost + totalValue
+                        totalCost: existing.totalCost + totalCost
                     }
-                    executedOrders.push({ ...order, executedPrice: stock.price, executedAt: Date.now() })
+                    executedOrders.push({
+                        ...order,
+                        targetPrice: normalizedTargetPrice,
+                        executedPrice: executionPrice,
+                        price: executionPrice,
+                        total: totalCost,
+                        fee,
+                        executedAt: Date.now()
+                    })
                 } else {
-                    remainingOrders.push(order)
+                    remainingOrders.push(normalizedOrder)
                 }
             } else if (order.side === 'sell') {
                 const holding = newPortfolio[order.stockId]
                 if (holding && holding.quantity >= order.quantity) {
-                    newCash += totalValue
+                    const netTotal = rawTotal - fee
+                    newCash += netTotal
                     const avgPrice = holding.totalCost / holding.quantity
                     const remainingQty = holding.quantity - order.quantity
+                    const profit = netTotal - (avgPrice * order.quantity)
 
                     if (remainingQty <= 0) {
                         delete newPortfolio[order.stockId]
@@ -751,13 +853,24 @@ export const processOrders = (orders, stocks, cash, portfolio) => {
                             totalCost: avgPrice * remainingQty
                         }
                     }
-                    executedOrders.push({ ...order, executedPrice: stock.price, executedAt: Date.now() })
+                    executedOrders.push({
+                        ...order,
+                        targetPrice: normalizedTargetPrice,
+                        executedPrice: executionPrice,
+                        price: executionPrice,
+                        total: netTotal,
+                        fee,
+                        profit,
+                        executedAt: Date.now()
+                    })
                 } else {
-                    remainingOrders.push(order)
+                    remainingOrders.push(normalizedOrder)
                 }
+            } else {
+                remainingOrders.push(normalizedOrder)
             }
         } else {
-            remainingOrders.push(order)
+            remainingOrders.push(normalizedOrder)
         }
     })
 
@@ -804,6 +917,49 @@ export const resetNewsEffects = () => {
     activeGlobalEvent = null
     resetCrisisState()
 }
+/**
+ * ????? ????? ???????
+ * @param {Array} stocks - ?????? ??????
+ * @param {number} currentDay - ????? ?????? ??
+ * @returns {Array} - ??????????????????????? ??????
+ */
+export const applyCrisisImpact = (stocks, currentDay) => {
+    const activeCrisis = getActiveCrisis()
+    if (!activeCrisis) return stocks
+
+    return stocks.map(stock => {
+        const crisisImpact = calculateCrisisImpact(stock, currentDay)
+
+        if (crisisImpact !== 0) {
+            const priceChange = stock.price * crisisImpact
+            let newPrice = stock.price + priceChange
+
+            const dailyOpen = stock.dailyOpen || stock.basePrice
+            const dailyChange = (newPrice - dailyOpen) / dailyOpen
+            const maxDaily = stock.type === 'crypto' ? 0.5 : 0.15
+
+            if (Math.abs(dailyChange) <= maxDaily) {
+                const tickSize = getTickSize(stock.price, stock.type || 'stock')
+                newPrice = Math.round(newPrice / tickSize) * tickSize
+
+                const stockType = stock.type || 'stock'
+                const minPrice = stockType === 'crypto'
+                    ? 0.01
+                    : (stockType === 'bond' ? 90000 : (stockType === 'commodity' ? 1 : 100))
+
+                return {
+                    ...stock,
+                    price: Math.max(minPrice, newPrice),
+                    momentum: (stock.momentum || 0) + crisisImpact * 0.5,
+                    dailyHigh: Math.max(stock.dailyHigh || newPrice, newPrice),
+                    dailyLow: Math.min(stock.dailyLow || newPrice, newPrice)
+                }
+            }
+        }
+
+        return stock
+    })
+}
 
 /**
  * 위기 이벤트를 포함한 통합 가격 업데이트
@@ -813,41 +969,9 @@ export const resetNewsEffects = () => {
  * @returns {Object} - 업데이트된 주식과 위기 이벤트 정보
  */
 export const updatePricesWithCrisis = (stocks, marketState, currentDay) => {
-    // 1. 위기 이벤트 체크 및 생성
     const crisisResult = checkAndGenerateCrisis(currentDay, marketState)
     const activeCrisis = getActiveCrisis()
-
-    // 2. 위기가 있으면 각 종목에 영향 적용
-    const updatedStocks = stocks.map(stock => {
-        if (!activeCrisis) return stock
-
-        // 위기 영향 계산
-        const crisisImpact = calculateCrisisImpact(stock, currentDay)
-
-        if (crisisImpact !== 0) {
-            const priceChange = stock.price * crisisImpact
-            let newPrice = stock.price + priceChange
-
-            // 일일 제한 체크
-            const dailyOpen = stock.dailyOpen || stock.basePrice
-            const dailyChange = (newPrice - dailyOpen) / dailyOpen
-            const maxDaily = stock.type === 'crypto' ? 0.5 : 0.15
-
-            if (Math.abs(dailyChange) <= maxDaily) {
-                // 호가 단위 적용
-                const tickSize = getTickSize(stock.price, stock.type || 'stock')
-                newPrice = Math.round(newPrice / tickSize) * tickSize
-
-                return {
-                    ...stock,
-                    price: Math.max(100, newPrice),
-                    momentum: (stock.momentum || 0) + crisisImpact * 0.5
-                }
-            }
-        }
-
-        return stock
-    })
+    const updatedStocks = activeCrisis ? applyCrisisImpact(stocks, currentDay) : stocks
 
     return {
         stocks: updatedStocks,
@@ -1113,7 +1237,10 @@ export const calculateAllStockPrices = (stocks, marketState, gameDay, gameTime =
             newPrice = calculatePriceChange(stock, marketState, gameDay)
         }
 
-        const minPrice = stock.type === 'crypto' ? 0.01 : 100
+        const stockType = stock.type || 'stock'
+        const minPrice = stockType === 'crypto'
+            ? 0.01
+            : (stockType === 'bond' ? 90000 : (stockType === 'commodity' ? 1 : 100))
         newPrice = Math.max(minPrice, newPrice)
 
         results[stock.id] = {

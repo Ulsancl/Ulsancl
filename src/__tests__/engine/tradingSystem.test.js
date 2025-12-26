@@ -28,7 +28,10 @@ describe('tradingSystem', () => {
 
             expect(result.executedOrders.length).toBe(1)
             expect(result.remainingOrders.length).toBe(0)
-            expect(result.cash).toBe(1000000 - 72000 * 10) // 720000 차감
+            const executed = result.executedOrders[0]
+            expect(executed.price).toBe(executed.executedPrice)
+            expect(executed.executedPrice).toBeLessThanOrEqual(orders[0].targetPrice)
+            expect(result.cash).toBe(1000000 - executed.executedPrice * 10)
             expect(result.portfolio[1].quantity).toBe(10)
         })
 
@@ -70,7 +73,10 @@ describe('tradingSystem', () => {
             const result = processOrders(orders, stocks, 100000, portfolio)
 
             expect(result.executedOrders.length).toBe(1)
-            expect(result.cash).toBe(100000 + 72000 * 5) // 360000 추가
+            const executed = result.executedOrders[0]
+            expect(executed.price).toBe(executed.executedPrice)
+            expect(executed.executedPrice).toBeLessThanOrEqual(orders[0].targetPrice)
+            expect(result.cash).toBe(100000 + executed.executedPrice * 5)
             expect(result.portfolio[1].quantity).toBe(5) // 5주 남음
         })
 
