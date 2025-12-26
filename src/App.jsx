@@ -193,12 +193,6 @@ function App() {
     initialCapital: INITIAL_CAPITAL
   })
 
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => { })
-    }
-  }, [])
-
   const {
     handleBuy,
     handleSellAll,
