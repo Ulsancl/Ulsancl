@@ -36,3 +36,6 @@ export { useLocalStorage, useSessionStorage } from './useStorage'
 
 // 게임 루프 및 Web Worker
 export { useGameLoop } from './useGameLoop'
+
+// Trade Log Recording (v3.0)
+export { useTradeLog, calculateChecksum } from './useTradeLog'

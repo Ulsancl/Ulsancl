@@ -102,20 +102,30 @@ export const normalizePrice = (price, type = 'stock') => {
 
 /**
  * 현실적인 가격 변동 계산
+ * @param {Object} stock - 종목 정보
+ * @param {Object} marketState - 시장 상태
+ * @param {number} _gameDay - 게임 일수
+ * @param {Array} activeNewsEffects - 활성 뉴스 효과
+ * @param {Object|null} activeGlobalEvent - 글로벌 이벤트
+ * @param {Object|null} rng - 시드 RNG 인스턴스 (null이면 Math.random 폴백)
  */
 export const calculatePriceChange = (
     stock,
     marketState = {},
     _gameDay = 0,
     activeNewsEffects = [],
-    activeGlobalEvent = null
+    activeGlobalEvent = null,
+    rng = null
 ) => {
     const { trend = 0, volatility = 1, sectorTrends = {} } = marketState
     const type = stock.type || 'stock'
     const config = VOLATILITY_CONFIG[type] || VOLATILITY_CONFIG.stock
 
-    // 기본 랜덤 워크
-    const randomFactor = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5
+    // 랜덤 함수 (RNG 인스턴스가 있으면 사용, 없으면 Math.random 폴백)
+    const random = rng ? () => rng.nextFloat() : Math.random
+
+    // 기본 랜덤 워크 (Central Limit Theorem approximation of Gaussian)
+    const randomFactor = (random() + random() + random() - 1.5) / 1.5
     let baseChange = randomFactor * config.base
 
     // 시장 트렌드 영향
@@ -194,7 +204,7 @@ export const calculatePriceChange = (
 
     if (roundedPrice === stock.price && baseChange !== 0) {
         const moveChance = type === 'crypto' ? 0.6 : (type === 'bond' ? 0.25 : 0.45)
-        if (Math.random() < moveChance) {
+        if (random() < moveChance) {
             newPrice = stock.price + (baseChange > 0 ? tickSize : -tickSize)
         } else {
             newPrice = stock.price

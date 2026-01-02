@@ -4,7 +4,7 @@
  */
 
 import { NEWS_TEMPLATES, SECTORS, GLOBAL_CRISIS_EVENTS, GLOBAL_EVENT_PROBABILITY } from '../constants'
-import { randomRange, randomChoice, generateId, randomInt } from '../utils'
+import { generateId } from '../utils'
 import { VOLATILITY_CONFIG, normalizePrice } from './priceCalculator'
 import { SEASONS } from './marketState'
 
@@ -52,9 +52,18 @@ export const updateNewsEffects = () => {
 
 /**
  * 뉴스 생성
+ * @param {Array} stocks - 종목 목록
+ * @param {number} probability - 생성 확률
+ * @param {Object|null} rng - 시드 RNG 인스턴스 (null이면 Math.random 폴백)
  */
-export const generateNews = (stocks, probability = 0.03) => {
-    if (Math.random() > probability) return null
+export const generateNews = (stocks, probability = 0.03, rng = null) => {
+    // 랜덤 함수 래퍼
+    const random = rng ? () => rng.nextFloat() : Math.random
+    const randomRange = (min, max) => min + random() * (max - min)
+    const randomInt = (min, max) => Math.floor(min + random() * (max - min + 1))
+    const randomChoice = (arr) => arr[Math.floor(random() * arr.length)]
+
+    if (random() > probability) return null
 
     const types = ['positive', 'negative', 'market', 'fund_positive', 'fund_negative']
     let weights = [0.35, 0.25, 0.15, 0.15, 0.10]
@@ -76,13 +85,13 @@ export const generateNews = (stocks, probability = 0.03) => {
         }
     }
 
-    const random = Math.random()
+    const rand = random()
     let cumulative = 0
     let selectedType = 'positive'
 
     for (let i = 0; i < types.length; i++) {
         cumulative += weights[i]
-        if (random < cumulative) {
+        if (rand < cumulative) {
             selectedType = types[i]
             break
         }
@@ -92,10 +101,10 @@ export const generateNews = (stocks, probability = 0.03) => {
     const stocksOnly = stocks.filter(s => !s.type || s.type === 'stock')
 
     let targetStock
-    if (recentNewsContext.lastSector && Math.random() < 0.4) {
+    if (recentNewsContext.lastSector && random() < 0.4) {
         const sameSectorStocks = stocksOnly.filter(s => s.sector === recentNewsContext.lastSector)
         targetStock = sameSectorStocks.length > 0 ? randomChoice(sameSectorStocks) : randomChoice(stocksOnly)
-    } else if (recentNewsContext.lastStock && Math.random() < 0.2) {
+    } else if (recentNewsContext.lastStock && random() < 0.2) {
         targetStock = stocks.find(s => s.id === recentNewsContext.lastStock) || randomChoice(stocksOnly)
     } else {
         targetStock = randomChoice(stocksOnly.length > 0 ? stocksOnly : stocks)
@@ -163,12 +172,18 @@ export const generateNews = (stocks, probability = 0.03) => {
 
 /**
  * 글로벌 이벤트 생성
+ * @param {Object|null} rng - 시드 RNG 인스턴스 (null이면 Math.random 폴백)
  */
-export const generateGlobalEvent = () => {
-    if (activeGlobalEvent) return null
-    if (Math.random() > GLOBAL_EVENT_PROBABILITY) return null
+export const generateGlobalEvent = (rng = null) => {
+    // 랜덤 함수 래퍼
+    const random = rng ? () => rng.nextFloat() : Math.random
+    const randomRange = (min, max) => min + random() * (max - min)
+    const randomChoice = (arr) => arr[Math.floor(random() * arr.length)]
 
-    const rand = Math.random()
+    if (activeGlobalEvent) return null
+    if (random() > GLOBAL_EVENT_PROBABILITY) return null
+
+    const rand = random()
     let eventType
     if (rand < 0.45) eventType = 'positive'
     else if (rand < 0.90) eventType = 'negative'
@@ -331,14 +346,23 @@ export const SEASONAL_EVENTS = {
     ]
 }
 
-export const generateSeasonalEvent = (season, probability = 0.01) => {
-    if (Math.random() > probability) return null
+/**
+ * 계절 이벤트 생성
+ * @param {string} season - 계절 이름
+ * @param {number} probability - 생성 확률
+ * @param {Object|null} rng - 시드 RNG 인스턴스 (null이면 Math.random 폴백)
+ */
+export const generateSeasonalEvent = (season, probability = 0.01, rng = null) => {
+    // 랜덤 함수 래퍼
+    const random = rng ? () => rng.nextFloat() : Math.random
+
+    if (random() > probability) return null
 
     const events = SEASONAL_EVENTS[season]
     if (!events || events.length === 0) return null
 
-    const event = events[Math.floor(Math.random() * events.length)]
-    const impact = event.impact[0] + Math.random() * (event.impact[1] - event.impact[0])
+    const event = events[Math.floor(random() * events.length)]
+    const impact = event.impact[0] + random() * (event.impact[1] - event.impact[0])
     const icon = SEASONS[season]?.icon
 
     return {

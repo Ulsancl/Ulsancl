@@ -67,3 +67,37 @@ export {
 export {
     checkAlerts
 } from './alerts'
+
+// Deterministic RNG (v3.0)
+export {
+    createRng,
+    generateSeed,
+    validateDeterminism
+} from './rng'
+
+// Fixed-point math (v3.0)
+export {
+    toFixed,
+    fromFixed,
+    fixedAdd,
+    fixedSub,
+    fixedMul,
+    fixedDiv,
+    fixedPercent,
+    roundToTick,
+    clamp,
+    priceChangePercent,
+    formatFixed,
+    money,
+    DEFAULT_DECIMALS,
+    DEFAULT_MULTIPLIER
+} from './fixedPoint'
+
+// Engine version (v3.0)
+export {
+    ENGINE_VERSION,
+    CLIENT_VERSION,
+    MIN_SUPPORTED_VERSION,
+    isVersionCompatible,
+    getVersionInfo
+} from './version'

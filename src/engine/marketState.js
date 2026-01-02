@@ -90,23 +90,32 @@ export const calculateGameDate = (gameStartTime, currentTime) => {
     }
 }
 
-export const updateMarketState = (prevState, activeGlobalEvent = null) => {
+/**
+ * 시장 상태 업데이트
+ * @param {Object} prevState - 이전 시장 상태
+ * @param {Object|null} activeGlobalEvent - 활성 글로벌 이벤트
+ * @param {Object|null} rng - 시드 RNG 인스턴스 (null이면 Math.random 폴백)
+ */
+export const updateMarketState = (prevState, activeGlobalEvent = null, rng = null) => {
+    // 랜덤 함수 래퍼
+    const random = rng ? () => rng.nextFloat() : Math.random
+
     const macro = prevState.macro || {
         interestRate: MACRO_CONFIG.interestRate.base,
         inflation: MACRO_CONFIG.inflation.base,
         gdpGrowth: MACRO_CONFIG.gdpGrowth.base
     }
 
-    if (Math.random() < 0.001) {
-        macro.interestRate += (Math.random() - 0.5) * MACRO_CONFIG.interestRate.volatility
+    if (random() < 0.001) {
+        macro.interestRate += (random() - 0.5) * MACRO_CONFIG.interestRate.volatility
         macro.interestRate = Math.max(MACRO_CONFIG.interestRate.min, Math.min(MACRO_CONFIG.interestRate.max, macro.interestRate))
     }
-    if (Math.random() < 0.001) {
-        macro.inflation += (Math.random() - 0.5) * MACRO_CONFIG.inflation.volatility
+    if (random() < 0.001) {
+        macro.inflation += (random() - 0.5) * MACRO_CONFIG.inflation.volatility
         macro.inflation = Math.max(MACRO_CONFIG.inflation.min, Math.min(MACRO_CONFIG.inflation.max, macro.inflation))
     }
-    if (Math.random() < 0.001) {
-        macro.gdpGrowth += (Math.random() - 0.5) * MACRO_CONFIG.gdpGrowth.volatility
+    if (random() < 0.001) {
+        macro.gdpGrowth += (random() - 0.5) * MACRO_CONFIG.gdpGrowth.volatility
         macro.gdpGrowth = Math.max(MACRO_CONFIG.gdpGrowth.min, Math.min(MACRO_CONFIG.gdpGrowth.max, macro.gdpGrowth))
     }
 
@@ -115,10 +124,10 @@ export const updateMarketState = (prevState, activeGlobalEvent = null) => {
     macroTrendBoost += (macro.gdpGrowth - MACRO_CONFIG.gdpGrowth.base) * 0.03
     macroTrendBoost -= (macro.inflation - MACRO_CONFIG.inflation.base) * 0.01
 
-    let newTrend = prevState.trend * 0.98 + (Math.random() - 0.5) * 0.05 + macroTrendBoost * 0.01
+    let newTrend = prevState.trend * 0.98 + (random() - 0.5) * 0.05 + macroTrendBoost * 0.01
     newTrend = Math.max(-0.5, Math.min(0.5, newTrend))
 
-    let newVolatility = prevState.volatility * 0.95 + 1 * 0.05 + (Math.random() - 0.5) * 0.1
+    let newVolatility = prevState.volatility * 0.95 + 1 * 0.05 + (random() - 0.5) * 0.1
 
     if (activeGlobalEvent?.volatilityBoost) {
         newVolatility *= activeGlobalEvent.volatilityBoost
@@ -142,7 +151,7 @@ export const updateMarketState = (prevState, activeGlobalEvent = null) => {
             sensitivity += (macro.inflation - MACRO_CONFIG.inflation.base) * 0.03
         }
 
-        current = current * 0.95 + (Math.random() - 0.5) * 0.1 + sensitivity * 0.05
+        current = current * 0.95 + (random() - 0.5) * 0.1 + sensitivity * 0.05
         sectorTrends[sector] = Math.max(-0.5, Math.min(0.5, current))
     })
 
