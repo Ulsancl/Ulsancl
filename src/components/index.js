@@ -4,7 +4,6 @@
  */
 
 // 새로운 모듈화된 컴포넌트
-export { default as StockCard } from './StockCard'
 export { StatCard, DashboardGrid, CreditTradingCard } from './DashboardCards'
 export { Modal, Button, Badge, Card, ProgressBar, Tooltip, Amount, Spinner } from './CommonUI'
 export { default as TechnicalChart } from './TechnicalChart'

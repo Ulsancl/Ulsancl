@@ -10,7 +10,9 @@ const AUTO_SAVE_INTERVAL = 5000
 
 export const useGameState = (input = {}) => {
     const isLegacy = Array.isArray(input)
-    const allProducts = isLegacy ? input : (input.allProducts || [])
+    const allProducts = useMemo(() => (
+        isLegacy ? (input || []) : ((input && input.allProducts) || [])
+    ), [input, isLegacy])
     const settings = isLegacy ? undefined : input.settings
     const setSettings = isLegacy ? undefined : input.setSettings
     const onNewUser = isLegacy ? undefined : input.onNewUser
@@ -299,6 +301,36 @@ export const useGameState = (input = {}) => {
         }
     }, [])
 
+    const resetGameState = useCallback(() => {
+        const defaults = getDefaultSaveState()
+        setStocks(allProducts)
+        setCash(defaults.cash)
+        setPortfolio(defaults.portfolio)
+        setShortPositions(defaults.shortPositions)
+        setCreditUsed(defaults.creditUsed)
+        setCreditInterest(defaults.creditInterest)
+        setTradeHistory(defaults.tradeHistory)
+        setPendingOrders(defaults.pendingOrders)
+        setUnlockedAchievements(defaults.unlockedAchievements)
+        setUnlockedSkills(defaults.unlockedSkills)
+        setTotalXp(defaults.totalXp)
+        setTotalTrades(defaults.totalTrades)
+        setWinStreak(defaults.winStreak)
+        setMaxWinStreak(defaults.maxWinStreak)
+        setTotalProfit(defaults.totalProfit)
+        setDailyTrades(0)
+        setDailyProfit(0)
+        setMissionProgress(defaults.missionProgress)
+        setCompletedMissions(defaults.completedMissions)
+        setNews(defaults.news)
+        setAssetHistory(defaults.assetHistory)
+        setWatchlist(defaults.watchlist)
+        setAlerts(defaults.alerts)
+        setTotalDividends(defaults.totalDividends)
+        setGameStartTime(defaults.gameStartTime)
+        setCurrentDay(defaults.currentDay)
+    }, [allProducts])
+
     return {
         // 상태
         isInitialized,
@@ -330,6 +362,7 @@ export const useGameState = (input = {}) => {
         gameStartTime, setGameStartTime,
         currentDay, setCurrentDay,
         // 함수
+        resetGameState,
         saveGameState,
         loadGameState
     }

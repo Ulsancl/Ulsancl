@@ -65,6 +65,8 @@ export function calculateChecksum(meta, tradeLogs) {
  * @param {number} [options.initialCapital=100000000] - Initial capital amount
  * @returns {Object} Trade log recorder API
  */
+const normalizeStockId = (stockId) => String(stockId)
+
 export function useTradeLog(options = {}) {
     const {
         seasonId: initialSeasonId = null,
@@ -87,7 +89,7 @@ export function useTradeLog(options = {}) {
         const action = {
             tick: tickRef.current,
             type,
-            stockId,
+            stockId: normalizeStockId(stockId),
             quantity,
             orderType: options.orderType || 'market',
             timestamp: Date.now()
@@ -226,8 +228,6 @@ export function useTradeLog(options = {}) {
 
         // Payload
         buildPayload,
-        // Backward compatibility for in-flight branches
-        getPayload: buildPayload,
         calculateChecksum: () => calculateChecksum(
             { seasonId, engineVersion: ENGINE_VERSION, totalTicks: tickRef.current },
             tradeLogs

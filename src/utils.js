@@ -58,6 +58,12 @@ const MIGRATIONS = [
         defaults: {},
         resetToDefaults: true,
         migrate: () => {}
+    },
+    {
+        version: 4,
+        defaults: {},
+        resetToDefaults: true,
+        migrate: () => {}
     }
 ]
 const SAVE_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version

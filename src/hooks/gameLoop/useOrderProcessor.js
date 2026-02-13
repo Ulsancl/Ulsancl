@@ -1,11 +1,13 @@
 /**
- * useOrderProcessor - 주문 처리 로직 담당 훅
- * useGameLoop에서 분리된 모듈
+ * useOrderProcessor - 주문 처리 훅
+ * useGameLoop에서 전달받은 주문을 매 틱 처리
  */
 
 import { useCallback, useRef, useLayoutEffect } from 'react'
 import { processOrders } from '../../engine'
 import { generateId } from '../../utils/index.js'
+
+const normalizeSideToTradeType = (side) => (side === 'buy' ? 'BUY' : 'SELL')
 
 export const useOrderProcessor = ({
     setTradeHistory,
@@ -15,15 +17,18 @@ export const useOrderProcessor = ({
     setDailyProfit,
     setWinStreak,
     showNotification,
-    playSound
+    playSound,
+    recordTrade
 }) => {
     const showNotificationRef = useRef(showNotification)
     const playSoundRef = useRef(playSound)
+    const recordTradeRef = useRef(recordTrade)
 
     useLayoutEffect(() => {
         showNotificationRef.current = showNotification
         playSoundRef.current = playSound
-    }, [showNotification, playSound])
+        recordTradeRef.current = recordTrade
+    }, [showNotification, playSound, recordTrade])
 
     const tick = useCallback(({
         pendingOrders: currentPendingOrders,
@@ -39,7 +44,7 @@ export const useOrderProcessor = ({
             return { cash: currentCash, portfolio: currentPortfolio, pendingOrders: currentPendingOrders || [] }
         }
 
-        // 수수료 계산
+        // 주문 수수료
         const feeDiscountLevel = currentUnlockedSkills?.['fee_discount'] || 0
         let orderFeeRate = 0.0015
         if (feeDiscountLevel > 0) {
@@ -55,7 +60,19 @@ export const useOrderProcessor = ({
             let profitDelta = 0
 
             executedOrders.forEach(order => {
-                showNotificationCurrent(`🔔 ${order.stockName} ${order.type} 주문 체결!`, 'success')
+                const actionType = normalizeSideToTradeType(order.side)
+
+                recordTradeRef.current?.(
+                    actionType,
+                    String(order.stockId),
+                    order.quantity,
+                    {
+                        orderType: order.type || 'market',
+                        limitPrice: order.targetPrice
+                    }
+                )
+
+                showNotificationCurrent(`?뵒 ${order.stockName} ${order.type} 주문 체결!`, 'success')
                 playSoundCurrent(order.side === 'buy' ? 'buy' : 'sell')
                 setTradeHistory(prev => [...prev, { ...order, type: order.side, id: generateId(), timestamp: now }])
                 if (order.side === 'sell' && typeof order.profit === 'number') {

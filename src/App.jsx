@@ -154,7 +154,8 @@ function App() {
     alerts, setAlerts,
     setTotalDividends,
     gameStartTime,
-    setCurrentDay
+    setCurrentDay,
+    resetGameState
   } = usePersistentGameState({
     allProducts,
     settings,
@@ -308,7 +309,8 @@ function App() {
     showNotification,
     playSound,
     formatNumber,
-    onTick: tradeLog.advanceTick
+    onTick: tradeLog.advanceTick,
+    recordTrade: tradeLog.recordTrade
   })
 
   const unlockAchievement = useCallback((id) => {
@@ -434,6 +436,7 @@ function App() {
         onCoverShort={handleCoverShort}
         onStartNewSeason={() => {
           closeModal(MODAL_NAMES.SEASON_END)
+          resetGameState()
           tradeLog.reset()
           showNotification(`?? ${gameTime.year + 1}?????쒖쫵 ?쒖옉!`, 'success')
         }}

@@ -38,7 +38,7 @@ describe('save/load migration', () => {
 
         const data = loadGame()
 
-        expect(data.version).toBe(3)
+        expect(data.version).toBe(4)
         expect(data.cash).toBe(INITIAL_CAPITAL)
         expect(data.shortPositions).toEqual({})
         expect(data.creditUsed).toBe(0)
@@ -57,7 +57,7 @@ describe('save/load migration', () => {
         const loaded = loadGame()
 
         expect(loaded.cash).toBe(12345)
-        expect(loaded.version).toBe(3)
+        expect(loaded.version).toBe(4)
         expect(typeof loaded.savedAt).toBe('number')
     })
 })

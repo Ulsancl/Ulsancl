@@ -85,7 +85,7 @@ export const useTrading = ({
             timestamp: Date.now()
         }
         setTradeHistory(prev => [...prev, trade])
-        recordTrade?.('BUY', stock.id, effectiveQty, { orderType: 'market' })
+        recordTrade?.('BUY', String(stock.id), effectiveQty, { orderType: 'market' })
         setTotalTrades(prev => prev + 1)
         setDailyTrades(prev => prev + 1)
         playSound?.('buy')
@@ -155,7 +155,7 @@ export const useTrading = ({
             timestamp: Date.now()
         }
         setTradeHistory(prev => [...prev, trade])
-        recordTrade?.('SELL', stock.id, qty, { orderType: 'market' })
+        recordTrade?.('SELL', String(stock.id), qty, { orderType: 'market' })
         setTotalTrades(prev => prev + 1)
         setDailyTrades(prev => prev + 1)
         setTotalProfit(prev => prev + profit)
@@ -209,7 +209,7 @@ export const useTrading = ({
 
         const trade = { id: generateId(), type: 'short', stockId: stock.id, quantity: qty, price: stock.price, total: marginRequired, timestamp: Date.now() }
         setTradeHistory(prev => [...prev, trade])
-        recordTrade?.('SHORT', stock.id, qty, { orderType: 'market' })
+        recordTrade?.('SHORT', String(stock.id), qty, { orderType: 'market' })
         setTotalTrades(prev => prev + 1)
         setDailyTrades(prev => prev + 1)
         playSound?.('sell')
@@ -244,7 +244,7 @@ export const useTrading = ({
         })
 
         setTotalTrades(prev => prev + 1)
-        recordTrade?.('COVER', stock.id, qty, { orderType: 'market' })
+        recordTrade?.('COVER', String(stock.id), qty, { orderType: 'market' })
         setTotalProfit(prev => prev + pnl)
         setDailyProfit(prev => prev + pnl)
 

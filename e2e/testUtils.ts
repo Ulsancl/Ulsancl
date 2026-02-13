@@ -5,7 +5,7 @@ const TAB_BUTTON_SELECTOR = '[data-testid="tab-btn"]'
 export const seedGameState = async (page: Page) => {
     await page.addInitScript(() => {
         const seed = {
-            version: 3,
+            version: 4,
             savedAt: Date.now(),
             totalTrades: 1
         }

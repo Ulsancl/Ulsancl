@@ -83,6 +83,7 @@ export const useGameLoop = ({
     playSound,
     formatNumber,
     onTick,
+    recordTrade,
     updateInterval = 1000
 }) => {
     // Refs
@@ -137,7 +138,7 @@ export const useGameLoop = ({
     const orderProcessor = useOrderProcessor({
         setTradeHistory,
         setTotalTrades, setDailyTrades, setTotalProfit, setDailyProfit, setWinStreak,
-        showNotification, playSound
+        showNotification, playSound, recordTrade
     })
 
     const creditManager = useCreditManager({

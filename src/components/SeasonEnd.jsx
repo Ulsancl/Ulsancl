@@ -333,15 +333,12 @@ export default function SeasonEndModal({
                             <button
                                 className="btn-submit-score"
                                 onClick={handleSubmitScore}
-                                disabled={!seasonId || !buildPayload || tradeLogs.length === 0}
+                                disabled={!seasonId || !buildPayload}
                             >
                                 점수 제출하기
                             </button>
                             {!seasonId && (
                                 <p className="submit-warning">시즌 정보를 불러오는 중입니다.</p>
-                            )}
-                            {tradeLogs.length === 0 && (
-                                <p className="submit-warning">제출 가능한 거래 로그가 없습니다.</p>
                             )}
                         </div>
                     )}
