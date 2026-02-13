@@ -4,6 +4,23 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom'],
+          firebase: [
+            'firebase/app',
+            'firebase/firestore',
+            'firebase/auth',
+            'firebase/functions',
+            'firebase/app-check'
+          ],
+          charts: ['recharts']
+        }
+      }
+    }
+  },
   server: {
     host: true, // 외부 접속 허용 (핸드폰에서 접속 가능)
     port: 7777, // 포트 고정 (다른 게임과 겹치지 않음)

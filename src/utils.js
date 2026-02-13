@@ -1,8 +1,33 @@
-// 게임 저장/로드 및 유틸리티 함수
+﻿// 寃뚯엫 ???濡쒕뱶 諛??좏떥由ы떚 ?⑥닔
 
 import { INITIAL_CAPITAL } from './constants'
 
 const SAVE_KEY = 'stockTradingGame'
+const SEASON_RESET_NOTICE_KEY = 'stockGameSeasonResetNoticePending'
+
+const markSeasonResetNoticePending = () => {
+    try {
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem(SEASON_RESET_NOTICE_KEY, '1')
+        }
+    } catch {
+        // noop
+    }
+}
+
+export const consumeSeasonResetNotice = () => {
+    try {
+        if (typeof window === 'undefined') return false
+        const isPending = window.localStorage.getItem(SEASON_RESET_NOTICE_KEY) === '1'
+        if (isPending) {
+            window.localStorage.removeItem(SEASON_RESET_NOTICE_KEY)
+            return true
+        }
+    } catch {
+        // noop
+    }
+    return false
+}
 
 const MIGRATIONS = [
     {
@@ -26,6 +51,12 @@ const MIGRATIONS = [
             currentDay: 1,
             gameStartTime: () => Date.now()
         },
+        migrate: () => {}
+    },
+    {
+        version: 3,
+        defaults: {},
+        resetToDefaults: true,
         migrate: () => {}
     }
 ]
@@ -125,8 +156,17 @@ const migrateSaveData = (rawData) => {
     MIGRATIONS.filter((migration) => migration.version > migratedVersion)
         .sort((a, b) => a.version - b.version)
         .forEach((migration) => {
-            applyDefaults(data, migration.defaults)
-            migration.migrate(data)
+            if (migration.resetToDefaults) {
+                const resetState = getDefaultSaveState()
+                Object.keys(data).forEach((key) => {
+                    delete data[key]
+                })
+                Object.assign(data, resetState)
+                markSeasonResetNoticePending()
+            } else {
+                applyDefaults(data, migration.defaults)
+                migration.migrate(data)
+            }
             migratedVersion = migration.version
         })
 
@@ -138,7 +178,7 @@ const migrateSaveData = (rawData) => {
     return data
 }
 
-// 게임 상태 저장
+// 寃뚯엫 ?곹깭 ???
 export const saveGame = (gameState) => {
     try {
         const saveData = sanitizeSaveData({
@@ -149,12 +189,12 @@ export const saveGame = (gameState) => {
         localStorage.setItem(SAVE_KEY, JSON.stringify(saveData))
         return true
     } catch (error) {
-        console.error('게임 저장 실패:', error)
+        console.error('寃뚯엫 ????ㅽ뙣:', error)
         return false
     }
 }
 
-// 게임 상태 로드
+// 寃뚯엫 ?곹깭 濡쒕뱶
 export const loadGame = () => {
     try {
         const saved = localStorage.getItem(SAVE_KEY)
@@ -165,17 +205,17 @@ export const loadGame = () => {
         data = sanitizeSaveData(migrateSaveData(data))
         return data
     } catch (error) {
-        console.error('게임 로드 실패:', error)
+        console.error('寃뚯엫 濡쒕뱶 ?ㅽ뙣:', error)
         return null
     }
 }
 
-// 게임 리셋
+// 寃뚯엫 由ъ뀑
 export const resetGame = () => {
     localStorage.removeItem(SAVE_KEY)
 }
 
-// 자동 저장 설정
+// ?먮룞 ????ㅼ젙
 export const setupAutoSave = (getState, interval = 10000) => {
     return setInterval(() => {
         const state = getState()
@@ -183,18 +223,18 @@ export const setupAutoSave = (getState, interval = 10000) => {
     }, interval)
 }
 
-// 숫자 포맷
+// ?レ옄 ?щ㎎
 export const formatNumber = (num) => {
     return new Intl.NumberFormat('ko-KR').format(num)
 }
 
-// 퍼센트 포맷
+// ?쇱꽱???щ㎎
 export const formatPercent = (num) => {
     const sign = num >= 0 ? '+' : ''
     return `${sign}${num.toFixed(2)}%`
 }
 
-// 금액 압축 포맷
+// 湲덉븸 ?뺤텞 ?щ㎎
 export const formatCompact = (num) => {
     const absNum = Math.abs(num)
     const sign = num < 0 ? '-' : ''
@@ -209,7 +249,7 @@ export const formatCompact = (num) => {
     return formatNumber(num)
 }
 
-// 시간 포맷
+// ?쒓컙 ?щ㎎
 export const formatTime = (timestamp) => {
     return new Date(timestamp).toLocaleTimeString('ko-KR', {
         hour: '2-digit',
@@ -218,7 +258,7 @@ export const formatTime = (timestamp) => {
     })
 }
 
-// 날짜 포맷
+// ?좎쭨 ?щ㎎
 export const formatDate = (timestamp) => {
     return new Date(timestamp).toLocaleDateString('ko-KR', {
         month: 'short',
@@ -228,27 +268,27 @@ export const formatDate = (timestamp) => {
     })
 }
 
-// 랜덤 범위 값
+// ?쒕뜡 踰붿쐞 媛?
 export const randomRange = (min, max) => {
     return Math.random() * (max - min) + min
 }
 
-// 랜덤 정수
+// ?쒕뜡 ?뺤닔
 export const randomInt = (min, max) => {
     return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-// 랜덤 배열 요소
+// ?쒕뜡 諛곗뿴 ?붿냼
 export const randomChoice = (arr) => {
     return arr[Math.floor(Math.random() * arr.length)]
 }
 
-// 깊은 복사
+// 源딆? 蹂듭궗
 export const deepClone = (obj) => {
     return JSON.parse(JSON.stringify(obj))
 }
 
-// 디바운스
+// ?붾컮?댁뒪
 export const debounce = (func, wait) => {
     let timeout
     return function executedFunction(...args) {
@@ -261,12 +301,12 @@ export const debounce = (func, wait) => {
     }
 }
 
-// UUID 생성
+// UUID ?앹꽦
 export const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substr(2)
 }
 
-// 경험치로 레벨 계산
+// 寃쏀뿕移섎줈 ?덈꺼 怨꾩궛
 export const calculateLevel = (xp, levels) => {
     for (let i = levels.length - 1; i >= 0; i--) {
         if (xp >= levels[i].minXp) {
@@ -281,39 +321,15 @@ export const calculateLevel = (xp, levels) => {
     return { ...levels[0], progress: 0, xpToNext: levels[1]?.minXp || 0 }
 }
 
-// 리더보드 저장/로드
-const LEADERBOARD_KEY = 'stockGameLeaderboard'
-
-export const saveToLeaderboard = (score) => {
-    try {
-        const existing = JSON.parse(localStorage.getItem(LEADERBOARD_KEY) || '[]')
-        existing.push(score)
-        existing.sort((a, b) => b.totalAssets - a.totalAssets)
-        const top10 = existing.slice(0, 10)
-        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(top10))
-        return top10
-    } catch {
-        return []
-    }
-}
-
-export const getLeaderboard = () => {
-    try {
-        return JSON.parse(localStorage.getItem(LEADERBOARD_KEY) || '[]')
-    } catch {
-        return []
-    }
-}
-
-// 캔들 데이터 생성 (시뮬레이션)
+// 캔들 데이터 생성 (시뮬레이션용)
 export const generateCandleData = (currentPrice, count, volatility) => {
     let data = []
     let price = currentPrice
     const now = Date.now()
 
-    // 역순으로 데이터 생성
+    // ??닚?쇰줈 ?곗씠???앹꽦
     for (let i = 0; i < count; i++) {
-        // 변동폭
+        // 蹂?숉룺
         const change = price * volatility * (Math.random() - 0.5)
         const open = price - change
         const high = Math.max(open, price) + (open * volatility * Math.random() * 0.5)

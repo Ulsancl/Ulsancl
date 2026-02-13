@@ -4,10 +4,10 @@
     "description": "Ulsancl Stock Game - Cloud Functions for server-side verification",
     "main": "lib/index.js",
     "scripts": {
-        "lint": "eslint --ext .js,.ts src",
+        "lint": "tsc --noEmit",
         "build": "npm run copy-engine && tsc",
         "build:watch": "tsc --watch",
-        "copy-engine": "node ../scripts/copy-engine.js",
+        "copy-engine": "node ../scripts/copy-engine.cjs",
         "serve": "npm run build && firebase emulators:start --only functions",
         "shell": "npm run build && firebase functions:shell",
         "start": "npm run shell",

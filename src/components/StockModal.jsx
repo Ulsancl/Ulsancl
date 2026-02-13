@@ -168,7 +168,8 @@ const CATEGORY_LABELS = {
     'month': '월'
 }
 
-// 기본 틱 데이터 생성 (일관된 가격 움직임)
+// 기본 틱 데이터 생성 (현재가를 기준으로 역산 후 정렬)
+// 마지막 틱이 currentPrice가 되도록 보장
 function generateBaseTickData(currentPrice, tickCount, volatility, seed = 12345) {
     const ticks = []
     let price = currentPrice
@@ -179,21 +180,24 @@ function generateBaseTickData(currentPrice, tickCount, volatility, seed = 12345)
         return x - Math.floor(x)
     }
 
-    // 현재 가격에서 과거로 역산
+    const now = Date.now()
+
+    // 현재가에서 시작하여 과거로 역산 (뒤에서부터 계산)
     for (let i = tickCount - 1; i >= 0; i--) {
         ticks.unshift({
             index: i,
             price: Math.round(price),
-            time: Date.now() - (tickCount - i) * 1000
+            time: now - (tickCount - 1 - i) * 1000
         })
 
-        // 이전 가격 계산 (역방향)
+        // 이전 가격 계산 (역방향으로 변동 적용)
         const change = price * volatility * (seededRandom(i) - 0.5)
-        price = price - change
+        price = Math.max(100, price - change) // 과거로 갈수록 변동 빼기
     }
 
     return ticks
 }
+
 
 // 틱 데이터를 캔들로 집계
 function aggregateTicksToCandles(ticks, ticksPerCandle, maxCandles = 60) {
@@ -285,10 +289,14 @@ export default function StockModal({
     useEffect(() => {
         // 충분한 틱 데이터 생성 (약 3시간분 = 10800틱)
         const tickCount = 10800
-        const basePrice = stockPriceRef.current ?? 0
+        // 현재가를 사용하여 역산 - 마지막 틱이 현재가가 되도록
+        const initialPrice = currentPriceRef.current || stockPriceRef.current || 50000
         const baseVolatility = volatilityRef.current ?? 2
-        const seed = stock.id * 1000 + basePrice // 주식별 고유 시드
-        const initialPrice = currentPriceRef.current ?? 0
+        const seed = (typeof stock.id === 'string'
+            ? stock.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+            : stock.id) * 1000 + Math.floor(initialPrice / 1000) // 주식별 고유 시드
+
+        // currentPrice에서 시작하여 과거로 역산
         baseTickDataRef.current = generateBaseTickData(initialPrice, tickCount, baseVolatility * 0.01, seed)
         lastPriceRef.current = initialPrice
         setTickVersion(prev => prev + 1)
@@ -347,8 +355,8 @@ export default function StockModal({
     const shortQty = shortPositions?.[stock.id]?.quantity || 0
 
     return (
-        <div className="chart-modal-overlay" onClick={onClose}>
-            <div className="chart-modal" onClick={e => e.stopPropagation()}>
+        <div className="chart-modal-overlay" onClick={onClose} data-testid="chart-modal-overlay">
+            <div className="chart-modal" onClick={e => e.stopPropagation()} data-testid="chart-modal">
 
                 {/* Header */}
                 <div className="chart-modal-header">

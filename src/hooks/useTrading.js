@@ -28,6 +28,7 @@ export const useTrading = ({
     showNotification,
     playSound,
     addActionFeedback,
+    recordTrade,
     formatNumber,
     formatCompact
 }) => {
@@ -84,6 +85,7 @@ export const useTrading = ({
             timestamp: Date.now()
         }
         setTradeHistory(prev => [...prev, trade])
+        recordTrade?.('BUY', stock.id, effectiveQty, { orderType: 'market' })
         setTotalTrades(prev => prev + 1)
         setDailyTrades(prev => prev + 1)
         playSound?.('buy')
@@ -91,7 +93,7 @@ export const useTrading = ({
 
         addActionFeedback?.(`-${formatCompact(cashRequired)}`, 'loss', window.innerWidth / 2, window.innerHeight / 2)
         return true
-    }, [cash, currentLeverage, unlockedSkills, showNotification, playSound, setCash, setPortfolio, setTradeHistory, setTotalTrades, setDailyTrades, addActionFeedback, formatCompact])
+    }, [cash, currentLeverage, unlockedSkills, showNotification, playSound, setCash, setPortfolio, setTradeHistory, setTotalTrades, setDailyTrades, addActionFeedback, recordTrade, formatCompact])
 
     // 매도
     const handleSell = useCallback((stock, qty) => {
@@ -153,6 +155,7 @@ export const useTrading = ({
             timestamp: Date.now()
         }
         setTradeHistory(prev => [...prev, trade])
+        recordTrade?.('SELL', stock.id, qty, { orderType: 'market' })
         setTotalTrades(prev => prev + 1)
         setDailyTrades(prev => prev + 1)
         setTotalProfit(prev => prev + profit)
@@ -170,7 +173,7 @@ export const useTrading = ({
             addActionFeedback?.(`${formatCompact(profit)}`, 'loss', window.innerWidth / 2, window.innerHeight / 2)
         }
         return true
-    }, [portfolio, unlockedSkills, showNotification, playSound, setCash, setPortfolio, setTradeHistory, setTotalTrades, setDailyTrades, setTotalProfit, setDailyProfit, setWinStreak, addActionFeedback, formatCompact])
+    }, [portfolio, unlockedSkills, showNotification, playSound, setCash, setPortfolio, setTradeHistory, setTotalTrades, setDailyTrades, setTotalProfit, setDailyProfit, setWinStreak, addActionFeedback, recordTrade, formatCompact])
 
     // 공매도
     const handleShortSell = useCallback((stock, qty) => {
@@ -206,12 +209,13 @@ export const useTrading = ({
 
         const trade = { id: generateId(), type: 'short', stockId: stock.id, quantity: qty, price: stock.price, total: marginRequired, timestamp: Date.now() }
         setTradeHistory(prev => [...prev, trade])
+        recordTrade?.('SHORT', stock.id, qty, { orderType: 'market' })
         setTotalTrades(prev => prev + 1)
         setDailyTrades(prev => prev + 1)
         playSound?.('sell')
         showNotification(`🐻 ${stock.name} ${qty}주 공매도`, 'info')
         return true
-    }, [canShortSell, cash, showNotification, playSound, setCash, setShortPositions, setTradeHistory, setTotalTrades, setDailyTrades])
+    }, [canShortSell, cash, showNotification, playSound, setCash, setShortPositions, setTradeHistory, setTotalTrades, setDailyTrades, recordTrade])
 
     // 공매도 청산
     const handleCoverShort = useCallback((stock, qty) => {
@@ -240,6 +244,7 @@ export const useTrading = ({
         })
 
         setTotalTrades(prev => prev + 1)
+        recordTrade?.('COVER', stock.id, qty, { orderType: 'market' })
         setTotalProfit(prev => prev + pnl)
         setDailyProfit(prev => prev + pnl)
 
@@ -249,7 +254,7 @@ export const useTrading = ({
         playSound?.('buy')
         showNotification(`🐻 ${stock.name} 청산 (${pnl >= 0 ? '+' : ''}${formatCompact(pnl)})`, pnl >= 0 ? 'success' : 'error')
         return true
-    }, [shortPositions, showNotification, playSound, setCash, setShortPositions, setTotalTrades, setTotalProfit, setDailyProfit, setWinStreak, formatCompact])
+    }, [shortPositions, showNotification, playSound, setCash, setShortPositions, setTotalTrades, setTotalProfit, setDailyProfit, setWinStreak, recordTrade, formatCompact])
 
     // 신용 거래 - 대출
     const handleBorrowCredit = useCallback((amount) => {

@@ -2,7 +2,7 @@
  * engine.ts - Server-Side Replay Engine
  * 
  * Replays a complete game session using the same deterministic logic as the client.
- * Uses shared engine modules copied from client source via copy-engine.js.
+ * Uses shared engine modules copied from client source via copy-engine.cjs.
  * 
  * CRITICAL: This must produce IDENTICAL results to client for same seed + tradeLogs
  * 
@@ -10,17 +10,9 @@
  * @version 3.0.0
  */
 
-// Import shared engine modules (copied from client by copy-engine.js)
-import { createRng, RNG } from '../shared/rng';
-import {
-    calculatePriceChange,
-    getTickSize,
-    roundToTickSize,
-    getMinPrice,
-    normalizePrice,
-    startNewTradingDay,
-    VOLATILITY_CONFIG
-} from '../shared/priceCalculator';
+// Import shared engine modules (copied from client by copy-engine.cjs)
+import { createRng } from '../shared/rng';
+import { calculatePriceChange } from '../shared/priceCalculator';
 import { updateMarketState } from '../shared/marketState';
 import { INITIAL_STOCKS, INITIAL_CAPITAL } from '../shared/constants';
 
@@ -177,7 +169,11 @@ export function replayGame(
             }
 
             // Update market state (uses RNG deterministically)
-            marketState = updateMarketState(marketState, activeGlobalEvent, rng) as MarketState;
+            marketState = updateMarketState(
+                marketState as unknown as Record<string, unknown>,
+                activeGlobalEvent,
+                rng as unknown as undefined
+            ) as MarketState;
 
             // Update all stock prices (uses RNG deterministically)
             updateAllPrices(stocks, marketState, currentDay, activeNewsEffects, activeGlobalEvent, rng);
@@ -318,17 +314,17 @@ function updateAllPrices(
     gameDay: number,
     activeNewsEffects: any[],
     activeGlobalEvent: any,
-    rng: RNG
+    rng: unknown
 ): void {
     for (const stock of stocks) {
         const newPrice = calculatePriceChange(
             stock,
             marketState,
             gameDay,
-            activeNewsEffects,
+            activeNewsEffects as never[],
             activeGlobalEvent,
-            rng
-        );
+            rng as undefined
+        ) as number;
 
         stock.price = newPrice;
         stock.dailyHigh = Math.max(stock.dailyHigh, newPrice);

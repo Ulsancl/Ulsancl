@@ -21,8 +21,7 @@ export {
     debounce,
     generateId,
     calculateLevel,
-    saveToLeaderboard,
-    getLeaderboard,
+    consumeSeasonResetNotice,
     generateCandleData
 } from '../utils'
 

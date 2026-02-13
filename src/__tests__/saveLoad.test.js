@@ -1,4 +1,5 @@
-import { loadGame, saveGame } from '../utils'
+import { consumeSeasonResetNotice, loadGame, saveGame } from '../utils'
+import { INITIAL_CAPITAL } from '../constants'
 
 const createStorageMock = () => {
     let store = {}
@@ -28,22 +29,23 @@ describe('save/load migration', () => {
         global.localStorage = storage
     })
 
-    test('migrates legacy saves sequentially to latest version', () => {
+    test('resets legacy saves to latest season baseline', () => {
         const legacySave = {
             version: 0,
             cash: 5000
         }
-        storage.getItem.mockReturnValue(JSON.stringify(legacySave))
+        storage.setItem('stockTradingGame', JSON.stringify(legacySave))
 
         const data = loadGame()
 
-        expect(data.version).toBe(2)
-        expect(data.cash).toBe(5000)
+        expect(data.version).toBe(3)
+        expect(data.cash).toBe(INITIAL_CAPITAL)
         expect(data.shortPositions).toEqual({})
         expect(data.creditUsed).toBe(0)
         expect(data.pendingOrders).toEqual([])
         expect(typeof data.gameStartTime).toBe('number')
         expect(data.currentDay).toBe(1)
+        expect(consumeSeasonResetNotice()).toBe(true)
     })
 
     test('saves and loads data without regression', () => {
@@ -55,7 +57,7 @@ describe('save/load migration', () => {
         const loaded = loadGame()
 
         expect(loaded.cash).toBe(12345)
-        expect(loaded.version).toBe(2)
+        expect(loaded.version).toBe(3)
         expect(typeof loaded.savedAt).toBe('number')
     })
 })

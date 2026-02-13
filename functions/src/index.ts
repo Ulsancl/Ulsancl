@@ -10,6 +10,7 @@
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { randomBytes } from 'crypto';
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -31,7 +32,7 @@ import { updateLeaderboardSnapshot, updateAllActiveSnapshots } from './scheduled
  * Flow:
  * 1. Verify App Check token (reject if missing)
  * 2. Validate trade log structure
- * 3. Fetch seed from Firestore (never sent by client)
+ * 3. Fetch seed from Firestore server-only secret document (never sent by client)
  * 4. Replay game with deterministic engine
  * 5. Update leaderboard if new high score
  * 
@@ -229,14 +230,18 @@ export const createSeason = functions.https.onRequest(async (req, res) => {
             return;
         }
 
-        // Generate cryptographically secure random seed
-        const seedBytes = require('crypto').randomBytes(32);
-        const seed = seedBytes.toString('hex');
+        // Generate cryptographically secure random seed.
+        const seed = randomBytes(32).toString('hex');
 
-        // Create season document
-        const seasonRef = await db.collection('seasons').add({
+        const seasonRef = db.collection('seasons').doc();
+        const seasonSecretRef = db.doc(`seasonSecrets/${seasonRef.id}`);
+        const leaderboardSnapshotRef = db.doc(`leaderboard/${seasonRef.id}/snapshot/top50`);
+
+        const batch = db.batch();
+
+        // Client-readable season metadata (seed excluded).
+        batch.set(seasonRef, {
             name,
-            seed, // SERVER-ONLY: Never exposed to clients
             startDate: admin.firestore.Timestamp.fromDate(new Date(startDate)),
             endDate: admin.firestore.Timestamp.fromDate(new Date(endDate)),
             initialCapital: initialCapital || 100000000,
@@ -246,8 +251,16 @@ export const createSeason = functions.https.onRequest(async (req, res) => {
             createdBy: decodedToken.uid
         });
 
-        // Create empty leaderboard snapshot
-        await db.doc(`leaderboard/${seasonRef.id}/snapshot/top50`).set({
+        // Server-only season seed.
+        batch.set(seasonSecretRef, {
+            seasonId: seasonRef.id,
+            seed,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdBy: decodedToken.uid
+        });
+
+        // Empty leaderboard snapshot.
+        batch.set(leaderboardSnapshotRef, {
             entries: [],
             updatedAt: Date.now(),
             seasonId: seasonRef.id,
@@ -255,6 +268,8 @@ export const createSeason = functions.https.onRequest(async (req, res) => {
             topScore: null,
             averageScore: null
         });
+
+        await batch.commit();
 
         console.log(`[createSeason] Created season: ${seasonRef.id} by admin: ${decodedToken.uid}`);
 

@@ -97,7 +97,7 @@ export function fixedDiv(a, b, decimals = DEFAULT_DECIMALS) {
  * @param {number} decimals - Decimal places
  * @returns {number} Percentage as fixed-point
  */
-export function fixedPercent(value, percent, decimals = DEFAULT_DECIMALS) {
+export function fixedPercent(value, percent, _decimals = DEFAULT_DECIMALS) {
     return Math.round((value * percent) / 100);
 }
 

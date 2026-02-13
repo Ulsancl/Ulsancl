@@ -4,14 +4,22 @@ service cloud.firestore {
     
     // ============================================
     // SEASONS COLLECTION
-    // Server stores seed here - clients can only READ
+    // Client-readable season metadata
     // ============================================
     match /seasons/{seasonId} {
-      // Authenticated users can read season info
-      // NOTE: seed field should be excluded in client queries (use security rules or field mask)
-      allow read: if request.auth != null;
+      // Public read is safe (seed is stored in seasonSecrets)
+      allow read: if true;
       
       // NEVER allow client writes - Admin SDK only
+      allow write: if false;
+    }
+
+    // ============================================
+    // SEASON SECRETS COLLECTION
+    // Server-only season seed
+    // ============================================
+    match /seasonSecrets/{seasonId} {
+      allow read: if false;
       allow write: if false;
     }
     

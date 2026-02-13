@@ -13,7 +13,6 @@
  */
 
 import * as admin from 'firebase-admin';
-import * as functions from 'firebase-functions';
 import { replayGame, TradeAction, ReplayResult } from '../replay/engine';
 import { isVersionCompatible, ENGINE_VERSION } from '../shared/version';
 
@@ -50,12 +49,15 @@ interface VerificationResult {
 }
 
 interface SeasonData {
-    seed: string;
     active: boolean;
     initialCapital: number;
     gameDuration: number;
     startDate: admin.firestore.Timestamp;
     endDate: admin.firestore.Timestamp;
+}
+
+interface SeasonSecretData {
+    seed: string;
 }
 
 // ============================================
@@ -66,6 +68,10 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 5;
 const MAX_TRADE_LOG_LENGTH = 100000; // Prevent abuse
 const MIN_TRADE_LOG_LENGTH = 0; // Allow zero trades (hold strategy)
+
+function logSubmissionEvent(event: string, payload: Record<string, unknown>) {
+    console.log('[submitScore:event]', JSON.stringify({ event, ...payload }));
+}
 
 // ============================================
 // MAIN SUBMIT FUNCTION
@@ -87,9 +93,22 @@ export async function submitScore(
 ): Promise<VerificationResult> {
 
     const startTime = Date.now();
+    if (!payload || typeof payload !== 'object') {
+        return createError('Payload must be an object', 'INVALID_INPUT', { uid });
+    }
+
     const { meta, tradeLogs, checksum } = payload;
 
-    console.log(`[submitScore] Start - uid: ${uid}, season: ${meta.seasonId}, trades: ${tradeLogs.length}`);
+    if (!meta || !Array.isArray(tradeLogs) || typeof checksum !== 'string') {
+        return createError('Payload is missing required fields', 'INVALID_INPUT', { uid });
+    }
+
+    logSubmissionEvent('start', {
+        uid,
+        seasonId: meta.seasonId,
+        tradeCount: tradeLogs.length,
+        totalTicks: meta.totalTicks
+    });
 
     // ========================================
     // STEP 1: VERSION CHECK
@@ -122,6 +141,10 @@ export async function submitScore(
         return createError(`Trade log exceeds maximum length (${MAX_TRADE_LOG_LENGTH})`, 'INVALID_INPUT');
     }
 
+    if (tradeLogs.length < MIN_TRADE_LOG_LENGTH) {
+        return createError(`Trade log is too short (${MIN_TRADE_LOG_LENGTH})`, 'INVALID_INPUT');
+    }
+
     // Validate trade log structure
     const validationResult = validateTradeLogs(tradeLogs);
     if (!validationResult.valid) {
@@ -140,7 +163,8 @@ export async function submitScore(
     if (!rateLimitResult.allowed) {
         return createError(
             `Rate limit exceeded. Try again in ${rateLimitResult.retryAfter} seconds.`,
-            'RATE_LIMITED'
+            'RATE_LIMITED',
+            { uid, retryAfter: rateLimitResult.retryAfter }
         );
     }
 
@@ -149,7 +173,8 @@ export async function submitScore(
     // ========================================
 
     const seasonRef = db.doc(`seasons/${meta.seasonId}`);
-    const seasonDoc = await seasonRef.get();
+    const seasonSecretRef = db.doc(`seasonSecrets/${meta.seasonId}`);
+    const [seasonDoc, seasonSecretDoc] = await Promise.all([seasonRef.get(), seasonSecretRef.get()]);
 
     if (!seasonDoc.exists) {
         return createError('Season not found', 'SEASON_NOT_FOUND');
@@ -170,8 +195,27 @@ export async function submitScore(
         );
     }
 
-    // The SEED - loaded from Firestore, NEVER sent by client
-    const seed = seasonData.seed;
+    let seed = '';
+    if (seasonSecretDoc.exists) {
+        const seasonSecretData = seasonSecretDoc.data() as SeasonSecretData;
+        if (typeof seasonSecretData?.seed === 'string' && seasonSecretData.seed.length > 0) {
+            seed = seasonSecretData.seed;
+        }
+    }
+
+    // Backward compatibility for old seasons created before secret split.
+    const legacySeasonData = seasonData as unknown as { seed?: unknown };
+    if (!seed && typeof legacySeasonData.seed === 'string') {
+        seed = legacySeasonData.seed;
+        logSubmissionEvent('legacy_seed_fallback', { uid, seasonId: meta.seasonId });
+    }
+
+    if (!seed) {
+        return createError('Season seed secret is missing', 'SEASON_CONFIG_ERROR', {
+            uid,
+            seasonId: meta.seasonId
+        });
+    }
 
     // ========================================
     // STEP 5: CHECKSUM VERIFICATION
@@ -187,7 +231,11 @@ export async function submitScore(
     // STEP 6: REPLAY GAME WITH SERVER LOGIC
     // ========================================
 
-    console.log(`[submitScore] Starting replay with seed length: ${seed.length}`);
+    logSubmissionEvent('replay_start', {
+        uid,
+        seasonId: meta.seasonId,
+        seedLength: seed.length
+    });
 
     let replayResult: ReplayResult;
     try {
@@ -196,25 +244,40 @@ export async function submitScore(
             totalTicks: meta.totalTicks
         });
     } catch (error) {
-        console.error('[submitScore] Replay failed:', error);
+        logSubmissionEvent('replay_exception', {
+            uid,
+            seasonId: meta.seasonId,
+            message: (error as Error).message
+        });
         return createError(
             `Game replay failed: ${(error as Error).message}`,
-            'REPLAY_MISMATCH'
+            'REPLAY_MISMATCH',
+            { uid, seasonId: meta.seasonId }
         );
     }
 
     // Check if replay was valid
     if (!replayResult.valid) {
-        console.warn(`[submitScore] Replay invalid: ${replayResult.error}`);
+        logSubmissionEvent('replay_invalid', {
+            uid,
+            seasonId: meta.seasonId,
+            reason: replayResult.error || 'unknown'
+        });
         return createError(
             replayResult.error || 'Replay verification failed',
-            'REPLAY_MISMATCH'
+            'REPLAY_MISMATCH',
+            { uid, seasonId: meta.seasonId }
         );
     }
 
     const calculatedScore = replayResult.finalScore;
 
-    console.log(`[submitScore] Replay complete - score: ${calculatedScore}, profitRate: ${replayResult.profitRate.toFixed(2)}%`);
+    logSubmissionEvent('replay_complete', {
+        uid,
+        seasonId: meta.seasonId,
+        score: calculatedScore,
+        profitRate: Number(replayResult.profitRate.toFixed(2))
+    });
 
     // ========================================
     // STEP 7: FIRESTORE TRANSACTION
@@ -305,7 +368,14 @@ export async function submitScore(
         rank = higherScoreCount.data().count + 1;
     }
 
-    console.log(`[submitScore] Complete - score: ${calculatedScore}, rank: ${rank}, updated: ${transactionResult.updated}`);
+    logSubmissionEvent('complete', {
+        uid,
+        seasonId: meta.seasonId,
+        score: calculatedScore,
+        rank,
+        updated: transactionResult.updated,
+        durationMs: Date.now() - startTime
+    });
 
     return {
         success: true,
@@ -325,8 +395,16 @@ export async function submitScore(
 /**
  * Create error response
  */
-function createError(message: string, code: string): VerificationResult {
-    console.warn(`[submitScore] Error: ${code} - ${message}`);
+function createError(
+    message: string,
+    code: string,
+    details: Record<string, unknown> = {}
+): VerificationResult {
+    logSubmissionEvent('error', {
+        code,
+        message,
+        ...details
+    });
     return {
         success: false,
         error: message,

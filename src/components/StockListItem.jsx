@@ -62,6 +62,8 @@ const StockListItem = memo(function StockListItem({
         <div
             className={`stock-card stock-card-compact ${isInitialized ? 'initialized' : ''}`}
             style={{ '--animation-delay': `${index * 0.03}s` }}
+            data-testid="stock-card"
+            data-stock-id={stock.id}
         >
             <div className="stock-left">
                 <div className="stock-header-row">
@@ -75,7 +77,7 @@ const StockListItem = memo(function StockListItem({
             </div>
 
             {/* 가격 정보 - 클릭하면 상세 차트 열림 */}
-            <div className="stock-center" onClick={handleShowChart}>
+            <div className="stock-center" onClick={handleShowChart} data-testid="stock-center">
                 <div className={`stock-price ${isUp ? 'text-profit' : 'text-loss'} ${priceChange === 'up' ? 'flash-up' : priceChange === 'down' ? 'flash-down' : ''}`}>
                     {formatNumber(stock.price)}원
                 </div>
@@ -92,8 +94,8 @@ const StockListItem = memo(function StockListItem({
                 </div>
                 {(heldQty > 0 || shortQty > 0) && (
                     <div className="stock-positions-inline">
-                        {heldQty > 0 && <span className="pos-badge long">📈{heldQty}</span>}
-                        {shortQty > 0 && <span className={`pos-badge short ${shortPnl >= 0 ? 'profit' : 'loss'}`}>🐻{shortQty}</span>}
+                        {heldQty > 0 && <span className="pos-badge long" data-testid="position-badge-long">📈{heldQty}</span>}
+                        {shortQty > 0 && <span className={`pos-badge short ${shortPnl >= 0 ? 'profit' : 'loss'}`} data-testid="position-badge-short">🐻{shortQty}</span>}
                     </div>
                 )}
             </div>
@@ -108,6 +110,7 @@ const StockListItem = memo(function StockListItem({
                                 onClick={handleBuy}
                                 disabled={cash < stock.price * estimatedQty || estimatedQty < 1}
                                 title={`${estimatedQty}주 매수`}
+                                data-testid="buy-btn"
                             >
                                 매수
                             </button>
@@ -116,6 +119,7 @@ const StockListItem = memo(function StockListItem({
                                     className="quick-btn sell-all"
                                     onClick={handleSellAll}
                                     title={`${heldQty}주 전량 매도`}
+                                    data-testid="sell-all-btn"
                                 >
                                     전량매도
                                 </button>
@@ -128,6 +132,7 @@ const StockListItem = memo(function StockListItem({
                                 onClick={handleShortSell}
                                 disabled={cash < stock.price * estimatedQty * SHORT_SELLING.marginRate || estimatedQty < 1}
                                 title={`${estimatedQty}주 공매도`}
+                                data-testid="short-btn"
                             >
                                 공매도
                             </button>
@@ -136,6 +141,7 @@ const StockListItem = memo(function StockListItem({
                                     className="quick-btn cover-all"
                                     onClick={handleCoverShort}
                                     title={`${shortQty}주 전량 청산`}
+                                    data-testid="cover-all-btn"
                                 >
                                     전량청산
                                 </button>

@@ -1,12 +1,15 @@
-/* TechnicalChart.css - 기술적 분석 차트 스타일 */
+/* ========================================
+   TechnicalChart.css - 기술적 분석 차트
+   Unified with main theme design system
+   ======================================== */
 
 .technical-chart-container {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    background: var(--color-bg-secondary, #1a1a25);
-    border-radius: 12px;
-    padding: 12px;
+    gap: var(--spacing-sm, 8px);
+    background: var(--color-bg-primary, #0a0e17);
+    border-radius: var(--radius-md, 10px);
+    padding: var(--spacing-sm, 8px);
 }
 
 /* 지표 토글 버튼 */
@@ -15,8 +18,11 @@
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 8px;
+    gap: var(--spacing-sm, 8px);
+    margin-bottom: var(--spacing-sm, 8px);
+    padding: var(--spacing-sm, 8px);
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: var(--radius-sm, 6px);
 }
 
 .toggle-group {
@@ -25,33 +31,36 @@
 }
 
 .toggle-btn {
-    padding: 4px 10px;
-    font-size: 11px;
+    padding: 5px 12px;
+    font-size: 0.7rem;
     font-weight: 600;
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: #888;
+    border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+    border-radius: var(--radius-sm, 6px);
+    color: var(--color-text-muted, #6b7280);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--transition-fast, 150ms ease);
 }
 
 .toggle-btn:hover {
     background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    color: var(--color-text-primary, #f3f4f6);
+    border-color: var(--color-border-hover, rgba(255, 255, 255, 0.15));
 }
 
 .toggle-btn.active {
-    background: rgba(var(--indicator-color-rgb, 99, 102, 241), 0.2);
-    border-color: var(--indicator-color, #6366f1);
-    color: var(--indicator-color, #6366f1);
+    background: var(--color-accent-bg, rgba(99, 102, 241, 0.1));
+    border-color: var(--color-accent, #6366f1);
+    color: var(--color-accent-light, #818cf8);
+    box-shadow: var(--shadow-glow-accent, 0 0 10px rgba(99, 102, 241, 0.2));
 }
 
 /* 메인 차트 영역 */
 .main-chart-area {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.02) 0%, transparent 100%);
+    border-radius: var(--radius-sm, 6px);
     overflow: hidden;
+    border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
 }
 
 .technical-chart-svg {
@@ -63,8 +72,8 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #888;
-    font-size: 14px;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.9rem;
 }
 
 /* 보조 지표 영역 */
@@ -75,51 +84,57 @@
 }
 
 .indicator-chart {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: var(--radius-sm, 6px);
     overflow: hidden;
     position: relative;
+    border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
 }
 
 .indicator-label {
     position: absolute;
-    top: 4px;
-    left: 8px;
+    top: 6px;
+    left: 10px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    color: #888;
+    gap: var(--spacing-sm, 8px);
+    font-size: 0.7rem;
+    color: var(--color-text-muted, #6b7280);
     z-index: 1;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 2px 8px;
+    border-radius: 4px;
 }
 
 .indicator-value {
     font-weight: 700;
-    font-size: 13px;
+    font-size: 0.8rem;
+    font-family: var(--font-family-mono, 'Roboto Mono', monospace);
 }
 
 /* 신호 패널 */
 .signal-panel {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    padding: 12px;
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.05) 0%, rgba(0, 0, 0, 0.3) 100%);
+    border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+    border-radius: var(--radius-md, 10px);
+    padding: var(--spacing-md, 16px);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--spacing-sm, 8px);
 }
 
 .trend-indicator {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
+    gap: var(--spacing-md, 16px);
+    padding: 12px 16px;
     background: rgba(255, 255, 255, 0.03);
-    border-radius: 8px;
+    border-radius: var(--radius-sm, 6px);
     border-left: 3px solid;
 }
 
 .trend-icon {
-    font-size: 24px;
+    font-size: 1.5rem;
 }
 
 .trend-info {
@@ -130,16 +145,17 @@
 }
 
 .trend-label {
-    font-size: 14px;
+    font-size: 0.9rem;
     font-weight: 700;
+    color: var(--color-text-primary, #f3f4f6);
 }
 
 .trend-strength {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    color: #888;
+    gap: var(--spacing-sm, 8px);
+    font-size: 0.7rem;
+    color: var(--color-text-muted, #6b7280);
 }
 
 .strength-bar {
@@ -153,7 +169,7 @@
 .strength-fill {
     height: 100%;
     border-radius: 2px;
-    transition: width 0.3s ease;
+    transition: width var(--transition-normal, 250ms ease);
 }
 
 /* 신호 리스트 */
@@ -166,20 +182,20 @@
 .signal-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 12px;
+    gap: var(--spacing-sm, 8px);
+    padding: 10px 14px;
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.8rem;
 }
 
 .signal-item.signal-buy {
-    background: rgba(38, 166, 154, 0.1);
-    border: 1px solid rgba(38, 166, 154, 0.3);
+    background: var(--color-profit-bg, rgba(16, 185, 129, 0.1));
+    border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .signal-item.signal-sell {
-    background: rgba(239, 83, 80, 0.1);
-    border: 1px solid rgba(239, 83, 80, 0.3);
+    background: var(--color-loss-bg, rgba(239, 68, 68, 0.1));
+    border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .signal-type {
@@ -187,57 +203,67 @@
     min-width: 60px;
 }
 
+.signal-item.signal-buy .signal-type {
+    color: var(--color-profit, #10b981);
+}
+
+.signal-item.signal-sell .signal-type {
+    color: var(--color-loss, #ef4444);
+}
+
 .signal-message {
     flex: 1;
-    color: #ccc;
+    color: var(--color-text-secondary, #9ca3af);
 }
 
 .signal-strength {
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: var(--radius-full, 9999px);
+    font-size: 0.65rem;
     font-weight: 600;
+    text-transform: uppercase;
 }
 
 .signal-strength.strength-strong {
-    background: rgba(255, 193, 7, 0.2);
-    color: #FFC107;
+    background: rgba(251, 191, 36, 0.15);
+    color: var(--color-warning, #f59e0b);
 }
 
 .signal-strength.strength-medium {
-    background: rgba(158, 158, 158, 0.2);
-    color: #9E9E9E;
+    background: rgba(156, 163, 175, 0.15);
+    color: var(--color-text-secondary, #9ca3af);
 }
 
 .no-signals {
     text-align: center;
-    color: #666;
-    font-size: 12px;
-    padding: 8px;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.8rem;
+    padding: var(--spacing-md, 16px);
 }
 
 .cross-alert {
     display: flex;
     justify-content: center;
-    gap: 12px;
-    padding: 8px;
-    background: rgba(255, 215, 0, 0.1);
-    border-radius: 6px;
+    gap: var(--spacing-md, 16px);
+    padding: var(--spacing-sm, 8px);
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: var(--radius-sm, 6px);
 }
 
 .golden-cross {
     color: #FFD700;
     font-weight: 700;
-    animation: pulse 1.5s ease-in-out infinite;
+    animation: signalPulse 1.5s ease-in-out infinite;
 }
 
 .death-cross {
-    color: #ef5350;
+    color: var(--color-loss, #ef4444);
     font-weight: 700;
-    animation: pulse 1.5s ease-in-out infinite;
+    animation: signalPulse 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse {
+@keyframes signalPulse {
 
     0%,
     100% {
@@ -257,8 +283,8 @@
     }
 
     .toggle-btn {
-        padding: 3px 8px;
-        font-size: 10px;
+        padding: 4px 10px;
+        font-size: 0.65rem;
     }
 
     .signal-item {
@@ -269,5 +295,9 @@
         order: 3;
         width: 100%;
         margin-top: 4px;
+    }
+
+    .signal-panel {
+        padding: var(--spacing-sm, 8px);
     }
 }

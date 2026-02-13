@@ -60,12 +60,19 @@ export function calculateChecksum(meta, tradeLogs) {
 /**
  * Hook for recording trade actions during gameplay
  * 
- * @param {string} seasonId - Current season ID
- * @param {number} initialCapital - Initial capital amount
+ * @param {Object} options - Hook options
+ * @param {string|null} [options.seasonId] - Current season ID
+ * @param {number} [options.initialCapital=100000000] - Initial capital amount
  * @returns {Object} Trade log recorder API
  */
-export function useTradeLog(seasonId, initialCapital = 100000000) {
+export function useTradeLog(options = {}) {
+    const {
+        seasonId: initialSeasonId = null,
+        initialCapital = 100000000
+    } = options
+
     const [tradeLogs, setTradeLogs] = useState([])
+    const [seasonId, setSeasonId] = useState(initialSeasonId)
     const tickRef = useRef(0)
     const startedAtRef = useRef(Date.now())
 
@@ -127,11 +134,18 @@ export function useTradeLog(seasonId, initialCapital = 100000000) {
 
     /**
      * Build client payload for submission
+     * @param {Object} [overrides]
+     * @param {string} [overrides.seasonId]
      * @returns {Object} Client payload
      */
-    const buildPayload = useCallback(() => {
+    const buildPayload = useCallback((overrides = {}) => {
+        const effectiveSeasonId = overrides.seasonId ?? seasonId
+        if (!effectiveSeasonId) {
+            return null
+        }
+
         const meta = {
-            seasonId,
+            seasonId: effectiveSeasonId,
             engineVersion: ENGINE_VERSION,
             clientVersion: CLIENT_VERSION,
             startedAt: startedAtRef.current,
@@ -198,10 +212,12 @@ export function useTradeLog(seasonId, initialCapital = 100000000) {
 
     return {
         // State
+        seasonId,
         tradeLogs,
         currentTick: tickRef.current,
 
         // Actions
+        setSeasonId,
         recordTrade,
         advanceTick,
         getCurrentTick,
@@ -210,6 +226,8 @@ export function useTradeLog(seasonId, initialCapital = 100000000) {
 
         // Payload
         buildPayload,
+        // Backward compatibility for in-flight branches
+        getPayload: buildPayload,
         calculateChecksum: () => calculateChecksum(
             { seasonId, engineVersion: ENGINE_VERSION, totalTicks: tickRef.current },
             tradeLogs

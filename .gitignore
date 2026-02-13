@@ -29,3 +29,6 @@ Ulsancl-*-dist.zip.sha256
 storybook-static
 playwright-report/
 test-results/
+functions/lib/
+functions/src/shared/fixedPoint.ts
+functions/src/shared/index.ts

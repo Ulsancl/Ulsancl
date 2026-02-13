@@ -2208,6 +2208,60 @@ input:focus-visible {
   }
 }
 
+.modal-loading-fallback {
+  min-width: 200px;
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.season-reset-notice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.season-reset-notice-modal {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: linear-gradient(180deg, #1a1f2e 0%, #111827 100%);
+  box-shadow: var(--shadow-lg);
+}
+
+.season-reset-notice-modal h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.season-reset-notice-modal p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.season-reset-notice-modal button {
+  margin-top: 14px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 700;
+  color: #fff;
+  background: var(--gradient-accent);
+}
+
 .credit-header {
   display: flex;
   align-items: center;

@@ -82,6 +82,7 @@ export const useGameLoop = ({
     showNotification,
     playSound,
     formatNumber,
+    onTick,
     updateInterval = 1000
 }) => {
     // Refs
@@ -104,6 +105,7 @@ export const useGameLoop = ({
     const unlockedSkillsRef = useRef(unlockedSkills)
     const showNotificationRef = useRef(showNotification)
     const playSoundRef = useRef(playSound)
+    const onTickRef = useRef(onTick)
     // Sync refs
     useLayoutEffect(() => {
         gameStartTimeRef.current = gameStartTime
@@ -120,7 +122,8 @@ export const useGameLoop = ({
         unlockedSkillsRef.current = unlockedSkills
         showNotificationRef.current = showNotification
         playSoundRef.current = playSound
-    }, [gameStartTime, stocks, alerts, pendingOrders, marketState, cash, portfolio, shortPositions, creditUsed, creditInterest, marginCallActive, unlockedSkills, showNotification, playSound])
+        onTickRef.current = onTick
+    }, [gameStartTime, stocks, alerts, pendingOrders, marketState, cash, portfolio, shortPositions, creditUsed, creditInterest, marginCallActive, unlockedSkills, showNotification, playSound, onTick])
 
     // 서브 모듈 초기화
     const priceUpdater = usePriceUpdater({
@@ -156,6 +159,12 @@ export const useGameLoop = ({
     // 메인 게임 루프
     useEffect(() => {
         const interval = setInterval(() => {
+            try {
+                onTickRef.current?.()
+            } catch (error) {
+                console.warn('[useGameLoop] onTick callback failed:', error)
+            }
+
             const now = Date.now()
             const currentStocks = stocksRef.current
             const currentAlerts = alertsRef.current
