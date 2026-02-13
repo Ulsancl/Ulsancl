@@ -1,23 +1,14 @@
 /**
- * Hooks 모듈 인덱스
- * 모든 커스텀 훅을 한 곳에서 export
+ * Hooks module index
  */
 
-// 거래 관련
 export { useTrading } from './useTrading'
-
-// 게임 상태
 export { useGameState } from './useGameState'
-
-// UI 관련
 export { useToast } from './useToast'
 export { useFeedback } from './useFeedback'
-export { useModals, MODAL_TYPES } from './useModals'
 export { useUiState } from './useUiState'
-export { useAppModalState } from './useAppModalState'
 export { useGameCalculations } from './useGameCalculations'
 
-// 성능 최적화
 export {
     useDebouncedValue,
     useThrottle as useThrottleCallback,
@@ -31,11 +22,5 @@ export {
     useOptimizedPriceHistory
 } from './useOptimization'
 
-// 스토리지
-export { useLocalStorage, useSessionStorage } from './useStorage'
-
-// 게임 루프 및 Web Worker
 export { useGameLoop } from './useGameLoop'
-
-// Trade Log Recording (v3.0)
 export { useTradeLog, calculateChecksum } from './useTradeLog'

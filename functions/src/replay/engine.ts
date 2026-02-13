@@ -93,6 +93,31 @@ interface MarketState {
     };
 }
 
+type NewsEffect = Record<string, unknown>;
+type GlobalEvent = Record<string, unknown> | null;
+type RngLike = { nextFloat: () => number };
+
+type PriceCalculator = (
+    stock: Stock,
+    marketState: MarketState,
+    gameDay: number,
+    activeNewsEffects: NewsEffect[],
+    activeGlobalEvent: GlobalEvent,
+    rng: RngLike | null
+) => number;
+
+const calculatePriceChangeTyped = calculatePriceChange as unknown as PriceCalculator;
+
+interface InitialStockSeed {
+    id: string | number;
+    name: string;
+    price: number;
+    basePrice?: number;
+    type?: string;
+    sector?: string;
+    fundamentals?: Stock['fundamentals'];
+}
+
 // ============================================
 // CONSTANTS
 // ============================================
@@ -147,8 +172,8 @@ export function replayGame(
     let tradeIndex = 0;
 
     // Active news/events (simplified for replay)
-    const activeNewsEffects: any[] = [];
-    let activeGlobalEvent: any = null;
+    const activeNewsEffects: NewsEffect[] = [];
+    let activeGlobalEvent: GlobalEvent = null;
 
     // Game day tracking
     let currentDay = 0;
@@ -282,8 +307,14 @@ export function replayGame(
  */
 function initializeStocks(): Stock[] {
     // Use shared INITIAL_STOCKS from copied constants
-    return INITIAL_STOCKS.map((stock: any) => ({
-        ...stock,
+    return (INITIAL_STOCKS as unknown as InitialStockSeed[]).map((stock) => ({
+        id: String(stock.id),
+        name: stock.name,
+        price: stock.price,
+        basePrice: stock.basePrice ?? stock.price,
+        type: stock.type ?? 'stock',
+        sector: stock.sector ?? 'general',
+        fundamentals: stock.fundamentals,
         dailyOpen: stock.price,
         dailyHigh: stock.price,
         dailyLow: stock.price,
@@ -312,19 +343,19 @@ function updateAllPrices(
     stocks: Stock[],
     marketState: MarketState,
     gameDay: number,
-    activeNewsEffects: any[],
-    activeGlobalEvent: any,
-    rng: unknown
+    activeNewsEffects: NewsEffect[],
+    activeGlobalEvent: GlobalEvent,
+    rng: RngLike | null
 ): void {
     for (const stock of stocks) {
-        const newPrice = calculatePriceChange(
+        const newPrice = calculatePriceChangeTyped(
             stock,
             marketState,
             gameDay,
-            activeNewsEffects as never[],
+            activeNewsEffects,
             activeGlobalEvent,
-            rng as undefined
-        ) as number;
+            rng
+        );
 
         stock.price = newPrice;
         stock.dailyHigh = Math.max(stock.dailyHigh, newPrice);

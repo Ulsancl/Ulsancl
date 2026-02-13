@@ -284,6 +284,9 @@ export async function submitScore(
     // Atomic read-modify-write for leaderboard
     // ========================================
 
+    // Avoid non-Firestore async calls inside transaction callback.
+    const displayName = await getDisplayName(uid);
+
     const transactionResult = await db.runTransaction(async (transaction) => {
         // Read existing entry for this user
         const entriesRef = db.collection(`leaderboard/${meta.seasonId}/entries`);
@@ -311,7 +314,7 @@ export async function submitScore(
         // Prepare entry data
         const entryData = {
             uid,
-            displayName: await getDisplayName(uid),
+            displayName,
             score: calculatedScore,
             portfolioValue: replayResult.portfolioValue,
             profitRate: replayResult.profitRate,
