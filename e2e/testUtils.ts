@@ -15,28 +15,28 @@ export const seedGameState = async (page: Page) => {
 }
 
 export const dismissTutorial = async (page: Page, timeout = 1500) => {
-    const overlay = page.locator('.tutorial-overlay')
+    const overlay = page.getByTestId('tutorial-overlay')
     try {
         await overlay.waitFor({ state: 'visible', timeout })
     } catch {
         return
     }
 
-    const skipButton = page.locator('.tutorial-overlay .btn-skip, .tutorial-overlay button').first()
+    const skipButton = page.getByTestId('tutorial-skip').first()
     if (await skipButton.isVisible()) {
         await skipButton.click({ force: true })
     }
 }
 
 export const dismissSeasonResetNotice = async (page: Page, timeout = 1500) => {
-    const overlay = page.locator('.season-reset-notice-overlay')
+    const overlay = page.getByTestId('season-reset-notice-overlay')
     try {
         await overlay.waitFor({ state: 'visible', timeout })
     } catch {
         return
     }
 
-    const confirmButton = overlay.locator('button').first()
+    const confirmButton = page.getByTestId('season-reset-notice-confirm').first()
     if (await confirmButton.isVisible()) {
         await confirmButton.click({ force: true })
     } else {
@@ -74,21 +74,37 @@ export const preparePage = async (page: Page, url = '/') => {
 
     const tabButtons = page.locator(TAB_BUTTON_SELECTOR)
     await tabButtons.first().waitFor({ state: 'visible' })
-    await page.waitForSelector('[data-testid="stock-card"]')
-    await page.waitForSelector('[data-testid="buy-btn"]')
+    await expect(page.getByTestId('game-header')).toBeVisible()
+    await expect(page.getByTestId('dashboard-panel')).toBeVisible()
+    await expect(page.getByTestId('stock-card').first()).toBeVisible()
+    await expect(page.getByTestId('buy-btn').first()).toBeVisible()
 
-    const tradeModeSection = page.locator('.trade-mode-toggle').first()
-    await tradeModeSection.scrollIntoViewIfNeeded()
-    await tradeModeSection.locator('.mode-btn').first().click({ force: true })
+    const longModeButton = page.getByTestId('long-mode-btn')
+    await longModeButton.scrollIntoViewIfNeeded()
+    await longModeButton.click({ force: true })
+    await expect(longModeButton).toHaveClass(/active/)
 
-    const amountModeSection = page.locator('.trade-mode-toggle').nth(1)
-    await amountModeSection.scrollIntoViewIfNeeded()
-    await amountModeSection.locator('.mode-btn').first().click({ force: true })
+    const quantityModeButton = page.getByTestId('quantity-mode-btn')
+    await quantityModeButton.scrollIntoViewIfNeeded()
+    await quantityModeButton.click({ force: true })
+    await expect(quantityModeButton).toHaveClass(/active/)
 
-    const quantityInput = page.locator('.quantity-input').first()
+    const quantityInput = page.getByTestId('quantity-input').first()
     if (await quantityInput.isVisible().catch(() => false)) {
         await quantityInput.fill('1')
     }
+}
+
+export const openChartModal = async (page: Page, index = 0) => {
+    const target = page.getByTestId('stock-center').nth(index)
+    await target.scrollIntoViewIfNeeded()
+    await target.click({ force: true })
+
+    await page.evaluate((targetIndex) => {
+        const node = document.querySelectorAll('[data-testid=\"stock-center\"]')[targetIndex] as HTMLElement | undefined
+        if (!node) return
+        node.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+    }, index)
 }
 
 export const parseKoreanNumber = (text: string | null) => {
@@ -115,6 +131,6 @@ export const parseKoreanNumber = (text: string | null) => {
 }
 
 export const readCashValue = async (page: Page) => {
-    const cashText = await page.locator('.stat-cash .stat-value').first().textContent()
+    const cashText = await page.getByTestId('cash-value').first().textContent()
     return parseKoreanNumber(cashText)
 }

@@ -378,7 +378,7 @@ export default function StockModal({
                         </div>
                     </div>
 
-                    <button className="close-btn" onClick={onClose}>&times;</button>
+                    <button className="close-btn" onClick={onClose} data-testid="chart-modal-close">&times;</button>
                 </div>
 
                 {/* Timeframe Selection */}

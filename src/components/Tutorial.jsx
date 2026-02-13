@@ -84,7 +84,7 @@ export default function Tutorial({ active, onClose }) {
     }
 
     return (
-        <div className="tutorial-overlay">
+        <div className="tutorial-overlay" data-testid="tutorial-overlay">
             {rect && (
                 <div
                     className="tutorial-highlight"
@@ -102,7 +102,7 @@ export default function Tutorial({ active, onClose }) {
                 <h3>{step.title}</h3>
                 <p>{step.content}</p>
                 <div className="tutorial-actions">
-                    <button className="btn-skip" onClick={onClose}>Skip</button>
+                    <button className="btn-skip" onClick={onClose} data-testid="tutorial-skip">Skip</button>
                     <button className="btn-next" onClick={handleNext}>
                         {stepIndex === TUTORIAL_STEPS.length - 1 ? 'Start Game' : 'Next'}
                     </button>

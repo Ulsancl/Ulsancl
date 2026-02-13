@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test'
-import { clickTabByIndex, parseKoreanNumber, preparePage, readCashValue } from './testUtils'
+import { clickTabByIndex, openChartModal, parseKoreanNumber, preparePage, readCashValue } from './testUtils'
 
 test.describe('사용자 시나리오: 첫 거래', () => {
     test('신규 유저가 첫 주식을 매수함', async ({ page }) => {
         await preparePage(page)
 
-        const totalText = await page.locator('.stat-total .stat-value').first().textContent()
+        const totalText = await page.getByTestId('total-assets-value').first().textContent()
         const totalValue = parseKoreanNumber(totalText)
         expect(totalValue).toBeGreaterThan(0)
 
-        const buyButton = page.locator('[data-testid="buy-btn"]').first()
+        const buyButton = page.getByTestId('buy-btn').first()
 
         const cashBefore = await readCashValue(page)
         await expect(buyButton).toBeEnabled()
@@ -22,14 +22,14 @@ test.describe('사용자 시나리오: 첫 거래', () => {
     test('주식을 매수 후 전량 매도', async ({ page }) => {
         await preparePage(page)
 
-        const buyButton = page.locator('[data-testid="buy-btn"]').first()
+        const buyButton = page.getByTestId('buy-btn').first()
         const cashBefore = await readCashValue(page)
         await buyButton.click({ force: true })
 
-        const sellAllButton = page.locator('[data-testid="sell-all-btn"]').first()
+        const sellAllButton = page.getByTestId('sell-all-btn').first()
         if (await sellAllButton.isVisible().catch(() => false)) {
             await sellAllButton.click({ force: true })
-            await expect(page.locator('[data-testid="position-badge-long"]')).toHaveCount(0)
+            await expect(page.getByTestId('position-badge-long')).toHaveCount(0)
         } else {
             const cashAfter = await readCashValue(page)
             expect(cashAfter).toBeLessThanOrEqual(cashBefore)
@@ -41,15 +41,11 @@ test.describe('사용자 시나리오: 차트 분석', () => {
     test('주식 차트를 열고 닫는다', async ({ page }) => {
         await preparePage(page)
 
-        await page.locator('[data-testid="stock-center"]').first().click({ force: true })
-        await page.evaluate(() => {
-            const target = document.querySelector('[data-testid="stock-center"]') as HTMLElement | null
-            target?.click()
-        })
-        const chartModal = page.locator('[data-testid="chart-modal-overlay"]')
+        await openChartModal(page)
+        const chartModal = page.getByTestId('chart-modal-overlay')
         await expect(chartModal).toBeVisible({ timeout: 5000 })
 
-        const closeButton = page.locator('.chart-modal .close-btn').first()
+        const closeButton = page.getByTestId('chart-modal-close').first()
         await closeButton.click({ force: true })
         await expect(chartModal).toHaveCount(0)
     })
@@ -68,7 +64,7 @@ test.describe('사용자 시나리오: 설정 변경', () => {
 test.describe('사용자 시나리오: 뉴스 확인', () => {
     test('뉴스 피드가 렌더된다', async ({ page }) => {
         await preparePage(page)
-        await expect(page.locator('.news-section').first()).toBeVisible({ timeout: 5000 })
+        await expect(page.getByTestId('news-section').first()).toBeVisible({ timeout: 5000 })
     })
 })
 

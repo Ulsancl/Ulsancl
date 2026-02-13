@@ -1,4 +1,4 @@
-﻿// 寃뚯엫 ???濡쒕뱶 諛??좏떥由ы떚 ?⑥닔
+// Save/load helpers and common utilities for the game
 
 import { INITIAL_CAPITAL } from './constants'
 
@@ -184,7 +184,7 @@ const migrateSaveData = (rawData) => {
     return data
 }
 
-// 寃뚯엫 ?곹깭 ???
+// Save game state
 export const saveGame = (gameState) => {
     try {
         const saveData = sanitizeSaveData({
@@ -195,12 +195,12 @@ export const saveGame = (gameState) => {
         localStorage.setItem(SAVE_KEY, JSON.stringify(saveData))
         return true
     } catch (error) {
-        console.error('寃뚯엫 ????ㅽ뙣:', error)
+        console.error('Save game failed:', error)
         return false
     }
 }
 
-// 寃뚯엫 ?곹깭 濡쒕뱶
+// Load game state
 export const loadGame = () => {
     try {
         const saved = localStorage.getItem(SAVE_KEY)
@@ -211,17 +211,17 @@ export const loadGame = () => {
         data = sanitizeSaveData(migrateSaveData(data))
         return data
     } catch (error) {
-        console.error('寃뚯엫 濡쒕뱶 ?ㅽ뙣:', error)
+        console.error('Load game failed:', error)
         return null
     }
 }
 
-// 寃뚯엫 由ъ뀑
+// Reset saved state
 export const resetGame = () => {
     localStorage.removeItem(SAVE_KEY)
 }
 
-// ?먮룞 ????ㅼ젙
+// Configure auto-save interval
 export const setupAutoSave = (getState, interval = 10000) => {
     return setInterval(() => {
         const state = getState()
@@ -229,18 +229,18 @@ export const setupAutoSave = (getState, interval = 10000) => {
     }, interval)
 }
 
-// ?レ옄 ?щ㎎
+// Number formatter
 export const formatNumber = (num) => {
     return new Intl.NumberFormat('ko-KR').format(num)
 }
 
-// ?쇱꽱???щ㎎
+// Percent formatter
 export const formatPercent = (num) => {
     const sign = num >= 0 ? '+' : ''
     return `${sign}${num.toFixed(2)}%`
 }
 
-// 湲덉븸 ?뺤텞 ?щ㎎
+// Compact money formatter
 export const formatCompact = (num) => {
     const absNum = Math.abs(num)
     const sign = num < 0 ? '-' : ''
@@ -255,7 +255,7 @@ export const formatCompact = (num) => {
     return formatNumber(num)
 }
 
-// ?쒓컙 ?щ㎎
+// Time formatter
 export const formatTime = (timestamp) => {
     return new Date(timestamp).toLocaleTimeString('ko-KR', {
         hour: '2-digit',
@@ -264,7 +264,7 @@ export const formatTime = (timestamp) => {
     })
 }
 
-// ?좎쭨 ?щ㎎
+// Date formatter
 export const formatDate = (timestamp) => {
     return new Date(timestamp).toLocaleDateString('ko-KR', {
         month: 'short',
@@ -274,27 +274,27 @@ export const formatDate = (timestamp) => {
     })
 }
 
-// ?쒕뜡 踰붿쐞 媛?
+// Random float in range
 export const randomRange = (min, max) => {
     return Math.random() * (max - min) + min
 }
 
-// ?쒕뜡 ?뺤닔
+// Random integer in range
 export const randomInt = (min, max) => {
     return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-// ?쒕뜡 諛곗뿴 ?붿냼
+// Random element from array
 export const randomChoice = (arr) => {
     return arr[Math.floor(Math.random() * arr.length)]
 }
 
-// 源딆? 蹂듭궗
+// Deep clone object
 export const deepClone = (obj) => {
     return JSON.parse(JSON.stringify(obj))
 }
 
-// ?붾컮?댁뒪
+// Debounce helper
 export const debounce = (func, wait) => {
     let timeout
     return function executedFunction(...args) {
@@ -307,12 +307,12 @@ export const debounce = (func, wait) => {
     }
 }
 
-// UUID ?앹꽦
+// ID generator
 export const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substr(2)
 }
 
-// 寃쏀뿕移섎줈 ?덈꺼 怨꾩궛
+// Calculate player level from XP table
 export const calculateLevel = (xp, levels) => {
     for (let i = levels.length - 1; i >= 0; i--) {
         if (xp >= levels[i].minXp) {
@@ -327,15 +327,15 @@ export const calculateLevel = (xp, levels) => {
     return { ...levels[0], progress: 0, xpToNext: levels[1]?.minXp || 0 }
 }
 
-// 캔들 데이터 생성 (시뮬레이션용)
+// Generate OHLC candle data for chart simulation
 export const generateCandleData = (currentPrice, count, volatility) => {
     let data = []
     let price = currentPrice
     const now = Date.now()
 
-    // ??닚?쇰줈 ?곗씠???앹꽦
+    // Build candle data backward in time
     for (let i = 0; i < count; i++) {
-        // 蹂?숉룺
+        // Price swing simulation
         const change = price * volatility * (Math.random() - 0.5)
         const open = price - change
         const high = Math.max(open, price) + (open * volatility * Math.random() * 0.5)

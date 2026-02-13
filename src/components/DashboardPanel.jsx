@@ -22,36 +22,37 @@ const DashboardPanel = memo(function DashboardPanel({
 }) {
     const handleBorrow = useCallback(() => {
         const amount = prompt('대출 금액을 입력하세요 (원)', String(Math.min(availableCredit, 10000000)))
-        if (amount) onBorrowCredit(parseInt(amount))
+        if (amount) onBorrowCredit(parseInt(amount, 10))
     }, [availableCredit, onBorrowCredit])
 
     const handleRepay = useCallback(() => {
         const amount = prompt('상환 금액을 입력하세요 (원)', String(Math.min(cash, creditUsed + creditInterest)))
-        if (amount) onRepayCredit(parseInt(amount))
+        if (amount) onRepayCredit(parseInt(amount, 10))
     }, [cash, creditUsed, creditInterest, onRepayCredit])
 
     return (
-        <section className="dashboard">
+        <section className="dashboard" data-testid="dashboard-panel">
             <div className="dashboard-grid">
                 <div
                     className="stat-card stat-total"
                     onClick={onShowAssetChart}
                     style={{ cursor: 'pointer' }}
+                    data-testid="open-asset-chart"
                 >
                     <div className="stat-label">총 자산</div>
-                    <div className="stat-value">{formatCompact(totalAssets)}</div>
+                    <div className="stat-value" data-testid="total-assets-value">{formatCompact(totalAssets)}</div>
                 </div>
                 <div className={`stat-card stat-profit ${profitRate >= 0 ? 'positive' : 'negative'}`}>
                     <div className="stat-label">수익률</div>
-                    <div className="stat-value">{formatPercent(profitRate)}</div>
+                    <div className="stat-value" data-testid="profit-rate-value">{formatPercent(profitRate)}</div>
                 </div>
                 <div className="stat-card stat-cash">
                     <div className="stat-label">현금</div>
-                    <div className="stat-value">{formatCompact(cash)}</div>
+                    <div className="stat-value" data-testid="cash-value">{formatCompact(cash)}</div>
                 </div>
                 <div className="stat-card stat-stock">
                     <div className="stat-label">투자금</div>
-                    <div className="stat-value">{formatCompact(stockValue)}</div>
+                    <div className="stat-value" data-testid="stock-value">{formatCompact(stockValue)}</div>
                 </div>
             </div>
 

@@ -78,7 +78,10 @@ const StockListItem = memo(function StockListItem({
 
             {/* 가격 정보 - 클릭하면 상세 차트 열림 */}
             <div className="stock-center" onClick={handleShowChart} data-testid="stock-center">
-                <div className={`stock-price ${isUp ? 'text-profit' : 'text-loss'} ${priceChange === 'up' ? 'flash-up' : priceChange === 'down' ? 'flash-down' : ''}`}>
+                <div
+                    className={`stock-price ${isUp ? 'text-profit' : 'text-loss'} ${priceChange === 'up' ? 'flash-up' : priceChange === 'down' ? 'flash-down' : ''}`}
+                    data-testid="current-price"
+                >
                     {formatNumber(stock.price)}원
                 </div>
                 <div className={`stock-change ${isUp ? 'positive' : 'negative'}`}>

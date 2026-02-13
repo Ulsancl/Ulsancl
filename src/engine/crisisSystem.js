@@ -2,7 +2,12 @@
  * crisisSystem.js - crisis-related price adjustments
  */
 
-import { checkAndGenerateCrisis, calculateCrisisImpact, getActiveCrisis } from '../game/CrisisEvents'
+import {
+    checkAndGenerateCrisis,
+    calculateCrisisImpact,
+    getActiveCrisis,
+    resetCrisis
+} from '../game/CrisisEvents'
 import { VOLATILITY_CONFIG, normalizePrice } from './priceCalculator'
 
 export const applyCrisisImpact = (stocks, currentDay) => {
@@ -49,6 +54,10 @@ export const updatePricesWithCrisis = (stocks, marketState, currentDay) => {
         crisisEvent: crisisResult,
         activeCrisis
     }
+}
+
+export const resetCrisisState = () => {
+    resetCrisis()
 }
 
 export {

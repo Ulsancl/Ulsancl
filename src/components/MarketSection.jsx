@@ -31,11 +31,12 @@ const MarketSection = memo(function MarketSection({
 }) {
   return (
     <>
-      <section className="trade-mode-section">
-        <div className="trade-mode-toggle">
+      <section className="trade-mode-section" data-testid="trade-controls">
+        <div className="trade-mode-toggle" data-testid="trade-mode-toggle">
           <button
             className={`mode-btn ${tradeMode === 'long' ? 'active' : ''}`}
             onClick={() => onTradeModeChange('long')}
+            data-testid="long-mode-btn"
           >
             📈 롱
           </button>
@@ -43,20 +44,23 @@ const MarketSection = memo(function MarketSection({
             className={`mode-btn short ${tradeMode === 'short' ? 'active' : ''} ${!canShortSell ? 'disabled' : ''}`}
             onClick={() => canShortSell && onTradeModeChange('short')}
             title={!canShortSell ? `Lv.${shortSellingMinLevel} 필요` : ''}
+            data-testid="short-mode-btn"
           >
             🐻 숏
           </button>
         </div>
-        <div className="trade-mode-toggle">
+        <div className="trade-mode-toggle" data-testid="amount-mode-toggle">
           <button
             className={`mode-btn ${!amountMode ? 'active' : ''}`}
             onClick={() => onAmountModeChange(false)}
+            data-testid="quantity-mode-btn"
           >
             수량
           </button>
           <button
             className={`mode-btn ${amountMode ? 'active' : ''}`}
             onClick={() => onAmountModeChange(true)}
+            data-testid="amount-mode-btn"
           >
             금액
           </button>
@@ -69,6 +73,7 @@ const MarketSection = memo(function MarketSection({
               onChange={(e) => onInputAmountChange(e.target.value)}
               placeholder="금액"
               className="amount-input"
+              data-testid="amount-input"
             />
             <span className="amount-unit">원</span>
           </div>
@@ -78,16 +83,17 @@ const MarketSection = memo(function MarketSection({
             <input
               type="number"
               value={quantity}
-              onChange={(e) => onQuantityChange(Math.max(1, parseInt(e.target.value) || 1))}
+              onChange={(e) => onQuantityChange(Math.max(1, parseInt(e.target.value, 10) || 1))}
               className="quantity-input"
               min="1"
+              data-testid="quantity-input"
             />
             <button className="qty-btn" onClick={() => onQuantityChange(quantity + 1)}>+</button>
           </div>
         )}
       </section>
 
-      <section className="stock-section">
+      <section className="stock-section" data-testid="stock-section">
         <div className="stock-list">
           {filteredStocks.map((stock, index) => {
             const holding = portfolio[stock.id]

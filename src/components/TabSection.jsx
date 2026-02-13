@@ -13,7 +13,7 @@ const TAB_CONFIG = [
 
 const TabSection = memo(function TabSection({ activeTab, onTabChange }) {
     return (
-        <section className="tab-section">
+        <section className="tab-section" data-testid="tab-section">
             <div className="tab-buttons">
                 {TAB_CONFIG.map(tab => (
                     <button
