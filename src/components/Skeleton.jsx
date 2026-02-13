@@ -1,11 +1,11 @@
 /**
- * Skeleton - 로딩 스켈레톤 컴포넌트
- * 콘텐츠 로딩 중 표시할 플레이스홀더
+ * Skeleton - 로딩 ?�켈?�톤 컴포?�트
+ * 콘텐�?로딩 �??�시???�레?�스?�??
  */
 import React from 'react'
 import './Skeleton.css'
 
-// 기본 스켈레톤
+// 기본 ?�켈?�톤
 export const Skeleton = ({
     width = '100%',
     height = '20px',
@@ -19,7 +19,7 @@ export const Skeleton = ({
     />
 )
 
-// 텍스트 스켈레톤
+// ?�스???�켈?�톤
 export const SkeletonText = ({ lines = 3, lastLineWidth = '60%' }) => (
     <div className="skeleton-text">
         {Array.from({ length: lines }).map((_, i) => (
@@ -33,7 +33,7 @@ export const SkeletonText = ({ lines = 3, lastLineWidth = '60%' }) => (
     </div>
 )
 
-// 아바타 스켈레톤
+// ?�바?� ?�켈?�톤
 export const SkeletonAvatar = ({ size = 40 }) => (
     <Skeleton
         width={`${size}px`}
@@ -42,7 +42,7 @@ export const SkeletonAvatar = ({ size = 40 }) => (
     />
 )
 
-// 카드 스켈레톤
+// 카드 ?�켈?�톤
 export const SkeletonCard = () => (
     <div className="skeleton-card">
         <div className="skeleton-card-header">
@@ -62,8 +62,8 @@ export const SkeletonCard = () => (
     </div>
 )
 
-// 주식 카드 스켈레톤
-export const SkeletonStockCard = () => (
+// 주식 카드 ?�켈?�톤
+export const SkeletonMarketCard = () => (
     <div className="skeleton-stock-card">
         <div className="skeleton-stock-left">
             <SkeletonAvatar size={36} />
@@ -83,16 +83,16 @@ export const SkeletonStockCard = () => (
     </div>
 )
 
-// 주식 리스트 스켈레톤
+// 주식 리스???�켈?�톤
 export const SkeletonStockList = ({ count = 6 }) => (
     <div className="skeleton-stock-list">
         {Array.from({ length: count }).map((_, i) => (
-            <SkeletonStockCard key={i} />
+            <SkeletonMarketCard key={i} />
         ))}
     </div>
 )
 
-// 대시보드 스켈레톤
+// ?�?�보???�켈?�톤
 export const SkeletonDashboard = () => (
     <div className="skeleton-dashboard">
         <div className="skeleton-stat-grid">
@@ -111,7 +111,7 @@ export default {
     SkeletonText,
     SkeletonAvatar,
     SkeletonCard,
-    SkeletonStockCard,
+    SkeletonMarketCard,
     SkeletonStockList,
     SkeletonDashboard
 }

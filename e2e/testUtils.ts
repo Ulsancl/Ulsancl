@@ -78,9 +78,11 @@ export const preparePage = async (page: Page, url = '/') => {
     await page.waitForSelector('[data-testid="buy-btn"]')
 
     const tradeModeSection = page.locator('.trade-mode-toggle').first()
+    await tradeModeSection.scrollIntoViewIfNeeded()
     await tradeModeSection.locator('.mode-btn').first().click({ force: true })
 
     const amountModeSection = page.locator('.trade-mode-toggle').nth(1)
+    await amountModeSection.scrollIntoViewIfNeeded()
     await amountModeSection.locator('.mode-btn').first().click({ force: true })
 
     const quantityInput = page.locator('.quantity-input').first()

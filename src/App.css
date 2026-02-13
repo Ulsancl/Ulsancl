@@ -1481,30 +1481,6 @@
   font-size: 0.8rem;
 }
 
-/* Header Actions */
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-}
-
-.header-btn {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-card);
-  color: var(--color-text-secondary);
-  border-radius: var(--radius-md);
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.header-btn:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
 /* Tab Section */
 .tab-section {
   max-width: 1400px;
@@ -1604,16 +1580,6 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-  .header-actions {
-    flex-wrap: wrap;
-    gap: var(--spacing-sm);
-  }
-
-  .header-btn {
-    font-size: 0.7rem;
-    padding: var(--spacing-xs) var(--spacing-sm);
-  }
-
   .tab-buttons {
     flex-wrap: wrap;
   }
@@ -1977,118 +1943,6 @@ input:focus-visible {
   }
 }
 
-/* ========================================
-   새 주식 카드 레이아웃 (좌: 정보+차트, 우: 버튼)
-   ======================================== */
-.stock-card-new {
-  display: flex;
-  align-items: stretch;
-  gap: var(--spacing-lg);
-}
-
-.stock-left {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  min-width: 0;
-}
-
-.stock-header-row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.stock-chart-row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  cursor: pointer;
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-md);
-  transition: background var(--transition-fast);
-}
-
-.stock-chart-row:hover {
-  background: var(--color-bg-hover);
-}
-
-.stock-chart-row .stock-chart {
-  width: 120px;
-  height: 50px;
-  flex-shrink: 0;
-}
-
-.stock-price-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.stock-positions {
-  display: flex;
-  gap: var(--spacing-sm);
-  flex-wrap: wrap;
-}
-
-.position-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: var(--radius-md);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.position-badge.long {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--color-profit);
-}
-
-.position-badge.short {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--color-loss);
-}
-
-.position-badge.short.profit {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--color-profit);
-}
-
-.stock-right {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  justify-content: center;
-  min-width: 100px;
-}
-
-.stock-right .btn {
-  width: 100%;
-  justify-content: center;
-}
-
-/* 공매도 버튼 */
-.btn-short {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
-  color: white;
-}
-
-.btn-short:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  transform: translateY(-2px);
-}
-
-.btn-cover {
-  background: linear-gradient(135deg, #059669, #047857);
-  color: white;
-}
-
-.btn-cover:hover:not(:disabled) {
-  background: linear-gradient(135deg, #10b981, #059669);
-  transform: translateY(-2px);
-}
 
 /* 숏 모드 버튼 */
 .mode-btn.short {
@@ -2105,30 +1959,6 @@ input:focus-visible {
 .mode-btn.disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-/* 모바일 대응 */
-@media (max-width: 768px) {
-  .stock-card-new {
-    flex-direction: column;
-  }
-
-  .stock-right {
-    flex-direction: row;
-    flex-wrap: wrap;
-    min-width: auto;
-  }
-
-  .stock-right .btn {
-    width: auto;
-    flex: 1;
-    min-width: 60px;
-  }
-
-  .stock-chart-row .stock-chart {
-    width: 80px;
-    height: 40px;
-  }
 }
 
 /* ========================================
@@ -2406,3 +2236,4 @@ input:focus-visible {
     padding: 0 var(--spacing-md);
   }
 }
+

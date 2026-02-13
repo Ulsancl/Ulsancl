@@ -3,7 +3,7 @@
  * 
  * 由ы뙥?좊쭅 ?? 559以???~320以?(43% 媛먯냼)
  * - ModalContext瑜??ъ슜?섏뿬 紐⑤떖 ?곹깭 愿由?
- * - useAppModalState ?쒓굅
+ * - legacy modal state hook removed
  * - props drilling 理쒖냼??
  */
 
@@ -63,16 +63,52 @@ import {
   useGameLoop
 } from './hooks'
 
+const PRODUCT_TYPE_LABELS = {
+  etf: 'ETF',
+  crypto: '肄붿씤',
+  bond: '梨꾧텒',
+  commodity: '원자재'
+}
+
+const toTradeableProduct = (product, fallbackType = 'stock') => ({
+  ...product,
+  type: product.type || fallbackType,
+  dailyOpen: product.price,
+  dailyHigh: product.price,
+  dailyLow: product.price
+})
+
+const ALL_PRODUCTS = [
+  ...INITIAL_STOCKS.map((stock) => toTradeableProduct(stock, 'stock')),
+  ...ETF_PRODUCTS.map((product) => toTradeableProduct(product)),
+  ...CRYPTO_PRODUCTS.map((product) => toTradeableProduct(product)),
+  ...BOND_PRODUCTS.map((product) => toTradeableProduct(product)),
+  ...COMMODITY_PRODUCTS.map((product) => toTradeableProduct(product))
+]
+
+const filterStocksByTab = (stocks, activeTab) => {
+  switch (activeTab) {
+    case 'stocks':
+      return stocks.filter((stock) => stock.type === 'stock' || !stock.type)
+    case 'etf':
+      return stocks.filter((stock) => stock.type === 'etf')
+    case 'crypto':
+      return stocks.filter((stock) => stock.type === 'crypto')
+    case 'bond':
+      return stocks.filter((stock) => stock.type === 'bond')
+    case 'commodity':
+      return stocks.filter((stock) => stock.type === 'commodity')
+    default:
+      return stocks
+  }
+}
+
+const estimateQuantity = (stockPrice, inputAmount) => Math.floor((parseInt(inputAmount, 10) || 0) / stockPrice)
+
 
 function App() {
   // 紐⑤뱺 湲덉쑖 ?곹뭹 ?⑹튂湲?(dailyOpen 珥덇린???ы븿)
-  const allProducts = useMemo(() => [
-    ...INITIAL_STOCKS.map(s => ({ ...s, type: 'stock', dailyOpen: s.price, dailyHigh: s.price, dailyLow: s.price })),
-    ...ETF_PRODUCTS.map(s => ({ ...s, dailyOpen: s.price, dailyHigh: s.price, dailyLow: s.price })),
-    ...CRYPTO_PRODUCTS.map(s => ({ ...s, dailyOpen: s.price, dailyHigh: s.price, dailyLow: s.price })),
-    ...BOND_PRODUCTS.map(s => ({ ...s, dailyOpen: s.price, dailyHigh: s.price, dailyLow: s.price })),
-    ...COMMODITY_PRODUCTS.map(s => ({ ...s, dailyOpen: s.price, dailyHigh: s.price, dailyLow: s.price }))
-  ], [])
+  const allProducts = useMemo(() => ALL_PRODUCTS, [])
 
   // Context濡쒕????ㅼ젙 媛?몄삤湲?
   const { settings, setSettings } = useSettings()
@@ -246,16 +282,7 @@ function App() {
   }, [])
 
   // ?꾪꽣??醫낅ぉ
-  const filteredStocks = useMemo(() => {
-    switch (activeTab) {
-      case 'stocks': return stocks.filter(s => s.type === 'stock' || !s.type)
-      case 'etf': return stocks.filter(s => s.type === 'etf')
-      case 'crypto': return stocks.filter(s => s.type === 'crypto')
-      case 'bond': return stocks.filter(s => s.type === 'bond')
-      case 'commodity': return stocks.filter(s => s.type === 'commodity')
-      default: return stocks
-    }
-  }, [stocks, activeTab])
+  const filteredStocks = useMemo(() => filterStocksByTab(stocks, activeTab), [stocks, activeTab])
 
   // ?쒖쫵 醫낅즺 ?몃뱾??
   const handleShowSeasonEnd = useCallback((show) => {
@@ -370,17 +397,18 @@ function App() {
     setWatchlist(prev => prev.includes(stockId) ? prev.filter(id => id !== stockId) : [...prev, stockId])
   }, [setWatchlist])
 
-  const getEstimatedQuantity = useCallback((stock) => Math.floor((parseInt(inputAmount) || 0) / stock.price), [inputAmount])
+  const getEstimatedQuantity = useCallback((stock) => estimateQuantity(stock.price, inputAmount), [inputAmount])
 
   const getProductTypeLabel = useCallback((type) => {
-    switch (type) {
-      case 'etf': return 'ETF'
-      case 'crypto': return '肄붿씤'
-      case 'bond': return '梨꾧텒'
-      case 'commodity': return '원자재'
-      default: return '二쇱떇'
-    }
+    return PRODUCT_TYPE_LABELS[type] || '二쇱떇'
   }, [])
+
+  const handleStartNewSeason = useCallback(() => {
+    closeModal(MODAL_NAMES.SEASON_END)
+    resetGameState()
+    tradeLog.reset()
+    showNotification(`?? ${gameTime.year + 1}?????쒖쫵 ?쒖옉!`, 'success')
+  }, [closeModal, gameTime.year, resetGameState, showNotification, tradeLog])
 
   return (
     <div className={`app theme-${settings.theme}`}>
@@ -434,12 +462,7 @@ function App() {
         onPlaceOrder={handlePlaceOrder}
         onShortSell={handleShortSell}
         onCoverShort={handleCoverShort}
-        onStartNewSeason={() => {
-          closeModal(MODAL_NAMES.SEASON_END)
-          resetGameState()
-          tradeLog.reset()
-          showNotification(`?? ${gameTime.year + 1}?????쒖쫵 ?쒖옉!`, 'success')
-        }}
+        onStartNewSeason={handleStartNewSeason}
         showNotification={showNotification}
       />
 
