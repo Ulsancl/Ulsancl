@@ -3,7 +3,7 @@ import NewsFeed from './NewsFeed'
 
 const NewsSection = memo(function NewsSection({ news, onNewsClick }) {
   return (
-    <section className="news-section">
+    <section className="news-section" data-testid="news-section">
       <NewsFeed news={news} onNewsClick={onNewsClick} />
     </section>
   )

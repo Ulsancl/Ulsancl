@@ -15,10 +15,10 @@ const GameHeader = memo(function GameHeader({
     onShowSettings
 }) {
     return (
-        <header className="header">
+        <header className="header" data-testid="game-header">
             <div className="header-content">
                 <div className="header-left">
-                    <div className="logo">
+                    <div className="logo" data-testid="game-logo">
                         <span className="logo-icon">📈</span>
                         <h1>트레이딩 게임</h1>
                     </div>

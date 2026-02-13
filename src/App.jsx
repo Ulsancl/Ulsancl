@@ -1,16 +1,12 @@
-﻿/**
- * App.jsx - 二쇱떇 ?몃젅?대뵫 寃뚯엫 硫붿씤 而댄룷?뚰듃
- * 
- * 由ы뙥?좊쭅 ?? 559以???~320以?(43% 媛먯냼)
- * - ModalContext瑜??ъ슜?섏뿬 紐⑤떖 ?곹깭 愿由?
- * - legacy modal state hook removed
- * - props drilling 理쒖냼??
+/**
+ * App.jsx - main app shell for the stock trading game
+ * Composes contexts and game hooks into a single UI tree.
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import './App.css'
 
-// ?곸닔 諛??좏떥由ы떚
+// Constants and utilities
 import {
   INITIAL_STOCKS,
   INITIAL_CAPITAL,
@@ -23,10 +19,10 @@ import {
 } from './constants'
 import { consumeSeasonResetNotice, formatNumber, formatCompact } from './utils'
 
-// 寃뚯엫 ?붿쭊
-import { checkAchievements } from './engine'
+// Game engine
+import { checkAchievements, resetCrisisState, resetNewsSystem } from './engine'
 
-// 遺꾨━??UI 而댄룷?뚰듃
+// UI components
 import {
   GameHeader,
   TabSection,
@@ -50,7 +46,7 @@ import {
 } from './components'
 import useSound from './useSound'
 
-// Context
+// Context hooks
 import { useSettings, useModal, MODAL_NAMES } from './context'
 import {
   useGameState as usePersistentGameState,
@@ -65,8 +61,8 @@ import {
 
 const PRODUCT_TYPE_LABELS = {
   etf: 'ETF',
-  crypto: '肄붿씤',
-  bond: '梨꾧텒',
+  crypto: '코인',
+  bond: '채권',
   commodity: '원자재'
 }
 
@@ -107,13 +103,13 @@ const estimateQuantity = (stockPrice, inputAmount) => Math.floor((parseInt(input
 
 
 function App() {
-  // 紐⑤뱺 湲덉쑖 ?곹뭹 ?⑹튂湲?(dailyOpen 珥덇린???ы븿)
+  // Initialize all tradeable products (including daily open values)
   const allProducts = useMemo(() => ALL_PRODUCTS, [])
 
-  // Context濡쒕????ㅼ젙 媛?몄삤湲?
+  // Load user settings
   const { settings, setSettings } = useSettings()
 
-  // Modal Context ?ъ슜
+  // Modal context state
   const {
     openModal,
     closeModal,
@@ -132,11 +128,11 @@ function App() {
     openOrderManager
   } = useModal()
 
-  // ?쒗넗由ъ뼹 ?곹깭 (showTutorial? 紐⑤떖???꾨땶 ?ㅻ쾭?덉씠)
+  // Tutorial and season notice overlays
   const [showTutorial, setShowTutorial] = useState(false)
   const [showSeasonResetNotice, setShowSeasonResetNotice] = useState(false)
 
-  // UI ?곹깭
+  // Trade input UI state
   const {
     quantity, setQuantity,
     amountMode, setAmountMode,
@@ -161,7 +157,7 @@ function App() {
     setShowTutorial(true)
   }, [])
 
-  // 寃뚯엫 ?곹깭
+  // Persistent game state
   const {
     isInitialized,
     stocks, setStocks,
@@ -206,13 +202,13 @@ function App() {
   })
   const [priceChanges, setPriceChanges] = useState({})
 
-  // 嫄곕옒???쒖뒪??
+  // In-game time state
   const [gameTime, setGameTime] = useState({ day: 1, hour: 9, minute: 0, displayDate: 'D+1', displayTime: '09:00' })
 
-  // ?쒖옣 ?곹깭
+  // Market state
   const [marketState, setMarketState] = useState({ trend: 0, volatility: 1, sectorTrends: {} })
 
-  // ?ъ슫??
+  // Sound controls
   const { playSound } = useSound(settings.soundEnabled, settings.volume)
 
   const {
@@ -281,10 +277,10 @@ function App() {
     }
   }, [])
 
-  // ?꾪꽣??醫낅ぉ
+  // Stocks filtered by active product tab
   const filteredStocks = useMemo(() => filterStocksByTab(stocks, activeTab), [stocks, activeTab])
 
-  // ?쒖쫵 醫낅즺 ?몃뱾??
+  // Bridge game loop season-end signal to modal
   const handleShowSeasonEnd = useCallback((show) => {
     if (show) {
       openModal(MODAL_NAMES.SEASON_END)
@@ -367,7 +363,7 @@ function App() {
     setMaxWinStreak(prev => Math.max(prev, winStreak))
   }, [setMaxWinStreak, winStreak])
 
-  // ?낆쟻 泥댄겕
+  // Achievement checks
   useEffect(() => {
     const gameState = { totalTrades, totalProfit, totalAssets, portfolio, tradeHistory, winStreak }
     const newUnlocks = checkAchievements(gameState, unlockedAchievements, ACHIEVEMENTS)
@@ -379,7 +375,7 @@ function App() {
     setCompletedMissions(prev => ({ ...prev, [mission.id]: true }))
     setCash(prev => prev + mission.reward.cash)
     setTotalXp(prev => prev + mission.reward.xp)
-    showNotification(`?럞 ${mission.name} 蹂댁긽 ?섎졊!`, 'success')
+    showNotification(`🎁 ${mission.name} 보상 수령!`, 'success')
     playSound('achievement')
   }, [playSound, setCash, setCompletedMissions, setTotalXp, showNotification])
 
@@ -389,7 +385,7 @@ function App() {
       if (currentLevel >= skill.maxLevel) return prev
       return { ...prev, [skill.id]: currentLevel + 1 }
     })
-    showNotification(`${skill.name} 媛뺥솕 ?깃났!`, 'success')
+    showNotification(`${skill.name} 강화 성공!`, 'success')
     playSound('achievement')
   }, [playSound, setUnlockedSkills, showNotification])
 
@@ -400,14 +396,16 @@ function App() {
   const getEstimatedQuantity = useCallback((stock) => estimateQuantity(stock.price, inputAmount), [inputAmount])
 
   const getProductTypeLabel = useCallback((type) => {
-    return PRODUCT_TYPE_LABELS[type] || '二쇱떇'
+    return PRODUCT_TYPE_LABELS[type] || '주식'
   }, [])
 
   const handleStartNewSeason = useCallback(() => {
     closeModal(MODAL_NAMES.SEASON_END)
     resetGameState()
     tradeLog.reset()
-    showNotification(`?? ${gameTime.year + 1}?????쒖쫵 ?쒖옉!`, 'success')
+    resetNewsSystem()
+    resetCrisisState()
+    showNotification(`🎉 ${gameTime.year + 1}년 시즌 시작!`, 'success')
   }, [closeModal, gameTime.year, resetGameState, showNotification, tradeLog])
 
   return (
@@ -417,11 +415,15 @@ function App() {
       <ActionFeedback items={feedbackItems} onRemove={removeFeedback} />
       <Tutorial active={showTutorial} onClose={() => setShowTutorial(false)} />
       {showSeasonResetNotice && (
-        <div className="season-reset-notice-overlay" onClick={() => setShowSeasonResetNotice(false)}>
+        <div
+          className="season-reset-notice-overlay"
+          data-testid="season-reset-notice-overlay"
+          onClick={() => setShowSeasonResetNotice(false)}
+        >
           <div className="season-reset-notice-modal" onClick={(e) => e.stopPropagation()}>
             <h3>신규 시즌 전환 안내</h3>
             <p>신규 시즌 전환으로 기존 로컬 진행 데이터가 초기화되었습니다.</p>
-            <button onClick={() => setShowSeasonResetNotice(false)}>확인</button>
+            <button data-testid="season-reset-notice-confirm" onClick={() => setShowSeasonResetNotice(false)}>확인</button>
           </div>
         </div>
       )}
@@ -484,7 +486,7 @@ function App() {
 
       <MacroIndicators macro={marketState.macro} />
 
-      {/* ?꾧린 ?대깽???뚮┝ */}
+      {/* Crisis alert banner */}
       {crisisAlert && (
         <CrisisAlert
           crisis={crisisAlert}
@@ -492,14 +494,14 @@ function App() {
         />
       )}
 
-      {/* ?쒖꽦 ?꾧린 ?곹깭 ?꾩젽 */}
+      {/* Active crisis status widget */}
       {activeCrisis && (
         <div className="crisis-widget-container">
           <CrisisStatusWidget crisis={activeCrisis} />
         </div>
       )}
 
-      {/* ?쒖옣 遺덉븞??吏??*/}
+      {/* Market instability indicator */}
       <div className="market-risk-indicator">
         <CrisisProbabilityMeter marketState={marketState} />
       </div>
@@ -570,7 +572,7 @@ function App() {
       )}
 
       <footer className="footer">
-        <p>Lv.{levelInfo.level} {levelInfo.name} | {gameTime.displayDate} | {totalTrades}??| ?곗듅 {winStreak}</p>
+        <p>Lv.{levelInfo.level} {levelInfo.name} | {gameTime.displayDate} | {totalTrades}회 거래 | 연승 {winStreak}</p>
       </footer>
 
     </div>

@@ -72,7 +72,7 @@ export const useOrderProcessor = ({
                     }
                 )
 
-                showNotificationCurrent(`?뵒 ${order.stockName} ${order.type} 주문 체결!`, 'success')
+                showNotificationCurrent(`✅ ${order.stockName} ${order.type} 주문 체결!`, 'success')
                 playSoundCurrent(order.side === 'buy' ? 'buy' : 'sell')
                 setTradeHistory(prev => [...prev, { ...order, type: order.side, id: generateId(), timestamp: now }])
                 if (order.side === 'sell' && typeof order.profit === 'number') {

@@ -4,7 +4,6 @@
  */
 
 // 새로운 모듈화된 컴포넌트
-export { StatCard, DashboardGrid, CreditTradingCard } from './DashboardCards'
 export { Modal, Button, Badge, Card, ProgressBar, Tooltip, Amount, Spinner } from './CommonUI'
 export { default as TechnicalChart } from './TechnicalChart'
 export { CrisisAlert, CrisisStatusWidget, CrisisHistory, CrisisProbabilityMeter } from './CrisisUI'
@@ -15,7 +14,6 @@ export { default as DashboardPanel } from './DashboardPanel'
 export { default as StockListItem } from './StockListItem'
 export { default as TabSection } from './TabSection'
 export { default as ViewSection } from './ViewSection'
-export { default as TradeModeSection } from './TradeModeSection'
 export { default as MarketSection } from './MarketSection'
 export { default as NewsSection } from './NewsSection'
 export { default as OrdersSection } from './OrdersSection'

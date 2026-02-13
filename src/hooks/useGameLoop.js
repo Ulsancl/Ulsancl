@@ -107,6 +107,40 @@ export const useGameLoop = ({
     const showNotificationRef = useRef(showNotification)
     const playSoundRef = useRef(playSound)
     const onTickRef = useRef(onTick)
+
+    const { tick: updatePricesTick } = usePriceUpdater({
+        setPriceHistory, setPriceChanges
+    })
+    const { tick: generateNewsTick } = useNewsGenerator({
+        setNews, showNotification, playSound
+    })
+    const { tick: processOrdersTick } = useOrderProcessor({
+        setTradeHistory,
+        setTotalTrades, setDailyTrades, setTotalProfit, setDailyProfit, setWinStreak,
+        showNotification, playSound, recordTrade
+    })
+    const { checkMarginCall, processShortPositions, processDailyInterest } = useCreditManager({
+        cash, portfolio,
+        creditUsed, creditInterest,
+        marginCallActive,
+        shortPositions,
+        showNotification, playSound, formatNumber
+    })
+    const { tick: processDividendsTick } = useDividendManager({
+        setCash, setTotalDividends, showNotification, formatNumber
+    })
+    const { tick: processCrisisTick } = useCrisisManager({
+        setActiveCrisis, setCrisisAlert, setCrisisHistory, showNotification, playSound
+    })
+
+    const updatePricesTickRef = useRef(updatePricesTick)
+    const generateNewsTickRef = useRef(generateNewsTick)
+    const processOrdersTickRef = useRef(processOrdersTick)
+    const checkMarginCallRef = useRef(checkMarginCall)
+    const processShortPositionsRef = useRef(processShortPositions)
+    const processDailyInterestRef = useRef(processDailyInterest)
+    const processDividendsTickRef = useRef(processDividendsTick)
+    const processCrisisTickRef = useRef(processCrisisTick)
     // Sync refs
     useLayoutEffect(() => {
         gameStartTimeRef.current = gameStartTime
@@ -124,38 +158,39 @@ export const useGameLoop = ({
         showNotificationRef.current = showNotification
         playSoundRef.current = playSound
         onTickRef.current = onTick
-    }, [gameStartTime, stocks, alerts, pendingOrders, marketState, cash, portfolio, shortPositions, creditUsed, creditInterest, marginCallActive, unlockedSkills, showNotification, playSound, onTick])
-
-    // 서브 모듈 초기화
-    const priceUpdater = usePriceUpdater({
-        setPriceHistory, setPriceChanges
-    })
-
-    const newsGenerator = useNewsGenerator({
-        setNews, showNotification, playSound
-    })
-
-    const orderProcessor = useOrderProcessor({
-        setTradeHistory,
-        setTotalTrades, setDailyTrades, setTotalProfit, setDailyProfit, setWinStreak,
-        showNotification, playSound, recordTrade
-    })
-
-    const creditManager = useCreditManager({
-        cash, portfolio,
-        creditUsed, creditInterest,
-        marginCallActive,
+        updatePricesTickRef.current = updatePricesTick
+        generateNewsTickRef.current = generateNewsTick
+        processOrdersTickRef.current = processOrdersTick
+        checkMarginCallRef.current = checkMarginCall
+        processShortPositionsRef.current = processShortPositions
+        processDailyInterestRef.current = processDailyInterest
+        processDividendsTickRef.current = processDividendsTick
+        processCrisisTickRef.current = processCrisisTick
+    }, [
+        gameStartTime,
+        stocks,
+        alerts,
+        pendingOrders,
+        marketState,
+        cash,
+        portfolio,
         shortPositions,
-        showNotification, playSound, formatNumber
-    })
-
-    const dividendManager = useDividendManager({
-        setCash, setTotalDividends, showNotification, formatNumber
-    })
-
-    const crisisManager = useCrisisManager({
-        setActiveCrisis, setCrisisAlert, setCrisisHistory, showNotification, playSound
-    })
+        creditUsed,
+        creditInterest,
+        marginCallActive,
+        unlockedSkills,
+        showNotification,
+        playSound,
+        onTick,
+        updatePricesTick,
+        generateNewsTick,
+        processOrdersTick,
+        checkMarginCall,
+        processShortPositions,
+        processDailyInterest,
+        processDividendsTick,
+        processCrisisTick
+    ])
 
     // 메인 게임 루프
     useEffect(() => {
@@ -211,7 +246,7 @@ export const useGameLoop = ({
                 workingStocks = startNewTradingDay(workingStocks)
                 setDailyTrades(0)
                 setDailyProfit(0)
-                const interestAccrued = creditManager.processDailyInterest()
+                const interestAccrued = processDailyInterestRef.current()
                 if (interestAccrued > 0) {
                     workingCreditInterest += interestAccrued
                 }
@@ -223,7 +258,7 @@ export const useGameLoop = ({
             let stockMap = new Map(workingStocks.map(stock => [stock.id, stock]))
 
             // 5. 마진콜 체크
-            const marginResult = creditManager.checkMarginCall(stockMap, {
+            const marginResult = checkMarginCallRef.current(stockMap, {
                 cash: workingCash,
                 portfolio: workingPortfolio,
                 shortPositions: workingShortPositions,
@@ -242,7 +277,7 @@ export const useGameLoop = ({
             }
 
             // 6. 뉴스 생성
-            const newsResult = newsGenerator.tick(workingStocks, workingMarketState, newGameTime)
+            const newsResult = generateNewsTickRef.current(workingStocks, workingMarketState, newGameTime)
             if (newsResult.stocks !== workingStocks) {
                 workingStocks = newsResult.stocks
                 workingMarketState = newsResult.marketState
@@ -271,10 +306,10 @@ export const useGameLoop = ({
             }
 
             // 9. 위기 이벤트
-            crisisManager.tick(workingStocks, workingMarketState, gameDay)
+            processCrisisTickRef.current(workingStocks, workingMarketState, gameDay)
 
             // 10. 가격 변동
-            workingStocks = priceUpdater.tick(workingStocks, workingMarketState, gameDay, newGameTime)
+            workingStocks = updatePricesTickRef.current(workingStocks, workingMarketState, gameDay, newGameTime)
             stockMap = new Map(workingStocks.map(stock => [stock.id, stock]))
 
             // 가격 변화 표시 리셋
@@ -282,7 +317,7 @@ export const useGameLoop = ({
             priceResetTimeoutRef.current = setTimeout(() => setPriceChanges({}), PRICE_RESET_DELAY)
 
             // 11. 주문 처리
-            const orderResult = orderProcessor.tick({
+            const orderResult = processOrdersTickRef.current({
                 pendingOrders: workingPendingOrders,
                 stocks: workingStocks,
                 cash: workingCash,
@@ -296,7 +331,7 @@ export const useGameLoop = ({
             }
 
             // 12. 공매도 처리
-            const shortResult = creditManager.processShortPositions(stockMap, {
+            const shortResult = processShortPositionsRef.current(stockMap, {
                 cash: workingCash,
                 shortPositions: workingShortPositions
             })
@@ -317,7 +352,7 @@ export const useGameLoop = ({
             }
 
             // 14. 배당금 처리 (1분마다)
-            const dividendTotal = dividendManager.tick(stockMap, now, workingPortfolio)
+            const dividendTotal = processDividendsTickRef.current(stockMap, now, workingPortfolio)
             if (dividendTotal > 0) {
                 workingCash += dividendTotal
             }
@@ -352,7 +387,6 @@ export const useGameLoop = ({
         }
     }, [
         updateInterval,
-        priceUpdater, newsGenerator, orderProcessor, creditManager, dividendManager, crisisManager,
         setActiveCrisis, setAlerts, setAssetHistory, setCash, setCreditInterest, setCreditUsed, setCrisisAlert, setCrisisHistory,
         setCurrentDay, setDailyProfit, setDailyTrades, setGameTime, setMarketState, setNews, setPendingOrders,
         setPortfolio, setPriceChanges, setShortPositions, setShowSeasonEnd, setStocks, setTotalDividends, setMarginCallActive

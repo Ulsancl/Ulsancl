@@ -59,6 +59,7 @@ export {
 export {
     applyCrisisImpact,
     updatePricesWithCrisis,
+    resetCrisisState,
     getActiveCrisis,
     checkAndGenerateCrisis,
     calculateCrisisImpact

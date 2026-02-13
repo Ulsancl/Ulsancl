@@ -7,6 +7,14 @@ import { useCallback } from 'react'
 import { generateId } from '../utils'
 import { SHORT_SELLING, CREDIT_TRADING } from '../constants'
 
+const normalizePositiveInteger = (value) => {
+    const numericValue = Number(value)
+    if (!Number.isFinite(numericValue)) return null
+    if (!Number.isInteger(numericValue)) return null
+    if (numericValue <= 0) return null
+    return numericValue
+}
+
 export const useTrading = ({
     cash, setCash,
     portfolio, setPortfolio,
@@ -35,8 +43,15 @@ export const useTrading = ({
 
     // 매수
     const handleBuy = useCallback((stock, qty) => {
+        const normalizedQty = normalizePositiveInteger(qty)
+        if (!normalizedQty) {
+            showNotification('유효한 수량을 입력하세요!', 'error')
+            playSound?.('error')
+            return false
+        }
+
         const leverageMultiplier = currentLeverage?.multiplier || 1
-        const effectiveQty = qty * leverageMultiplier
+        const effectiveQty = normalizedQty * leverageMultiplier
         const notional = stock.price * effectiveQty
 
         // 수수료 계산 (기본 0.15%)
@@ -97,14 +112,21 @@ export const useTrading = ({
 
     // 매도
     const handleSell = useCallback((stock, qty) => {
+        const normalizedQty = normalizePositiveInteger(qty)
+        if (!normalizedQty) {
+            showNotification('유효한 수량을 입력하세요!', 'error')
+            playSound?.('error')
+            return false
+        }
+
         const holding = portfolio[stock.id]
-        if (!holding || holding.quantity < qty) {
+        if (!holding || holding.quantity < normalizedQty) {
             showNotification('보유 수량이 부족합니다!', 'error')
             playSound?.('error')
             return false
         }
 
-        const rawTotal = stock.price * qty
+        const rawTotal = stock.price * normalizedQty
         let feeRate = 0.0015
         const feeDiscountLevel = unlockedSkills?.['fee_discount'] || 0
         if (feeDiscountLevel > 0) {
@@ -114,20 +136,20 @@ export const useTrading = ({
         const proceeds = rawTotal - fee
 
         const avgCost = holding.totalCost / holding.quantity
-        const costBasis = avgCost * qty
+        const costBasis = avgCost * normalizedQty
         const profit = proceeds - costBasis
 
         const borrowedTotal = typeof holding.borrowed === 'number' ? holding.borrowed : 0
         const marginTotal = typeof holding.margin === 'number' ? holding.margin : 0
         const borrowedPerShare = holding.quantity > 0 ? borrowedTotal / holding.quantity : 0
         const marginPerShare = holding.quantity > 0 ? marginTotal / holding.quantity : 0
-        const borrowedRepayment = borrowedPerShare * qty
-        const marginReturn = marginPerShare * qty
+        const borrowedRepayment = borrowedPerShare * normalizedQty
+        const marginReturn = marginPerShare * normalizedQty
         const netProceeds = proceeds - borrowedRepayment
 
         setCash(prev => prev + netProceeds)
         setPortfolio(prev => {
-            const newQty = holding.quantity - qty
+            const newQty = holding.quantity - normalizedQty
             if (newQty <= 0) {
                 const { [stock.id]: _, ...rest } = prev
                 return rest
@@ -148,14 +170,14 @@ export const useTrading = ({
             id: generateId(),
             type: 'sell',
             stockId: stock.id,
-            quantity: qty,
+            quantity: normalizedQty,
             price: stock.price,
             total: proceeds,
             profit,
             timestamp: Date.now()
         }
         setTradeHistory(prev => [...prev, trade])
-        recordTrade?.('SELL', String(stock.id), qty, { orderType: 'market' })
+        recordTrade?.('SELL', String(stock.id), normalizedQty, { orderType: 'market' })
         setTotalTrades(prev => prev + 1)
         setDailyTrades(prev => prev + 1)
         setTotalProfit(prev => prev + profit)
@@ -164,12 +186,12 @@ export const useTrading = ({
         if (profit > 0) {
             setWinStreak(prev => prev + 1)
             playSound?.('sell')
-            showNotification(`${stock.name} ${qty}주 매도 (+${formatCompact(profit)})`, 'success')
+            showNotification(`${stock.name} ${normalizedQty}주 매도 (+${formatCompact(profit)})`, 'success')
             addActionFeedback?.(`+${formatCompact(profit)}`, 'profit', window.innerWidth / 2, window.innerHeight / 2)
         } else {
             setWinStreak(0)
             playSound?.('sell')
-            showNotification(`${stock.name} ${qty}주 매도 (${formatCompact(profit)})`, 'warning')
+            showNotification(`${stock.name} ${normalizedQty}주 매도 (${formatCompact(profit)})`, 'warning')
             addActionFeedback?.(`${formatCompact(profit)}`, 'loss', window.innerWidth / 2, window.innerHeight / 2)
         }
         return true
@@ -177,13 +199,20 @@ export const useTrading = ({
 
     // 공매도
     const handleShortSell = useCallback((stock, qty) => {
+        const normalizedQty = normalizePositiveInteger(qty)
+        if (!normalizedQty) {
+            showNotification('유효한 수량을 입력하세요!', 'error')
+            playSound?.('error')
+            return false
+        }
+
         if (!canShortSell) {
             showNotification(`공매도는 Lv.${SHORT_SELLING.minLevel} 이상 필요!`, 'error')
             playSound?.('error')
             return false
         }
 
-        const marginRequired = stock.price * qty * SHORT_SELLING.marginRate
+        const marginRequired = stock.price * normalizedQty * SHORT_SELLING.marginRate
         if (marginRequired > cash) {
             showNotification('증거금이 부족합니다!', 'error')
             playSound?.('error')
@@ -192,10 +221,10 @@ export const useTrading = ({
 
         setCash(prev => prev - marginRequired)
         setShortPositions(prev => {
-            const existing = prev[stock.id]
+                const existing = prev[stock.id]
             if (existing) {
-                const totalQty = existing.quantity + qty
-                const avgPrice = (existing.entryPrice * existing.quantity + stock.price * qty) / totalQty
+                const totalQty = existing.quantity + normalizedQty
+                const avgPrice = (existing.entryPrice * existing.quantity + stock.price * normalizedQty) / totalQty
                 return {
                     ...prev,
                     [stock.id]: { quantity: totalQty, entryPrice: avgPrice, margin: existing.margin + marginRequired, openTime: existing.openTime }
@@ -203,35 +232,42 @@ export const useTrading = ({
             }
             return {
                 ...prev,
-                [stock.id]: { quantity: qty, entryPrice: stock.price, margin: marginRequired, openTime: Date.now() }
+                [stock.id]: { quantity: normalizedQty, entryPrice: stock.price, margin: marginRequired, openTime: Date.now() }
             }
         })
 
-        const trade = { id: generateId(), type: 'short', stockId: stock.id, quantity: qty, price: stock.price, total: marginRequired, timestamp: Date.now() }
+        const trade = { id: generateId(), type: 'short', stockId: stock.id, quantity: normalizedQty, price: stock.price, total: marginRequired, timestamp: Date.now() }
         setTradeHistory(prev => [...prev, trade])
-        recordTrade?.('SHORT', String(stock.id), qty, { orderType: 'market' })
+        recordTrade?.('SHORT', String(stock.id), normalizedQty, { orderType: 'market' })
         setTotalTrades(prev => prev + 1)
         setDailyTrades(prev => prev + 1)
         playSound?.('sell')
-        showNotification(`🐻 ${stock.name} ${qty}주 공매도`, 'info')
+        showNotification(`🐻 ${stock.name} ${normalizedQty}주 공매도`, 'info')
         return true
     }, [canShortSell, cash, showNotification, playSound, setCash, setShortPositions, setTradeHistory, setTotalTrades, setDailyTrades, recordTrade])
 
     // 공매도 청산
     const handleCoverShort = useCallback((stock, qty) => {
+        const normalizedQty = normalizePositiveInteger(qty)
+        if (!normalizedQty) {
+            showNotification('유효한 수량을 입력하세요!', 'error')
+            playSound?.('error')
+            return false
+        }
+
         const position = shortPositions[stock.id]
-        if (!position || qty > position.quantity) {
+        if (!position || normalizedQty > position.quantity) {
             showNotification('공매도 포지션이 부족합니다!', 'error')
             playSound?.('error')
             return false
         }
 
-        const pnl = (position.entryPrice - stock.price) * qty
-        const marginReturn = (position.margin / position.quantity) * qty
+        const pnl = (position.entryPrice - stock.price) * normalizedQty
+        const marginReturn = (position.margin / position.quantity) * normalizedQty
 
         setCash(prev => prev + marginReturn + pnl)
         setShortPositions(prev => {
-            const remainingQty = position.quantity - qty
+            const remainingQty = position.quantity - normalizedQty
             if (remainingQty <= 0) {
                 const updated = { ...prev }
                 delete updated[stock.id]
@@ -244,7 +280,7 @@ export const useTrading = ({
         })
 
         setTotalTrades(prev => prev + 1)
-        recordTrade?.('COVER', String(stock.id), qty, { orderType: 'market' })
+        recordTrade?.('COVER', String(stock.id), normalizedQty, { orderType: 'market' })
         setTotalProfit(prev => prev + pnl)
         setDailyProfit(prev => prev + pnl)
 
@@ -258,40 +294,49 @@ export const useTrading = ({
 
     // 신용 거래 - 대출
     const handleBorrowCredit = useCallback((amount) => {
+        const normalizedAmount = normalizePositiveInteger(amount)
+
         if (!canUseCredit) {
             showNotification('신용 거래는 레벨 3부터 가능합니다!', 'error')
             return false
         }
 
-        if (amount <= 0) {
+        if (!normalizedAmount) {
             showNotification('대출 금액을 입력하세요!', 'error')
             return false
         }
 
-        if (amount > availableCredit) {
+        if (normalizedAmount > availableCredit) {
             showNotification(`대출 한도 초과! 가용 한도: ${formatNumber(availableCredit)}원`, 'error')
             return false
         }
 
-        const fee = Math.floor(amount * CREDIT_TRADING.borrowFee)
-        const netAmount = amount - fee
+        const fee = Math.floor(normalizedAmount * CREDIT_TRADING.borrowFee)
+        const netAmount = normalizedAmount - fee
 
-        setCreditUsed(prev => prev + amount)
+        setCreditUsed(prev => prev + normalizedAmount)
         setCash(prev => prev + netAmount)
-        showNotification(`${formatNumber(amount)}원 대출 실행 (수수료 ${formatNumber(fee)}원)`, 'info')
+        showNotification(`${formatNumber(normalizedAmount)}원 대출 실행 (수수료 ${formatNumber(fee)}원)`, 'info')
         playSound?.('buy')
         return true
     }, [canUseCredit, availableCredit, showNotification, playSound, setCreditUsed, setCash, formatNumber])
 
     // 신용 거래 - 상환
     const handleRepayCredit = useCallback((amount) => {
+        const normalizedAmount = normalizePositiveInteger(amount)
+
         if (creditUsed <= 0 && creditInterest <= 0) {
             showNotification('상환할 대출이 없습니다!', 'error')
             return false
         }
 
+        if (!normalizedAmount) {
+            showNotification('상환 금액을 입력하세요!', 'error')
+            return false
+        }
+
         const totalDebtNow = creditUsed + creditInterest
-        const repayAmount = Math.min(amount, totalDebtNow, cash)
+        const repayAmount = Math.min(normalizedAmount, totalDebtNow, cash)
 
         if (repayAmount <= 0) {
             showNotification('상환할 금액이 부족합니다!', 'error')
