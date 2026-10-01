@@ -29,25 +29,25 @@ const GameHeader = memo(function GameHeader({
                             {gameTime.displayDate} {gameTime.displayTime}
                         </span>
                     </div>
-                    <div className="live-indicator">
+                    <div className="live-indicator" title="앱 내부에서 생성한 가상 시장 가격입니다.">
                         <span className="live-dot" />
-                        LIVE
+                        가상 시장
                     </div>
                 </div>
 
                 <div className="header-actions">
                     <LevelBadge xp={totalXp} />
                     <div className="menu-grid">
-                        <button className="header-btn" onClick={onShowSkills} data-tooltip="스킬" data-testid="open-skills">
+                        <button className="header-btn" onClick={onShowSkills} data-tooltip="스킬" aria-label="스킬" data-testid="open-skills">
                             ⚔️
                         </button>
-                        <button className="header-btn" onClick={onShowMissions} data-tooltip="미션" data-testid="open-missions">
+                        <button className="header-btn" onClick={onShowMissions} data-tooltip="미션" aria-label="미션" data-testid="open-missions">
                             🎯
                         </button>
                         <button
                             className="header-btn"
                             onClick={onShowAchievements}
-                            data-tooltip="업적"
+                            data-tooltip="업적" aria-label="업적"
                             data-testid="open-achievements"
                         >
                             🏆
@@ -55,7 +55,7 @@ const GameHeader = memo(function GameHeader({
                         <button
                             className="header-btn"
                             onClick={onShowLeaderboard}
-                            data-tooltip="순위"
+                            data-tooltip="순위" aria-label="순위"
                             data-testid="open-leaderboard"
                         >
                             🥇
@@ -63,7 +63,7 @@ const GameHeader = memo(function GameHeader({
                         <button
                             className="header-btn"
                             onClick={onShowStatistics}
-                            data-tooltip="통계"
+                            data-tooltip="통계" aria-label="통계"
                             data-testid="open-statistics"
                         >
                             📊
@@ -71,7 +71,7 @@ const GameHeader = memo(function GameHeader({
                         <button
                             className="header-btn"
                             onClick={onShowWatchlist}
-                            data-tooltip="관심"
+                            data-tooltip="관심" aria-label="관심"
                             data-testid="open-watchlist"
                         >
                             ⭐
@@ -79,7 +79,7 @@ const GameHeader = memo(function GameHeader({
                         <button
                             className="header-btn"
                             onClick={onShowAlertManager}
-                            data-tooltip="알림"
+                            data-tooltip="알림" aria-label="알림"
                             data-testid="open-alerts"
                         >
                             🔔
@@ -87,7 +87,7 @@ const GameHeader = memo(function GameHeader({
                         <button
                             className="header-btn"
                             onClick={onShowTradeHistory}
-                            data-tooltip="거래"
+                            data-tooltip="거래" aria-label="거래"
                             data-testid="open-trades"
                         >
                             📜
@@ -95,7 +95,7 @@ const GameHeader = memo(function GameHeader({
                         <button
                             className="header-btn"
                             onClick={onShowSettings}
-                            data-tooltip="설정"
+                            data-tooltip="설정" aria-label="설정"
                             data-testid="open-settings"
                         >
                             ⚙️

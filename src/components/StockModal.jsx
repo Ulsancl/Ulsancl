@@ -1,362 +1,49 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import OrderBook from './OrderBook'
-import { formatNumber, formatPercent, formatCompact } from '../utils'
+import { formatPercent } from '../utils'
 import TechnicalChart from './TechnicalChart'
+import { aggregateObservations, formatChartPrice } from '../utils/chart-observations'
 import './StockModal.css'
 
-// 순수 SVG 캔들스틱 차트 컴포넌트
-function CandlestickChart({ data, width, height, currentPrice }) {
-    if (!data || data.length === 0 || !width || !height) {
-        return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888' }}>데이터 로딩중...</div>
-    }
-
-    const padding = { top: 20, right: 60, bottom: 30, left: 10 }
-    const chartWidth = width - padding.left - padding.right
-    const chartHeight = height - padding.top - padding.bottom
-
-    const allHighs = data.map(d => d.high)
-    const allLows = data.map(d => d.low)
-    const dataMin = Math.min(...allLows)
-    const dataMax = Math.max(...allHighs)
-    const priceRange = dataMax - dataMin || 1
-    const pricePadding = priceRange * 0.05
-
-    const minPrice = dataMin - pricePadding
-    const maxPrice = dataMax + pricePadding
-    const adjustedRange = maxPrice - minPrice
-
-    const priceToY = (price) => {
-        return padding.top + chartHeight - ((price - minPrice) / adjustedRange) * chartHeight
-    }
-
-    const candleWidth = Math.max(Math.min(chartWidth / data.length * 0.7, 12), 3)
-    const gap = chartWidth / data.length
-
-    const yTicks = []
-    const tickCount = 5
-    for (let i = 0; i <= tickCount; i++) {
-        const price = minPrice + (adjustedRange / tickCount) * i
-        yTicks.push(price)
-    }
-
-    const gridLines = yTicks.map((price, i) => {
-        const y = priceToY(price)
-        return (
-            <line
-                key={`grid-${i}`}
-                x1={padding.left}
-                y1={y}
-                x2={width - padding.right}
-                y2={y}
-                stroke="rgba(255,255,255,0.1)"
-                strokeDasharray="3 3"
-            />
-        )
-    })
-
-    // Y축 레이블 포맷 (정밀도 유지)
-    const formatYLabel = (price) => {
-        const rounded = Math.round(price)
-        // 가격 범위에 따라 적절한 포맷 선택
-        if (rounded >= 1000000) {
-            return (rounded / 10000).toFixed(0) + '만'
-        }
-        return formatNumber(rounded)
-    }
-
-    const yLabels = yTicks.map((price, i) => {
-        const y = priceToY(price)
-        return (
-            <text
-                key={`label-${i}`}
-                x={width - padding.right + 5}
-                y={y + 4}
-                fill="#888"
-                fontSize="10"
-                textAnchor="start"
-            >
-                {formatYLabel(price)}
-            </text>
-        )
-    })
-
-    const candles = data.map((candle, i) => {
-        const x = padding.left + (i * gap) + gap / 2
-        const isUp = candle.close >= candle.open
-        const color = isUp ? '#26a69a' : '#ef5350'
-
-        const yHigh = priceToY(candle.high)
-        const yLow = priceToY(candle.low)
-        const yOpen = priceToY(candle.open)
-        const yClose = priceToY(candle.close)
-
-        const bodyTop = Math.min(yOpen, yClose)
-        const bodyHeight = Math.max(Math.abs(yOpen - yClose), 1)
-
-        return (
-            <g key={i}>
-                <line x1={x} y1={yHigh} x2={x} y2={Math.min(yOpen, yClose)} stroke={color} strokeWidth={1} />
-                <line x1={x} y1={Math.max(yOpen, yClose)} x2={x} y2={yLow} stroke={color} strokeWidth={1} />
-                <rect x={x - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={color} stroke={color} strokeWidth={1} />
-            </g>
-        )
-    })
-
-    const lastCandle = data[data.length - 1]
-    const lastY = priceToY(currentPrice || lastCandle.close)
-    const lastIsUp = (currentPrice || lastCandle.close) >= lastCandle.open
-
-    return (
-        <svg width={width} height={height} style={{ display: 'block' }}>
-            <rect x={0} y={0} width={width} height={height} fill="transparent" />
-            {gridLines}
-            {yLabels}
-            {candles}
-            <line x1={padding.left} y1={lastY} x2={width - padding.right} y2={lastY} stroke={lastIsUp ? '#26a69a' : '#ef5350'} strokeWidth={1} strokeDasharray="5 3" />
-            <rect x={width - padding.right} y={lastY - 10} width={55} height={20} fill={lastIsUp ? '#26a69a' : '#ef5350'} rx={3} />
-            <text x={width - padding.right + 5} y={lastY + 4} fill="white" fontSize="11" fontWeight="bold">
-                {formatCompact(currentPrice || lastCandle.close)}
-            </text>
-        </svg>
-    )
-}
-
-// 시간프레임별 틱 수 (짧은 구간은 초 단위, 장기 구간은 시간 단위로 축약)
-const TIMEFRAME_TICKS = {
-    'tick-1': 1,
-    'tick-3': 3,
-    'tick-5': 5,
-    'tick-15': 15,
-    'tick-30': 30,
-    'tick-60': 60,
-    'min-1': 60,
-    'min-3': 180,
-    'min-5': 300,
-    'min-15': 900,
-    'min-30': 1800,
-    'min-60': 3600,
-    'day-1': 24,
-    'day-3': 72,
-    'day-5': 120,
-    'week-1': 168,
-    'week-3': 504,
-    'month-1': 720,
-    'month-3': 2160,
-}
-
-const TIMEFRAME_LABELS = {
-    'tick-1': '1틱', 'tick-3': '3틱', 'tick-5': '5틱', 'tick-15': '15틱', 'tick-30': '30틱', 'tick-60': '60틱',
-    'min-1': '1분', 'min-3': '3분', 'min-5': '5분', 'min-15': '15분', 'min-30': '30분', 'min-60': '60분',
-    'day-1': '1일', 'day-3': '3일', 'day-5': '5일',
-    'week-1': '1주', 'week-3': '3주',
-    'month-1': '1월', 'month-3': '3월',
-}
-
-const CATEGORY_OPTIONS = {
-    'tick': [1, 3, 5, 15, 30, 60],
-    'min': [1, 3, 5, 15, 30, 60],
-    'day': [1, 3, 5],
-    'week': [1, 3],
-    'month': [1, 3]
-}
-
-const CATEGORY_LABELS = {
-    'tick': '틱',
-    'min': '분',
-    'day': '일',
-    'week': '주',
-    'month': '월'
-}
-
-// 기본 틱 데이터 생성 (현재가를 기준으로 역산 후 정렬)
-// 마지막 틱이 currentPrice가 되도록 보장
-function generateBaseTickData(currentPrice, tickCount, volatility, seed = 12345) {
-    const ticks = []
-    let price = currentPrice
-
-    // 간단한 시드 기반 랜덤 (일관성 유지)
-    const seededRandom = (i) => {
-        const x = Math.sin(seed + i) * 10000
-        return x - Math.floor(x)
-    }
-
-    const now = Date.now()
-
-    // 현재가에서 시작하여 과거로 역산 (뒤에서부터 계산)
-    for (let i = tickCount - 1; i >= 0; i--) {
-        ticks.unshift({
-            index: i,
-            price: Math.round(price),
-            time: now - (tickCount - 1 - i) * 1000
-        })
-
-        // 이전 가격 계산 (역방향으로 변동 적용)
-        const change = price * volatility * (seededRandom(i) - 0.5)
-        price = Math.max(100, price - change) // 과거로 갈수록 변동 빼기
-    }
-
-    return ticks
-}
-
-
-// 틱 데이터를 캔들로 집계
-function aggregateTicksToCandles(ticks, ticksPerCandle, maxCandles = 60) {
-    if (!ticks || ticks.length === 0) return []
-
-    const candles = []
-    const totalCandles = Math.min(Math.ceil(ticks.length / ticksPerCandle), maxCandles)
-    const startIndex = Math.max(0, ticks.length - totalCandles * ticksPerCandle)
-
-    for (let i = 0; i < totalCandles; i++) {
-        const candleStartIndex = startIndex + i * ticksPerCandle
-        const candleEndIndex = Math.min(candleStartIndex + ticksPerCandle, ticks.length)
-        const candleTicks = ticks.slice(candleStartIndex, candleEndIndex)
-
-        if (candleTicks.length === 0) continue
-
-        const prices = candleTicks.map(t => t.price)
-        const open = candleTicks[0].price
-        const close = candleTicks[candleTicks.length - 1].price
-        const high = Math.max(...prices)
-        const low = Math.min(...prices)
-
-        candles.push({
-            index: i,
-            open,
-            close,
-            high,
-            low,
-            time: candleTicks[0].time
-        })
-    }
-
-    return candles
-}
-
-export default function StockModal({
-    stock,
-    onClose,
-    currentPrice,
-    onOpenOrder,
-    portfolio,
-    shortPositions,
-    canShortSell
-}) {
-    const [category, setCategory] = useState('min')
+export default function StockModal({ stock, onClose, currentPrice, observations = [], onOpenOrder, portfolio, shortPositions, canShortSell }) {
+    const [category, setCategory] = useState('ticks')
     const [subOption, setSubOption] = useState(1)
-    const [chartSize, setChartSize] = useState({ width: 0, height: 0 })
-    const [chartMode, setChartMode] = useState('candle') // 'candle' | 'technical'
-    const [tickVersion, setTickVersion] = useState(0)
-    const chartContainerRef = useRef(null)
-
-    // 기본 틱 데이터 저장 (일관성 유지를 위해)
-    const baseTickDataRef = useRef(null)
-    const lastPriceRef = useRef(currentPrice)
-    const currentPriceRef = useRef(currentPrice)
-    const stockPriceRef = useRef(stock.price)
-    const volatilityRef = useRef(stock.volatility)
-
-    const timeframeKey = `${category}-${subOption}`
-    const ticksPerCandle = TIMEFRAME_TICKS[timeframeKey] || 60
-
-    // 차트 크기 감지
+    const [chartMode, setChartMode] = useState('candle')
+    const [chartWidth, setChartWidth] = useState(700)
+    const chartContainerRef = useRef(null), dialogRef = useRef(null)
     useEffect(() => {
-        const updateSize = () => {
-            if (chartContainerRef.current) {
-                const rect = chartContainerRef.current.getBoundingClientRect()
-                setChartSize({ width: rect.width, height: rect.height })
-            }
-        }
-        updateSize()
-        window.addEventListener('resize', updateSize)
-        const timer = setTimeout(updateSize, 100)
-        return () => {
-            window.removeEventListener('resize', updateSize)
-            clearTimeout(timer)
-        }
+        const previous = document.activeElement
+        dialogRef.current?.querySelector('.close-btn')?.focus()
+        return () => previous?.focus?.()
     }, [])
-
-    // 기본 틱 데이터 초기화 (주식별로 한 번만)
     useEffect(() => {
-        currentPriceRef.current = currentPrice
-    }, [currentPrice])
-
-    useEffect(() => {
-        stockPriceRef.current = stock.price
-        volatilityRef.current = stock.volatility
-    }, [stock.price, stock.volatility])
-
-    useEffect(() => {
-        // 충분한 틱 데이터 생성 (약 3시간분 = 10800틱)
-        const tickCount = 10800
-        // 현재가를 사용하여 역산 - 마지막 틱이 현재가가 되도록
-        const initialPrice = currentPriceRef.current || stockPriceRef.current || 50000
-        const baseVolatility = volatilityRef.current ?? 2
-        const seed = (typeof stock.id === 'string'
-            ? stock.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-            : stock.id) * 1000 + Math.floor(initialPrice / 1000) // 주식별 고유 시드
-
-        // currentPrice에서 시작하여 과거로 역산
-        baseTickDataRef.current = generateBaseTickData(initialPrice, tickCount, baseVolatility * 0.01, seed)
-        lastPriceRef.current = initialPrice
-        setTickVersion(prev => prev + 1)
-    }, [stock.id])
-
-    // 가격 변동 시 틱 데이터 업데이트
-    useEffect(() => {
-        if (!baseTickDataRef.current || baseTickDataRef.current.length === 0) return
-
-        // 새 틱 추가
-        const newTick = {
-            index: baseTickDataRef.current.length,
-            price: currentPrice,
-            time: Date.now()
-        }
-
-        baseTickDataRef.current.push(newTick)
-
-        // 최대 틱 수 유지 (오래된 것 제거)
-        if (baseTickDataRef.current.length > 20000) {
-            baseTickDataRef.current = baseTickDataRef.current.slice(-15000)
-            // 인덱스 재정렬
-            baseTickDataRef.current.forEach((t, i) => t.index = i)
-        }
-
-        lastPriceRef.current = currentPrice
-        setTickVersion(prev => prev + 1)
-    }, [currentPrice])
-
-    // 현재 시간프레임에 맞는 캔들 데이터 계산
-    const candleData = useMemo(() => {
-        void tickVersion
-        if (!baseTickDataRef.current || baseTickDataRef.current.length === 0) {
-            return []
-        }
-
-        return aggregateTicksToCandles(baseTickDataRef.current, ticksPerCandle, 60)
-    }, [tickVersion, ticksPerCandle])
-
-    // 카테고리 변경
-    const handleCategoryChange = (newCategory) => {
-        setCategory(newCategory)
-        setSubOption(CATEGORY_OPTIONS[newCategory][0])
+        const node = chartContainerRef.current
+        const resize = () => { const width = node?.getBoundingClientRect().width; if (width > 0) setChartWidth(Math.max(240, width - 16)) }
+        resize()
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize)
+        if (node) observer?.observe(node)
+        window.addEventListener('resize', resize)
+        return () => { observer?.disconnect(); window.removeEventListener('resize', resize) }
+    }, [])
+    const handleDialogKey = event => {
+        if (event.key === 'Escape') { event.stopPropagation(); onClose(); return }
+        if (event.key !== 'Tab') return
+        const focusable = [...dialogRef.current.querySelectorAll('button:not(:disabled),select,[tabindex="0"]')].filter(node => node.getClientRects().length)
+        const first = focusable[0], last = focusable.at(-1)
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
     }
-
-    // 펀더멘털 데이터
+    const candleData = useMemo(() => aggregateObservations(observations, { kind: category, size: subOption, maxCandles: Infinity }), [observations, category, subOption])
     const fundamentals = stock.fundamentals || {}
-
-    // 가격 변동 계산
-    const startPrice = candleData.length > 0 ? candleData[0].open : currentPrice
-    const change = currentPrice - startPrice
-    const changeRate = startPrice ? (change / startPrice) * 100 : 0
-    const isUp = change >= 0
-
+    const fundamentalValue = (value, unit = '') => Number.isFinite(value) ? `${formatChartPrice(value)}${unit}` : '—'
+    const startPrice = Number.isFinite(stock.dailyOpen) ? stock.dailyOpen : currentPrice
+    const change = currentPrice - startPrice, changeRate = startPrice ? change / startPrice * 100 : 0, isUp = change >= 0
     const holdingQty = portfolio?.[stock.id]?.quantity || 0
     const shortQty = shortPositions?.[stock.id]?.quantity || 0
 
     return (
         <div className="chart-modal-overlay" onClick={onClose} data-testid="chart-modal-overlay">
-            <div className="chart-modal" onClick={e => e.stopPropagation()} data-testid="chart-modal">
+            <div className="chart-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="stock-chart-title" onClick={e => e.stopPropagation()} onKeyDown={handleDialogKey} data-testid="chart-modal">
 
                 {/* Header */}
                 <div className="chart-modal-header">
@@ -365,103 +52,54 @@ export default function StockModal({
                             {stock.code?.slice(0, 2)}
                         </div>
                         <div>
-                            <h2>{stock.name}</h2>
+                            <h2 id="stock-chart-title">{stock.name}</h2>
                             <span style={{ color: 'var(--color-text-secondary)' }}>{stock.code} · {stock.sector}</span>
                         </div>
                         <div style={{ marginLeft: '20px' }}>
                             <div className={`chart-price ${isUp ? 'text-profit' : 'text-loss'}`}>
-                                {formatNumber(currentPrice)}원
+                                {formatChartPrice(currentPrice)}원
                             </div>
                             <div style={{ fontSize: '14px', color: isUp ? 'var(--color-profit)' : 'var(--color-loss)' }}>
-                                {isUp ? '▲' : '▼'} {formatNumber(Math.abs(change))} ({formatPercent(Math.abs(changeRate))})
+                                당일 시가 대비 {formatChartPrice(change)}원 ({formatPercent(changeRate)})
                             </div>
                         </div>
                     </div>
 
-                    <button className="close-btn" onClick={onClose} data-testid="chart-modal-close">&times;</button>
+                    <button className="close-btn" aria-label="차트 닫기" onClick={onClose} data-testid="chart-modal-close">&times;</button>
                 </div>
 
-                {/* Timeframe Selection */}
-                <div className="timeframe-selection">
+                <div className="timeframe-selection" aria-label="관찰 기록 집계">
                     <div className="timeframe-categories">
-                        {Object.entries(CATEGORY_LABELS).map(([cat, label]) => (
-                            <button
-                                key={cat}
-                                onClick={() => handleCategoryChange(cat)}
-                                className={`category-btn ${category === cat ? 'active' : ''}`}
-                            >
-                                {label}
-                            </button>
-                        ))}
+                        <button className={`category-btn ${category === 'ticks' ? 'active' : ''}`} aria-pressed={category === 'ticks'} onClick={() => { setCategory('ticks'); setSubOption(1) }}>관찰 횟수</button>
+                        <button className={`category-btn ${category === 'days' ? 'active' : ''}`} aria-pressed={category === 'days'} onClick={() => { setCategory('days'); setSubOption(1) }}>게임일</button>
                     </div>
-
-                    <div className="timeframe-suboptions">
-                        {CATEGORY_OPTIONS[category].map(opt => (
-                            <button
-                                key={opt}
-                                onClick={() => setSubOption(opt)}
-                                className={`suboption-btn ${subOption === opt ? 'active' : ''}`}
-                            >
-                                {opt}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="current-timeframe">
-                        {TIMEFRAME_LABELS[timeframeKey]}봉
-                    </div>
-
-                    {/* 차트 모드 토글 */}
+                    <div className="timeframe-suboptions">{(category === 'ticks' ? [1, 5, 15, 60] : [1, 3, 5]).map(size =>
+                        <button key={size} className={`suboption-btn ${subOption === size ? 'active' : ''}`} aria-pressed={subOption === size} onClick={() => setSubOption(size)}>{size}{category === 'ticks' ? '회' : '일'}</button>)}</div>
                     <div className="chart-mode-toggle">
-                        <button
-                            className={`mode-btn ${chartMode === 'candle' ? 'active' : ''}`}
-                            onClick={() => setChartMode('candle')}
-                        >
-                            📊 캔들
-                        </button>
-                        <button
-                            className={`mode-btn ${chartMode === 'technical' ? 'active' : ''}`}
-                            onClick={() => setChartMode('technical')}
-                        >
-                            📈 기술적 분석
-                        </button>
+                        <button className={`mode-btn ${chartMode === 'candle' ? 'active' : ''}`} aria-pressed={chartMode === 'candle'} onClick={() => setChartMode('candle')}>캔들</button>
+                        <button className={`mode-btn ${chartMode === 'technical' ? 'active' : ''}`} aria-pressed={chartMode === 'technical'} onClick={() => setChartMode('technical')}>보조지표</button>
                     </div>
                 </div>
+                <p className="chart-history-scope" data-testid="chart-history-scope">이번 실행에서 관찰한 가격 {observations.length.toLocaleString()}개 · 실제 거래량이 아닌 관찰 횟수입니다. 게임 1일은 실제 300초이며 게임 시각은 10분 단위로 표시됩니다. 기록이 없는 구간은 만들지 않습니다.</p>
 
                 {/* Main Content */}
                 <div className="chart-modal-content">
 
                     <div className="chart-panel">
                         <div className="chart-area" ref={chartContainerRef}>
-                            {/* 기술적 분석은 최소 15개 캔들 필요 */}
-                            {chartMode === 'candle' || candleData.length < 15 ? (
-                                <CandlestickChart
-                                    data={candleData}
-                                    width={chartSize.width}
-                                    height={chartSize.height}
-                                    currentPrice={currentPrice}
-                                />
-                            ) : (
-                                <TechnicalChart
-                                    candleData={candleData}
-                                    priceHistory={candleData.map(c => c.close)}
-                                    currentPrice={currentPrice}
-                                    width={chartSize.width}
-                                    height={chartSize.height}
-                                    showIndicatorPanel={true}
-                                />
-                            )}
+                            <TechnicalChart key={`${stock.id}:${category}:${subOption}`} candleData={candleData} currentPrice={currentPrice} width={chartWidth} showIndicatorPanel={chartMode === 'technical'} />
                         </div>
 
                         <div className="stock-fundamentals-grid">
-                            <FundItem label="시가총액" value={formatCompact(fundamentals.marketCap || 0)} />
-                            <FundItem label="PER" value={fundamentals.pe || '-'} />
-                            <FundItem label="EPS" value={formatNumber(fundamentals.eps || 0)} />
-                            <FundItem label="배당률" value={formatPercent(fundamentals.dividendYield || 0)} />
-                            <FundItem label="매출액" value={formatCompact(fundamentals.revenue || 0)} />
-                            <FundItem label="영업이익" value={formatCompact(fundamentals.profit || 0)} />
-                            <FundItem label="부채비율" value={formatPercent(fundamentals.debtRatio || 0)} />
-                            <FundItem label="변동성" value={stock.volatility ? stock.volatility + '%' : '-'} />
+                            <FundItem label="시가총액 설정값" value={fundamentalValue(fundamentals.marketCap)} />
+                            <FundItem label="PER" value={fundamentalValue(fundamentals.pe, '배')} />
+                            <FundItem label="EPS" value={fundamentalValue(fundamentals.eps)} />
+                            <FundItem label="배당률" value={fundamentalValue(fundamentals.yield ?? fundamentals.dividendYield, '%')} />
+                            <FundItem label="매출 설정값" value={fundamentalValue(fundamentals.revenue)} />
+                            <FundItem label="이익 설정값" value={fundamentalValue(fundamentals.profit)} />
+                            <FundItem label="부채비율" value={fundamentalValue(fundamentals.debtRatio, '%')} />
+                            <FundItem label="변동성" value={fundamentalValue(stock.volatility, '%')} />
+                            <p className="fundamentals-note">기업 기본값은 게임 설정 자료입니다. 금액 단위가 없는 항목은 설정값으로 표시하며, 제공되지 않은 값은 —로 표시합니다.</p>
                         </div>
                     </div>
 

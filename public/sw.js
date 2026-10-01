@@ -1,57 +1,41 @@
-// 서비스 워커 - 오프라인 지원
-const CACHE_NAME = 'stock-game-v1'
-const urlsToCache = [
-    '/',
-    '/index.html',
-]
+// Build finalization injects every local production asset and its content revision.
+const PRECACHE = /* STOCK_PRECACHE */ ['/', '/index.html']
+const CACHE_NAME = 'stock-game-/* STOCK_REVISION */development'
+const PREFIX = 'stock-game-'
 
-// 설치 이벤트
-self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => {
-                console.log('캐시 열기 성공')
-                return cache.addAll(urlsToCache)
-            })
-    )
+self.addEventListener('install', event => {
+    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE)))
 })
 
-// 활성화 이벤트 - 오래된 캐시 정리
-self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.filter((cacheName) => {
-                    return cacheName !== CACHE_NAME
-                }).map((cacheName) => {
-                    return caches.delete(cacheName)
-                })
-            )
-        })
-    )
+self.addEventListener('activate', event => {
+    event.waitUntil((async () => {
+        const names = await caches.keys()
+        await Promise.all(names.filter(name => name.startsWith(PREFIX) && name !== CACHE_NAME).map(name => caches.delete(name)))
+        await self.clients.claim()
+    })())
 })
 
-// 요청 인터셉트
-self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        caches.match(event.request)
-            .then((response) => {
-                // 캐시에 있으면 캐시 반환, 없으면 네트워크 요청
-                if (response) {
-                    return response
+self.addEventListener('fetch', event => {
+    const request = event.request, url = new URL(request.url)
+    if (request.method !== 'GET' || url.origin !== self.location.origin) return
+    if (request.mode === 'navigate') {
+        event.respondWith((async () => {
+            try {
+                const response = await fetch(request)
+                if (response.ok) {
+                    const cache = await caches.open(CACHE_NAME)
+                    await cache.put('/index.html', response.clone())
                 }
-                return fetch(event.request).then((response) => {
-                    // 유효한 응답이면 캐시에 저장
-                    if (!response || response.status !== 200 || response.type !== 'basic') {
-                        return response
-                    }
-                    const responseToCache = response.clone()
-                    caches.open(CACHE_NAME)
-                        .then((cache) => {
-                            cache.put(event.request, responseToCache)
-                        })
-                    return response
-                })
-            })
-    )
+                return response
+            } catch {
+                return (await caches.open(CACHE_NAME)).match('/index.html')
+            }
+        })())
+        return
+    }
+    if (!PRECACHE.includes(url.pathname)) return
+    event.respondWith((async () => {
+        const cache = await caches.open(CACHE_NAME)
+        return await cache.match(request) || fetch(request)
+    })())
 })

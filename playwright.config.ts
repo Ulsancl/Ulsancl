@@ -1,4 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
+const port = Number(process.env.PLAYWRIGHT_PORT || 5264);
+const baseURL = `http://127.0.0.1:${port}`;
 
 /**
  * Playwright E2E 테스트 설정
@@ -31,7 +33,7 @@ export default defineConfig({
     // 글로벌 설정
     use: {
         // 기본 URL
-        baseURL: 'http://localhost:7777',
+        baseURL,
 
         // 실패시 스크린샷
         screenshot: 'only-on-failure',
@@ -73,8 +75,8 @@ export default defineConfig({
 
     // 테스트 전 개발 서버 시작
     webServer: {
-        command: 'npm run dev',
-        url: 'http://localhost:7777',
+        command: `npm run dev -- --host 127.0.0.1 --port ${port}`,
+        url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,
     },

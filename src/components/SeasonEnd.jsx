@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatNumber, formatPercent } from '../utils'
+import { formatChartPrice } from '../utils/chart-observations'
 import { ACHIEVEMENTS } from '../constants'
 import {
     ensureAuth,
     getCurrentSeason,
+    isFirebaseConfigured,
     reportClientError,
     submitGameScore
 } from '../firebase/config'
@@ -30,20 +32,13 @@ function getGrade(rate) {
 }
 
 function calculateMaxDrawdown(assetHistory) {
-    if (!Array.isArray(assetHistory) || assetHistory.length < 2) return 0
-
-    let peak = Number(assetHistory[0]?.value) || 0
-    let maxDrawdown = 0
-
-    for (const point of assetHistory) {
-        const value = Number(point?.value) || 0
-        if (value > peak) peak = value
-
+    let peak = null, maxDrawdown = null
+    for (const point of assetHistory || []) {
+        if (!Number.isFinite(point?.value)) continue
+        const value = point.value
+        peak = peak === null ? value : Math.max(peak, value)
         if (peak > 0) {
-            const drawdown = ((peak - value) / peak) * 100
-            if (drawdown > maxDrawdown) {
-                maxDrawdown = drawdown
-            }
+            maxDrawdown = Math.max(maxDrawdown ?? 0, ((peak - value) / peak) * 100)
         }
     }
 
@@ -95,47 +90,53 @@ export default function SeasonEndModal({
     const [submitResult, setSubmitResult] = useState(null)
     const [submitError, setSubmitError] = useState(null)
     const [seasonId, setSeasonId] = useState(null)
+    const [seasonLoading, setSeasonLoading] = useState(false)
 
     const tradeLogs = tradeLogApi?.tradeLogs || []
     const buildPayload = tradeLogApi?.buildPayload
+    const setTradeLogSeasonId = tradeLogApi?.setSeasonId
 
-    const profitRate = ((totalAssets - initialCapital) / initialCapital) * 100
+    const profitRate = Number.isFinite(totalAssets) && initialCapital > 0
+        ? ((totalAssets - initialCapital) / initialCapital) * 100 : null
 
-    const profitTrades = useMemo(
-        () => tradeHistory.filter((trade) => trade.type === 'sell' && trade.profit > 0),
+    const settledTrades = useMemo(
+        () => tradeHistory.filter(trade => (trade.type === 'sell' || trade.type === 'cover') && Number.isFinite(trade.profit)),
         [tradeHistory]
     )
+
+    const profitTrades = useMemo(
+        () => settledTrades.filter(trade => trade.profit > 0),
+        [settledTrades]
+    )
     const lossTrades = useMemo(
-        () => tradeHistory.filter((trade) => trade.type === 'sell' && trade.profit < 0),
-        [tradeHistory]
+        () => settledTrades.filter(trade => trade.profit < 0),
+        [settledTrades]
     )
 
     const winRate = useMemo(() => {
-        const totalSettledTrades = profitTrades.length + lossTrades.length
-        if (totalSettledTrades === 0) return 0
+        const totalSettledTrades = settledTrades.length
+        if (totalSettledTrades === 0) return null
         return (profitTrades.length / totalSettledTrades) * 100
-    }, [lossTrades.length, profitTrades.length])
+    }, [settledTrades.length, profitTrades.length])
 
     const maxProfitTrade = useMemo(
         () =>
-            tradeHistory
-                .filter((trade) => typeof trade.profit === 'number')
+            profitTrades
                 .reduce(
                     (best, trade) => (trade.profit > (best?.profit ?? Number.NEGATIVE_INFINITY) ? trade : best),
                     null
                 ),
-        [tradeHistory]
+        [profitTrades]
     )
 
     const maxLossTrade = useMemo(
         () =>
-            tradeHistory
-                .filter((trade) => typeof trade.profit === 'number')
+            lossTrades
                 .reduce(
                     (worst, trade) => (trade.profit < (worst?.profit ?? Number.POSITIVE_INFINITY) ? trade : worst),
                     null
                 ),
-        [tradeHistory]
+        [lossTrades]
     )
 
     const totalGain = useMemo(
@@ -146,7 +147,7 @@ export default function SeasonEndModal({
         () => Math.abs(lossTrades.reduce((sum, trade) => sum + trade.profit, 0)),
         [lossTrades]
     )
-    const profitFactor = totalLoss > 0 ? totalGain / totalLoss : totalGain > 0 ? Infinity : 0
+    const profitFactor = totalLoss > 0 ? totalGain / totalLoss : totalGain > 0 ? Infinity : null
 
     const yearAchievements = useMemo(
         () =>
@@ -158,25 +159,33 @@ export default function SeasonEndModal({
     )
 
     const maxDrawdown = useMemo(() => calculateMaxDrawdown(assetHistory), [assetHistory])
-    const gradeInfo = useMemo(() => getGrade(profitRate), [profitRate])
+    const gradeInfo = useMemo(() => profitRate === null
+        ? { grade: '—', color: '#636e72', title: '수익률 계산 불가' } : getGrade(profitRate), [profitRate])
 
     useEffect(() => {
+        if (!isFirebaseConfigured) return
+        let active = true
+        setSeasonLoading(true)
         const fetchSeason = async () => {
             try {
                 const season = await getCurrentSeason()
-                if (season) {
+                if (active && season) {
                     setSeasonId(season.id)
-                    tradeLogApi?.setSeasonId?.(season.id)
+                    setTradeLogSeasonId?.(season.id)
                 }
             } catch (error) {
                 reportClientError('season_fetch_failed', error, { source: 'season_end_modal' })
+            } finally {
+                if (active) setSeasonLoading(false)
             }
         }
 
         fetchSeason()
-    }, [tradeLogApi])
+        return () => { active = false }
+    }, [setTradeLogSeasonId])
 
     const handleSubmitScore = useCallback(async () => {
+        if (!isFirebaseConfigured) return
         if (!seasonId) {
             setSubmitError('시즌 정보를 찾을 수 없습니다.')
             setSubmitStatus(SUBMIT_STATUS.ERROR)
@@ -226,7 +235,7 @@ export default function SeasonEndModal({
             <div className="season-end-modal">
                 <div className="season-end-header">
                     <h1>🎊 {year}년 시즌 종료!</h1>
-                    <p className="season-subtitle">1년간의 트레이딩 성과를 분석합니다.</p>
+                    <p className="season-subtitle">현재 순자산과 저장된 거래·자산 기록을 분석합니다.</p>
                 </div>
 
                 <div className="grade-section">
@@ -238,18 +247,18 @@ export default function SeasonEndModal({
 
                 <div className="stats-grid">
                     <div className="stat-box">
-                        <div className="stat-label">총 자산</div>
+                        <div className="stat-label">순자산</div>
                         <div className="stat-value">{formatNumber(totalAssets)}원</div>
                     </div>
                     <div className={`stat-box ${profitRate >= 0 ? 'positive' : 'negative'}`}>
                         <div className="stat-label">수익률</div>
-                        <div className="stat-value">{formatPercent(profitRate)}</div>
+                        <div className="stat-value">{profitRate === null ? '—' : formatPercent(profitRate)}</div>
                     </div>
                     <div className="stat-box">
-                        <div className="stat-label">총 손익</div>
+                        <div className="stat-label">실현 손익 누계</div>
                         <div className={`stat-value ${totalProfit >= 0 ? 'profit' : 'loss'}`}>
                             {totalProfit >= 0 ? '+' : ''}
-                            {formatNumber(totalProfit)}원
+                            {formatChartPrice(totalProfit)}원
                         </div>
                     </div>
                     <div className="stat-box">
@@ -263,7 +272,7 @@ export default function SeasonEndModal({
                     <div className="detail-grid">
                         <div className="detail-item">
                             <span className="detail-label">승률</span>
-                            <span className="detail-value">{winRate.toFixed(1)}%</span>
+                            <span className="detail-value">{winRate === null ? '—' : `${winRate.toFixed(1)}%`}</span>
                         </div>
                         <div className="detail-item">
                             <span className="detail-label">수익 거래</span>
@@ -274,25 +283,25 @@ export default function SeasonEndModal({
                             <span className="detail-value text-loss">{lossTrades.length}회</span>
                         </div>
                         <div className="detail-item">
-                            <span className="detail-label">손익비</span>
+                            <span className="detail-label">총이익 / 총손실</span>
                             <span className="detail-value">
-                                {profitFactor === Infinity ? '∞' : profitFactor.toFixed(2)}
+                                {profitFactor === Infinity ? '∞' : profitFactor === null ? '—' : profitFactor.toFixed(2)}
                             </span>
                         </div>
                         <div className="detail-item">
                             <span className="detail-label">최대 연승</span>
-                            <span className="detail-value">{maxWinStreak || winStreak}연승</span>
+                            <span className="detail-value">{maxWinStreak ?? winStreak}연승</span>
                         </div>
                         <div className="detail-item">
-                            <span className="detail-label">최대 낙폭</span>
-                            <span className="detail-value text-loss">{maxDrawdown.toFixed(1)}%</span>
+                            <span className="detail-label">기록 구간 최대낙폭</span>
+                            <span className="detail-value text-loss">{maxDrawdown === null ? '—' : `${maxDrawdown.toFixed(1)}%`}</span>
                         </div>
 
                         {maxProfitTrade && (
                             <div className="detail-item">
                                 <span className="detail-label">최대 수익</span>
                                 <span className="detail-value text-profit">
-                                    +{formatNumber(maxProfitTrade.profit)}원
+                                    +{formatChartPrice(maxProfitTrade.profit)}원
                                 </span>
                             </div>
                         )}
@@ -301,11 +310,12 @@ export default function SeasonEndModal({
                             <div className="detail-item">
                                 <span className="detail-label">최대 손실</span>
                                 <span className="detail-value text-loss">
-                                    {formatNumber(maxLossTrade.profit)}원
+                                    {formatChartPrice(maxLossTrade.profit)}원
                                 </span>
                             </div>
                         )}
                     </div>
+                    <p className="submit-note">수익·손실·승률은 손익이 기록된 매도와 공매도 청산 {settledTrades.length}회 기준이며 본전도 승률 분모에 포함합니다. 낙폭은 보존된 자산 기록 구간만 반영합니다. 실현 손익 누계에는 미실현 손익·배당·별도 이자가 포함되지 않습니다.</p>
                 </div>
 
                 {yearAchievements.length > 0 && (
@@ -328,17 +338,19 @@ export default function SeasonEndModal({
                     {submitStatus === SUBMIT_STATUS.IDLE && (
                         <div className="submit-idle">
                             <p className="submit-description">
-                                결과를 서버에서 검증한 뒤 시즌 랭킹에 등록합니다.
+                                로컬 순자산과 온라인 순위는 별도로 계산됩니다. 제출 시 서버의 거래 재현 규칙으로 검증합니다.
                             </p>
                             <button
                                 className="btn-submit-score"
                                 onClick={handleSubmitScore}
-                                disabled={!seasonId || !buildPayload}
+                                disabled={!isFirebaseConfigured || !seasonId || !buildPayload}
                             >
                                 점수 제출하기
                             </button>
-                            {!seasonId && (
-                                <p className="submit-warning">시즌 정보를 불러오는 중입니다.</p>
+                            {!isFirebaseConfigured ? (
+                                <p className="submit-warning">온라인 순위 서비스가 연결되지 않았습니다.</p>
+                            ) : !seasonId && (
+                                <p className="submit-warning">{seasonLoading ? '시즌 정보를 불러오는 중입니다.' : '제출할 활성 시즌 정보가 없습니다.'}</p>
                             )}
                         </div>
                     )}

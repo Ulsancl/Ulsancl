@@ -18,8 +18,25 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-xl);
     width: 100%;
-    max-width: 450px;
+    max-width: 540px;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
 }
+
+.save-management { border-top: 1px solid var(--color-border); padding-top: 16px; }
+.save-management h3 { font-size: 1rem; margin: 0 0 12px; }
+.save-management p { font-size: .8rem; line-height: 1.65; color: var(--color-text-secondary); }
+.save-management .save-state { color: var(--color-profit); font-weight: 600; }
+.save-management .save-state.memory { color: var(--color-loss); }
+.save-management button { padding: 10px 12px; background: var(--color-bg-card); border: 1px solid var(--color-border); color: var(--color-text-primary); border-radius: 8px; cursor: pointer; }
+.save-management .save-download { width: 100%; border-color: var(--color-accent); }
+.save-backups { margin-top: 16px; font-size: .85rem; }
+.save-backups summary { cursor: pointer; }
+.save-backups ul { padding: 0; list-style: none; }
+.save-backups li { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin: 12px 0; font-size: .72rem; }
+.save-backups small { display: block; margin-top: 4px; color: var(--color-text-secondary); }
+.save-backups button { flex-shrink: 0; font-size: .75rem; }
+.save-message:empty { display: none; }
 
 .settings-header {
     display: flex;

@@ -1,131 +1,58 @@
-// 자산 변동 차트 컴포넌트
-import { useMemo } from 'react'
-import { formatCompact, formatPercent } from '../utils'
+import { useMemo, useState, useEffect, useRef } from 'react'
+import { formatPercent } from '../utils'
 import { INITIAL_CAPITAL } from '../constants'
+import { assetPlotPoints, formatChartPrice } from '../utils/chart-observations'
 import './AssetChart.css'
 
-export default function AssetChart({ assetHistory, onClose }) {
-    const chartData = useMemo(() => {
-        if (!assetHistory || assetHistory.length < 2) return null
-
-        const values = assetHistory.map(h => h.value)
-        const min = Math.min(...values)
-        const max = Math.max(...values)
-        const range = max - min || 1
-
-        // SVG 경로 생성
-        const width = 600
-        const height = 200
-        const padding = 40
-
-        const points = assetHistory.map((h, i) => {
-            const x = padding + (i / (assetHistory.length - 1)) * (width - padding * 2)
-            const y = height - padding - ((h.value - min) / range) * (height - padding * 2)
-            return { x, y, ...h }
-        })
-
-        const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
-        const areaD = `${pathD} L ${points[points.length - 1].x} ${height - padding} L ${padding} ${height - padding} Z`
-
-        return { points, pathD, areaD, min, max, width, height, padding }
-    }, [assetHistory])
-
-    if (!chartData) {
-        return (
-            <div className="asset-chart-overlay" onClick={onClose}>
-                <div className="asset-chart-panel" onClick={e => e.stopPropagation()}>
-                    <div className="asset-chart-header">
-                        <h2>📈 자산 변동 차트</h2>
-                        <button className="close-btn" onClick={onClose}>×</button>
-                    </div>
-                    <div className="no-data">
-                        <span>📊</span>
-                        <p>아직 충분한 데이터가 없습니다.</p>
-                        <p className="sub">게임을 진행하면 자산 변동이 기록됩니다.</p>
-                    </div>
-                </div>
-            </div>
-        )
+const timestampLabel = time => new Date(time).toLocaleString('ko-KR', { hour12:false })
+export default function AssetChart({ assetHistory = [], onClose }) {
+    const { points, domain } = useMemo(() => assetPlotPoints(assetHistory), [assetHistory])
+    const [selectedTime,setSelectedTime] = useState(null)
+    const dialog = useRef(null)
+    useEffect(() => { const previous=document.activeElement; dialog.current?.querySelector('button')?.focus(); return()=>previous?.focus?.() },[])
+    const last=points.at(-1), selected=points.find(p=>p.timestamp===selectedTime)||last
+    const currentValue=last?.value ?? INITIAL_CAPITAL, profitRate=(currentValue-INITIAL_CAPITAL)/INITIAL_CAPITAL*100, isProfit=profitRate>=0
+    const min=points.length?Math.min(...points.map(p=>p.value)):0,max=points.length?Math.max(...points.map(p=>p.value)):0
+    const path=points.map((p,i)=>`${i?'L':'M'}${p.x},${p.y}`).join(' ')
+    const y=value=>20+(domain.max-value)/(domain.max-domain.min)*180
+    const keyDown=event=>{
+        if(event.key==='Escape'){event.stopPropagation();onClose();return}
+        if(event.key==='Tab'){
+            const nodes=[...dialog.current.querySelectorAll('button:not(:disabled),[tabindex="0"]')].filter(node=>node.getClientRects().length),first=nodes[0],last=nodes.at(-1)
+            if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
+            else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}
+            return
+        }
+        if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!points.length)return
+        event.preventDefault();event.stopPropagation()
+        const i=points.indexOf(selected),next=event.key==='Home'?0:event.key==='End'?points.length-1:i+(event.key==='ArrowLeft'?-1:1)
+        setSelectedTime(points[Math.max(0,Math.min(points.length-1,next))].timestamp)
     }
-
-    const { points, pathD, areaD, min, max, width, height, padding } = chartData
-    const currentValue = points[points.length - 1]?.value || INITIAL_CAPITAL
-    const profitRate = ((currentValue - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100
-    const isProfit = profitRate >= 0
-
-    return (
-        <div className="asset-chart-overlay" onClick={onClose}>
-            <div className="asset-chart-panel" onClick={e => e.stopPropagation()}>
-                <div className="asset-chart-header">
-                    <h2>📈 자산 변동 차트</h2>
-                    <button className="close-btn" onClick={onClose}>×</button>
-                </div>
-
+    return <div className="asset-chart-overlay" onClick={onClose}>
+        <div className="asset-chart-panel" ref={dialog} role="dialog" aria-modal="true" aria-labelledby="asset-chart-title" onClick={e=>e.stopPropagation()} onKeyDown={keyDown}>
+            <div className="asset-chart-header"><h2 id="asset-chart-title">자산 기록</h2><button className="close-btn" aria-label="자산 차트 닫기" onClick={onClose}>×</button></div>
+            {!points.length?<div className="no-data"><p>시각이 기록된 자산 표본이 아직 없습니다.</p><p className="sub">실행 중 약 10초마다 기록합니다.</p></div>:<>
                 <div className="asset-summary">
-                    <div className="summary-item">
-                        <span className="label">현재 자산</span>
-                        <span className="value">{formatCompact(currentValue)}</span>
-                    </div>
-                    <div className="summary-item">
-                        <span className="label">최고</span>
-                        <span className="value high">{formatCompact(max)}</span>
-                    </div>
-                    <div className="summary-item">
-                        <span className="label">최저</span>
-                        <span className="value low">{formatCompact(min)}</span>
-                    </div>
-                    <div className="summary-item">
-                        <span className="label">수익률</span>
-                        <span className={`value ${isProfit ? 'profit' : 'loss'}`}>{formatPercent(profitRate)}</span>
-                    </div>
+                    <div className="summary-item"><span className="label">마지막 기록 자산</span><span className="value" data-testid="last-recorded-asset" data-value={currentValue}>{formatChartPrice(currentValue)}원</span></div>
+                    <div className="summary-item"><span className="label">기록 최고</span><span className="value high">{formatChartPrice(max)}원</span></div>
+                    <div className="summary-item"><span className="label">기록 최저</span><span className="value low">{formatChartPrice(min)}원</span></div>
+                    <div className="summary-item"><span className="label">초기 자산 대비</span><span className={`value ${isProfit?'profit':'loss'}`} data-testid="recorded-asset-return">{formatPercent(profitRate)}</span></div>
                 </div>
-
-                <div className="chart-container">
-                    <svg viewBox={`0 0 ${width} ${height}`} className="asset-svg">
-                        {/* 그리드 라인 */}
-                        {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
-                            const y = padding + ratio * (height - padding * 2)
-                            const value = max - ratio * (max - min)
-                            return (
-                                <g key={i}>
-                                    <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="var(--color-border)" strokeDasharray="4" />
-                                    <text x={padding - 5} y={y + 4} textAnchor="end" fill="var(--color-text-muted)" fontSize="10">
-                                        {formatCompact(value)}
-                                    </text>
-                                </g>
-                            )
-                        })}
-
-                        {/* 시작선 (원금) */}
-                        {min < INITIAL_CAPITAL && max > INITIAL_CAPITAL && (
-                            <line
-                                x1={padding}
-                                y1={height - padding - ((INITIAL_CAPITAL - min) / (max - min)) * (height - padding * 2)}
-                                x2={width - padding}
-                                y2={height - padding - ((INITIAL_CAPITAL - min) / (max - min)) * (height - padding * 2)}
-                                stroke="var(--color-accent)"
-                                strokeDasharray="6"
-                                strokeWidth="1"
-                            />
-                        )}
-
-                        {/* 영역 */}
-                        <path d={areaD} fill={isProfit ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'} />
-
-                        {/* 라인 */}
-                        <path d={pathD} fill="none" stroke={isProfit ? 'var(--color-profit)' : 'var(--color-loss)'} strokeWidth="2" />
-
-                        {/* 포인트들 */}
-                        {points.filter((_, i) => i % Math.ceil(points.length / 10) === 0 || i === points.length - 1).map((p, i) => (
-                            <circle key={i} cx={p.x} cy={p.y} r="4" fill={isProfit ? 'var(--color-profit)' : 'var(--color-loss)'} />
-                        ))}
-                    </svg>
-                </div>
-
-                <div className="chart-footer">
-                    <span>총 {assetHistory.length}개의 기록</span>
-                </div>
-            </div>
+                <div className="asset-selected" data-testid="asset-selected" data-time={selected.timestamp} data-value={selected.value}>{timestampLabel(selected.timestamp)} · {formatChartPrice(selected.value)}원</div>
+                <div className="chart-container"><svg viewBox="0 0 600 240" className="asset-svg" role="group" tabIndex="0" aria-label="기록 시각에 따른 자산. 방향키로 기록 선택" onPointerMove={event=>{
+                    const rect=event.currentTarget.getBoundingClientRect(),x=(event.clientX-rect.left)/rect.width*600
+                    const nearest=points.reduce((a,b)=>Math.abs(b.x-x)<Math.abs(a.x-x)?b:a);setSelectedTime(nearest.timestamp)
+                }}>
+                    {Array.from({length:5},(_,i)=>{const value=domain.min+(domain.max-domain.min)*i/4;return <g key={i}><line x1="85" x2="580" y1={y(value)} y2={y(value)} stroke="var(--color-border)" strokeDasharray="4"/><text x="78" y={y(value)+4} textAnchor="end" fill="var(--color-text-muted)" fontSize="10">{formatChartPrice(value,(domain.max-domain.min)/4)}</text></g>})}
+                    {domain.min<=INITIAL_CAPITAL&&domain.max>=INITIAL_CAPITAL&&<line x1="85" x2="580" y1={y(INITIAL_CAPITAL)} y2={y(INITIAL_CAPITAL)} stroke="var(--color-accent)" strokeDasharray="6"/>}
+                    <path d={path} fill="none" stroke={isProfit?'var(--color-profit)':'var(--color-loss)'} strokeWidth="2"/>
+                    {points.map((p,i)=><circle key={`${p.timestamp}:${i}`} data-asset-time={p.timestamp} data-asset-value={p.value} cx={p.x} cy={p.y} r={p===selected?4:2} fill={p===selected?'var(--color-text-primary)':'var(--color-accent)'}/>)}
+                    <line x1={selected.x} x2={selected.x} y1="20" y2="200" stroke="var(--color-text-muted)" strokeDasharray="3 3"/>
+                    <text x="85" y="229" fill="var(--color-text-muted)" fontSize="10">{new Date(points[0].timestamp).toLocaleTimeString('ko-KR',{hour12:false})}</text>
+                    <text x="580" y="229" textAnchor="end" fill="var(--color-text-muted)" fontSize="10">{new Date(last.timestamp).toLocaleTimeString('ko-KR',{hour12:false})}</text>
+                </svg></div>
+                <div className="chart-footer">{points.length}개 표본 · 마지막 기록 {timestampLabel(last.timestamp)}<br/>가로축은 실제 기록 시각입니다. 현재 계좌와 다음 기록 전까지 차이가 날 수 있습니다.</div>
+            </>}
         </div>
-    )
+    </div>
 }

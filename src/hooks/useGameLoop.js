@@ -12,10 +12,12 @@ import {
     applyEventEffect,
     startNewTradingDay,
     calculateGameDate,
+    GAME_START_YEAR,
+    DAYS_PER_YEAR,
     getActiveGlobalEvent,
     checkAlerts
 } from '../engine'
-import { calculateStockValueFromMap, calculateShortValueFromMap } from '../utils/index.js'
+import { calculateAssets } from '../utils/index.js'
 
 // 서브 모듈 import
 import {
@@ -30,14 +32,6 @@ import {
 // 상수
 const PRICE_RESET_DELAY = 500
 const ASSET_HISTORY_INTERVAL = 10000
-
-const getLeverageDebt = (portfolio) => {
-    if (!portfolio) return 0
-    return Object.values(portfolio).reduce((total, holding) => {
-        const borrowed = typeof holding.borrowed === 'number' ? holding.borrowed : 0
-        return total + borrowed
-    }, 0)
-}
 
 export const useGameLoop = ({
     stocks,
@@ -69,6 +63,8 @@ export const useGameLoop = ({
     setTotalDividends,
     unlockedSkills,
     gameStartTime,
+    currentDay = 1,
+    isInitialized = true,
     setCurrentDay,
     marketState,
     setMarketState,
@@ -83,12 +79,14 @@ export const useGameLoop = ({
     playSound,
     formatNumber,
     onTick,
+    onObservation,
     recordTrade,
     updateInterval = 1000
 }) => {
     // Refs
-    const lastDayRef = useRef(1)
-    const lastSeasonYearRef = useRef(2020)
+    const lastDayRef = useRef(currentDay)
+    const lastSeasonYearRef = useRef(GAME_START_YEAR - 1)
+    const sessionRef = useRef(null)
     const priceResetTimeoutRef = useRef(null)
     const lastAssetHistoryRef = useRef(0)
     const gameTimeRef = useRef(null)
@@ -107,6 +105,7 @@ export const useGameLoop = ({
     const showNotificationRef = useRef(showNotification)
     const playSoundRef = useRef(playSound)
     const onTickRef = useRef(onTick)
+    const onObservationRef = useRef(onObservation)
 
     const { tick: updatePricesTick } = usePriceUpdater({
         setPriceHistory, setPriceChanges
@@ -141,6 +140,22 @@ export const useGameLoop = ({
     const processDailyInterestRef = useRef(processDailyInterest)
     const processDividendsTickRef = useRef(processDividendsTick)
     const processCrisisTickRef = useRef(processCrisisTick)
+    // Saved currentDay is the last processed trading day, not the wall-clock day.
+    // Restore it once per session so a same-day reload cannot reset statistics or charge interest twice.
+    useLayoutEffect(() => {
+        if (!isInitialized) {
+            sessionRef.current = null
+            return
+        }
+        if (sessionRef.current?.gameStartTime === gameStartTime) return
+        const savedDay = Number.isInteger(currentDay) && currentDay > 0 ? currentDay : 1
+        sessionRef.current = { gameStartTime }
+        lastDayRef.current = savedDay
+        lastSeasonYearRef.current = GAME_START_YEAR + Math.floor((savedDay - 1) / DAYS_PER_YEAR) - 1
+        gameTimeRef.current = null
+        lastAssetHistoryRef.current = 0
+        if (priceResetTimeoutRef.current) clearTimeout(priceResetTimeoutRef.current)
+    }, [currentDay, gameStartTime, isInitialized])
     // Sync refs
     useLayoutEffect(() => {
         gameStartTimeRef.current = gameStartTime
@@ -158,6 +173,7 @@ export const useGameLoop = ({
         showNotificationRef.current = showNotification
         playSoundRef.current = playSound
         onTickRef.current = onTick
+        onObservationRef.current = onObservation
         updatePricesTickRef.current = updatePricesTick
         generateNewsTickRef.current = generateNewsTick
         processOrdersTickRef.current = processOrdersTick
@@ -182,6 +198,7 @@ export const useGameLoop = ({
         showNotification,
         playSound,
         onTick,
+        onObservation,
         updatePricesTick,
         generateNewsTick,
         processOrdersTick,
@@ -194,6 +211,7 @@ export const useGameLoop = ({
 
     // 메인 게임 루프
     useEffect(() => {
+        if (!isInitialized) return
         const interval = setInterval(() => {
             try {
                 onTickRef.current?.()
@@ -224,6 +242,7 @@ export const useGameLoop = ({
             let workingCreditInterest = currentCreditInterest
             let workingMarginCallActive = currentMarginCallActive
             let workingPendingOrders = currentPendingOrders
+            const liquidationTrades = []
 
             // 1. 게임 시간 업데이트
             const newGameTime = calculateGameDate(gameStartTimeRef.current, now)
@@ -274,6 +293,7 @@ export const useGameLoop = ({
                 if (marginResult.portfolio !== undefined) workingPortfolio = marginResult.portfolio
                 if (marginResult.creditUsed !== undefined) workingCreditUsed = marginResult.creditUsed
                 if (marginResult.creditInterest !== undefined) workingCreditInterest = marginResult.creditInterest
+                liquidationTrades.push(...(marginResult.trades || []))
             }
 
             // 6. 뉴스 생성
@@ -338,6 +358,20 @@ export const useGameLoop = ({
             if (shortResult) {
                 workingCash = shortResult.cash
                 workingShortPositions = shortResult.shortPositions
+                liquidationTrades.push(...(shortResult.trades || []))
+            }
+
+            // Forced settlements use the existing cash flow, without adding server replay actions.
+            if (liquidationTrades.length > 0) {
+                setTradeHistory(prev => [...prev, ...liquidationTrades.map(trade => ({
+                    ...trade, id: `liquidation-${now}-${trade.type}-${trade.stockId}`, timestamp: now
+                }))])
+                setTotalTrades(prev => prev + liquidationTrades.length)
+                setDailyTrades(prev => prev + liquidationTrades.length)
+                const profit = liquidationTrades.reduce((sum, trade) => sum + trade.profit, 0)
+                setTotalProfit(prev => prev + profit)
+                setDailyProfit(prev => prev + profit)
+                setWinStreak(prev => liquidationTrades.reduce((streak, trade) => trade.profit > 0 ? streak + 1 : 0, prev))
             }
 
             // 13. 알림 체크
@@ -360,11 +394,10 @@ export const useGameLoop = ({
             // 15. 자산 기록 (10초마다)
             if (now - lastAssetHistoryRef.current >= ASSET_HISTORY_INTERVAL) {
                 lastAssetHistoryRef.current = now
-                const stockValueNow = calculateStockValueFromMap(stockMap, workingPortfolio)
-                const shortValueNow = calculateShortValueFromMap(stockMap, workingShortPositions)
-                const grossAssetsNow = workingCash + stockValueNow + shortValueNow
-                const leverageDebtNow = getLeverageDebt(workingPortfolio)
-                const totalAssetsNow = grossAssetsNow - workingCreditUsed - workingCreditInterest - leverageDebtNow
+                const { totalAssets: totalAssetsNow } = calculateAssets({
+                    cash: workingCash, portfolio: workingPortfolio, shortPositions: workingShortPositions,
+                    stockMap, creditUsed: workingCreditUsed, creditInterest: workingCreditInterest
+                })
                 setAssetHistory(prev => [...prev.slice(-100), { value: totalAssetsNow, timestamp: now, day: gameDay }])
             }
 
@@ -379,6 +412,13 @@ export const useGameLoop = ({
             if (workingCreditInterest !== currentCreditInterest) setCreditInterest(workingCreditInterest)
             if (workingMarginCallActive !== currentMarginCallActive) setMarginCallActive(workingMarginCallActive)
 
+            // Observe every completed tick, including unchanged prices; never consume market randomness.
+            try {
+                onObservationRef.current?.({ stocks: workingStocks, timeMs: now, gameDay, gameTime: newGameTime })
+            } catch (error) {
+                console.warn('[useGameLoop] observation callback failed:', error)
+            }
+
         }, updateInterval)
 
         return () => {
@@ -386,10 +426,12 @@ export const useGameLoop = ({
             if (priceResetTimeoutRef.current) clearTimeout(priceResetTimeoutRef.current)
         }
     }, [
+        isInitialized,
         updateInterval,
         setActiveCrisis, setAlerts, setAssetHistory, setCash, setCreditInterest, setCreditUsed, setCrisisAlert, setCrisisHistory,
         setCurrentDay, setDailyProfit, setDailyTrades, setGameTime, setMarketState, setNews, setPendingOrders,
-        setPortfolio, setPriceChanges, setShortPositions, setShowSeasonEnd, setStocks, setTotalDividends, setMarginCallActive
+        setPortfolio, setPriceChanges, setShortPositions, setShowSeasonEnd, setStocks, setTotalDividends, setMarginCallActive,
+        setTradeHistory, setTotalTrades, setTotalProfit, setWinStreak
     ])
 }
 

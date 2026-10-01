@@ -31,6 +31,8 @@ export {
     calculateShortValue,
     calculateStockValueFromMap,
     calculateShortValueFromMap,
+    getShortPositionMargin,
+    calculateShortMargin,
     calculateAssets,
     safeNumber,
     formatProfitRate

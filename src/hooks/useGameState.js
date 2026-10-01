@@ -165,6 +165,8 @@ export const useGameState = (input = {}) => {
             setIfChanged(setTotalTrades, saved.totalTrades ?? 0)
             setIfChanged(setWinStreak, saved.winStreak ?? 0)
             setIfChanged(setTotalProfit, saved.totalProfit ?? 0)
+            setIfChanged(setDailyTrades, saved.dailyTrades ?? 0)
+            setIfChanged(setDailyProfit, saved.dailyProfit ?? 0)
             setIfChanged(setNews, saved.news ?? [])
             setIfChanged(setMissionProgress, saved.missionProgress ?? {})
             setIfChanged(setCompletedMissions, saved.completedMissions ?? {})
@@ -364,6 +366,7 @@ export const useGameState = (input = {}) => {
         // 함수
         resetGameState,
         saveGameState,
+        getSaveSnapshot: () => structuredClone(buildSnapshot()),
         loadGameState
     }
 }

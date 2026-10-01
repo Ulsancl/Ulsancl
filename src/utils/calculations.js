@@ -3,7 +3,7 @@
  * NaN 안전 계산 및 파생 값 계산
  */
 
-import { INITIAL_CAPITAL, CREDIT_TRADING } from '../constants'
+import { INITIAL_CAPITAL, CREDIT_TRADING, SHORT_SELLING } from '../constants'
 
 /**
  * 주식 가치 계산
@@ -72,6 +72,17 @@ export const calculateShortValueFromMap = (stockMap, shortPositions) => {
     }, 0)
 }
 
+// Cash already excludes this collateral. Keep it separate from unrealized P/L.
+export const getShortPositionMargin = (position) => {
+    if (!position) return 0
+    if (Number.isFinite(position.margin) && position.margin >= 0) return position.margin
+    const legacyMargin = position.entryPrice * position.quantity * SHORT_SELLING.marginRate
+    return Number.isFinite(legacyMargin) && legacyMargin >= 0 ? legacyMargin : 0
+}
+
+export const calculateShortMargin = (shortPositions) =>
+    Object.values(shortPositions || {}).reduce((total, position) => total + getShortPositionMargin(position), 0)
+
 /**
  * 안전한 숫자 반환 (NaN 방지)
  * @param {number} value - 숫자 값
@@ -92,30 +103,34 @@ export const calculateAssets = ({
     portfolio,
     shortPositions,
     stocks,
+    stockMap,
     creditUsed = 0,
     creditInterest = 0,
-    levelInfo = { level: 1 }
+    levelInfo = { level: 1 },
+    initialCapital = INITIAL_CAPITAL
 }) => {
     const safeCash = safeNumber(cash)
     const safeCreditUsed = safeNumber(creditUsed)
     const safeCreditInterest = safeNumber(creditInterest)
 
-    const stockValue = calculateStockValue(portfolio, stocks)
-    const shortValue = calculateShortValue(shortPositions, stocks)
+    const stockValue = stockMap ? calculateStockValueFromMap(stockMap, portfolio) : calculateStockValue(portfolio, stocks)
+    const shortValue = stockMap ? calculateShortValueFromMap(stockMap, shortPositions) : calculateShortValue(shortPositions, stocks)
+    const shortMargin = calculateShortMargin(shortPositions)
+    const shortEquity = shortMargin + shortValue
     const leverageDebt = Object.values(portfolio || {}).reduce((total, holding) => {
         const borrowed = typeof holding.borrowed === 'number' ? holding.borrowed : 0
         return total + (isNaN(borrowed) ? 0 : borrowed)
     }, 0)
 
     // 총 자산 (부채 제외)
-    const grossAssets = safeCash + stockValue + shortValue
+    const grossAssets = safeCash + stockValue + shortEquity
 
     // 순 자산 (부채 차감)
     const totalAssets = grossAssets - safeCreditUsed - safeCreditInterest - leverageDebt
 
     // 수익률
-    const profitRate = INITIAL_CAPITAL > 0
-        ? ((totalAssets - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100
+    const profitRate = initialCapital > 0
+        ? ((totalAssets - initialCapital) / initialCapital) * 100
         : 0
 
     // 신용 거래 관련
@@ -128,6 +143,8 @@ export const calculateAssets = ({
     return {
         stockValue,
         shortValue,
+        shortMargin,
+        shortEquity,
         grossAssets,
         totalAssets,
         profitRate,
@@ -158,6 +175,8 @@ export default {
     calculateShortValue,
     calculateStockValueFromMap,
     calculateShortValueFromMap,
+    getShortPositionMargin,
+    calculateShortMargin,
     calculateAssets,
     safeNumber,
     formatProfitRate

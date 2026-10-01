@@ -31,7 +31,7 @@ const firebaseConfig = {
 }
 
 const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId']
-const isFirebaseConfigured = requiredKeys.every((key) => Boolean(firebaseConfig[key]))
+export const isFirebaseConfigured = requiredKeys.every((key) => Boolean(firebaseConfig[key]))
 const isDevHost =
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
@@ -140,6 +140,7 @@ export function getCurrentUserId() {
 export const submitGameScore = httpsCallable(functions, 'submitGameScore')
 
 export async function getCurrentSeason() {
+    if (!isFirebaseConfigured) return null
     try {
         const q = query(
             collection(db, 'seasons'),

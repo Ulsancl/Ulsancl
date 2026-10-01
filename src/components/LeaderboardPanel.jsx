@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+    isFirebaseConfigured,
     getCurrentSeason,
     getCurrentUserId,
     getLeaderboardSnapshot,
@@ -13,10 +14,14 @@ const REFRESH_INTERVAL = 60000
 const ERROR_STATE = {
     NONE: 'none',
     NO_SEASON: 'no_season',
-    NETWORK: 'network'
+    NETWORK: 'network',
+    UNCONFIGURED: 'unconfigured'
 }
 
 function resolveErrorMessage(errorState) {
+    if (errorState === ERROR_STATE.UNCONFIGURED) {
+        return '이 배포본은 온라인 랭킹에 연결되어 있지 않습니다. 로컬 시뮬레이션의 순자산과 거래 내역은 계속 이용할 수 있습니다.'
+    }
     if (errorState === ERROR_STATE.NO_SEASON) {
         return '활성 시즌 정보를 찾을 수 없습니다.'
     }
@@ -39,6 +44,11 @@ export function LeaderboardPanel({ isOpen, onClose, seasonId: propSeasonId }) {
     }, [propSeasonId])
 
     const fetchLeaderboard = useCallback(async () => {
+        if (!isFirebaseConfigured) {
+            setLoading(false)
+            setErrorState(ERROR_STATE.UNCONFIGURED)
+            return
+        }
         setLoading(true)
         setErrorState(ERROR_STATE.NONE)
 
