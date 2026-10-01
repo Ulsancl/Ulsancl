@@ -36,6 +36,9 @@ self.addEventListener('fetch', event => {
     if (!PRECACHE.includes(url.pathname)) return
     event.respondWith((async () => {
         const cache = await caches.open(CACHE_NAME)
-        return await cache.match(request) || fetch(request)
+        // Build-manifest assets are static and same-origin. Development/preview
+        // servers may emit Vary: Origin while module requests add Origin and the
+        // precache request does not. Match these known files independently of Vary.
+        return await cache.match(request, { ignoreVary: true }) || fetch(request)
     })())
 })

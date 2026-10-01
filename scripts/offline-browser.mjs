@@ -7,7 +7,7 @@ import { chromium } from 'playwright'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const output = path.join(root, 'output/offline-browser')
 await fs.mkdir(output, { recursive: true })
-const report = { checks: [], errors: [], screenshots: [] }
+const report = { checks: [], errors: [], screenshots: [], phases: [], failedRequests: [] }
 const legacySource = `self.addEventListener('install',e=>e.waitUntil(caches.open('stock-game-v1').then(c=>c.put('/index.html',new Response('LEGACY_STOCK_CACHE')))));self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',e=>{if(e.request.mode==='navigate')e.respondWith(caches.open('stock-game-v1').then(c=>c.match('/index.html')))});`
 const legacyFixture = { name: 'legacy-worker-fixture', configurePreviewServer(server) {
   server.middlewares.use((request, response, next) => {
@@ -50,6 +50,7 @@ try {
     }
     next = await context.newPage()
     next.on('pageerror', error => report.errors.push(error.message))
+    next.on('requestfailed', request => report.failedRequests.push({ url: request.url(), error: request.failure()?.errorText }))
     await next.goto('http://127.0.0.1:5265', { waitUntil: 'domcontentloaded' })
     await next.waitForFunction(() => window.stockLab?.getState().isInitialized)
     const data = await next.evaluate(async () => ({ keys: await caches.keys(), cash: window.stockLab.getState().cash, retained: await (await caches.open('unrelated-app-cache')).match('/other-app-proof').then(r => r.text()) }))
@@ -58,7 +59,26 @@ try {
     assert.equal(data.cash, 123456789)
   })
   await check('all lazy views and saved balance load offline from the production package', async () => {
-    await next.evaluate(async () => { await navigator.serviceWorker.ready })
+    // Registration readiness alone does not establish control over this document.
+    await next.waitForFunction(async () => {
+      const registration = await navigator.serviceWorker.getRegistration()
+      return navigator.serviceWorker.controller?.scriptURL.endsWith('/sw.js')
+        && navigator.serviceWorker.controller.state === 'activated'
+        && registration?.active?.state === 'activated'
+    }, null, { polling: 100 })
+    report.phases.push(await next.evaluate(async () => ({ phase: 'controlled-online', controller: navigator.serviceWorker.controller?.scriptURL,
+      cached: await Promise.all((await caches.keys()).map(async name => {
+        const cache = await caches.open(name), requests = await cache.keys()
+        const module = requests.find(request => /\/assets\/index-.*\.js$/.test(request.url))
+        const varyProbe = module ? new Request(module.url, { headers: { Origin: location.origin } }) : null
+        return { name, urls: requests.map(request => request.url), moduleVary: module ? (await cache.match(module)).headers.get('vary') : null,
+          moduleOrigin: module?.headers.get('origin'), exactModuleMatch: varyProbe ? Boolean(await cache.match(varyProbe)) : null,
+          staticModuleMatch: varyProbe ? Boolean(await cache.match(varyProbe, { ignoreVary: true })) : null }
+      })) })))
+    // Do not let a warm HTTP cache conceal missing service-worker module matches.
+    const cacheSession = await context.newCDPSession(next)
+    await cacheSession.send('Network.enable')
+    await cacheSession.send('Network.clearBrowserCache')
     await context.setOffline(true)
     await next.reload({ waitUntil: 'domcontentloaded' })
     await next.waitForFunction(() => window.stockLab?.getState().isInitialized)
@@ -97,6 +117,12 @@ try {
 } catch (error) {
   report.failure = error.stack
   console.error(error)
+  if (next && !next.isClosed()) {
+    report.phases.push(await next.evaluate(() => ({ phase: 'failure', url: location.href, ready: document.readyState, title: document.title,
+      controller: navigator.serviceWorker.controller?.scriptURL, state: navigator.serviceWorker.controller?.state,
+      body: document.body?.innerText.slice(0, 1500), scripts: [...document.scripts].map(script => script.src) })).catch(error => ({ diagnosticError: error.message })))
+    await next.screenshot({ path: path.join(output, 'failure.png') }).catch(() => {})
+  }
   process.exitCode = 1
 } finally {
   await fs.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2))
