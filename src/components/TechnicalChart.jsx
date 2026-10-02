@@ -1,511 +1,109 @@
-/**
- * TechnicalChart - 기술적 분석 차트 컴포넌트
- * RSI, MACD, 볼린저밴드, 이동평균선 표시
- */
-import React, { useMemo, useState, memo } from 'react'
-import {
-    calculateSMA,
-    calculateRSI,
-    calculateMACD,
-    calculateBollingerBands,
-    analyzeTrend,
-    generateSignals
-} from '../game/TechnicalAnalysis'
-import { formatCompact } from '../utils'
+import React, { useMemo, useState } from 'react'
+import { generateSignals } from '../game/TechnicalAnalysis'
+import { alignedIndicators, priceDomain, formatChartPrice, observationTime } from '../utils/chart-observations'
 import './TechnicalChart.css'
 
-// 기술적 지표 설정
-const INDICATOR_CONFIGS = {
-    sma5: { name: 'SMA 5', color: '#FFD700', period: 5 },
-    sma20: { name: 'SMA 20', color: '#00BFFF', period: 20 },
-    sma60: { name: 'SMA 60', color: '#FF69B4', period: 60 },
-    bb: { name: '볼린저 밴드', upperColor: 'rgba(147, 112, 219, 0.5)', lowerColor: 'rgba(147, 112, 219, 0.5)', middleColor: '#9370DB' },
-}
+const COLORS = { sma5: '#f2ca65', sma20: '#63c5f5', sma60: '#ef9ccb', bbMiddle: '#b3a0f4', macd: '#63c5f5', signal: '#f5a383' }
+const fields = [['open','시가'],['high','고가'],['low','저가'],['close','종가']]
 
-/**
- * 메인 가격 차트 + 이동평균선 + 볼린저밴드
- */
-const PriceChart = memo(function PriceChart({
-    candleData,
-    priceHistory,
-    width,
-    height,
-    showSMA,
-    showBB,
-    currentPrice
-}) {
-    if (!candleData || candleData.length === 0 || !width || !height) {
-        return <div className="chart-loading">데이터 로딩중...</div>
+export default function TechnicalChart({ candleData = [], currentPrice, width = 700, showIndicatorPanel = true }) {
+    const [shown, setShown] = useState({ sma5: true, sma20: true, sma60: false, bb: false })
+    const [selectedId, setSelectedId] = useState(null), [hoverId, setHoverId] = useState(null)
+    const [endId, setEndId] = useState(null), [windowSize, setWindowSize] = useState(60)
+    const indicators = useMemo(() => alignedIndicators(candleData), [candleData])
+    const signals = useMemo(() => generateSignals(candleData.map(c => c.close)), [candleData])
+    const endIndex = endId ? candleData.findIndex(c => c.id === endId) : candleData.length - 1
+    const end = endIndex >= 0 ? endIndex + 1 : candleData.length, start = Math.max(0, end - windowSize)
+    const visible = candleData.slice(start, end), n = visible.length
+    const selected = visible.find(c => c.id === hoverId) || candleData.find(c => c.id === selectedId) || visible.at(-1)
+    const selectedGlobal = selected ? candleData.findIndex(c => c.id === selected.id) : -1
+    const expired = selectedId && !candleData.some(c => c.id === selectedId)
+    const w = Math.max(240, width), left = 12, right = w < 400 ? 84 : 102, plotWidth = w - left - right
+    const x = i => left + (i + .5) * plotWidth / Math.max(n, 1)
+    const priceTop = 24, priceBottom = 240, rsiTop = 302, rsiBottom = 372, macdTop = 421, macdBottom = 491
+    const height = showIndicatorPanel ? 529 : 286
+    const live = end === candleData.length && !endId
+    const values = visible.flatMap(c => [c.high, c.low])
+    if (live && Number.isFinite(currentPrice)) values.push(currentPrice)
+    if (showIndicatorPanel) for (const key of ['sma5','sma20','sma60','bbUpper','bbLower']) {
+        if (shown[key] || (shown.bb && key.startsWith('bb'))) values.push(...indicators[key].slice(start,end).filter(Number.isFinite))
     }
-
-    const padding = { top: 20, right: 60, bottom: 30, left: 10 }
-    const chartWidth = width - padding.left - padding.right
-    const chartHeight = height - padding.top - padding.bottom
-
-    // 가격 범위 계산
-    const prices = priceHistory || candleData.map(d => d.close)
-    const bb = showBB && prices.length >= 20 ? calculateBollingerBands(prices) : null
-
-    let allValues = [...candleData.map(d => d.high), ...candleData.map(d => d.low)]
-    if (bb) {
-        allValues = [...allValues, ...bb.upper, ...bb.lower]
+    const domain = priceDomain(values), y = value => priceTop + (domain.max - value) / (domain.max - domain.min) * (priceBottom - priceTop)
+    const rsiY = value => rsiBottom - value / 100 * (rsiBottom - rsiTop)
+    const macdLimit = Math.max(1e-10, ...['macd','signal','histogram'].flatMap(key => indicators[key].slice(start,end).filter(Number.isFinite).map(Math.abs))) * 1.15
+    const macdY = value => (macdTop + macdBottom) / 2 - value / macdLimit * (macdBottom - macdTop) / 2
+    const line = (values, toY) => {
+        let moving = true
+        return values.slice(start,end).map((value,i) => {
+            if (!Number.isFinite(value)) { moving = true; return '' }
+            const command = moving ? 'M' : 'L'; moving = false; return `${command}${x(i)},${toY(value)}`
+        }).join(' ')
     }
-
-    const dataMin = Math.min(...allValues)
-    const dataMax = Math.max(...allValues)
-    const priceRange = dataMax - dataMin || 1
-    const pricePadding = priceRange * 0.05
-    const minPrice = dataMin - pricePadding
-    const maxPrice = dataMax + pricePadding
-    const adjustedRange = maxPrice - minPrice
-
-    const priceToY = (price) => {
-        return padding.top + chartHeight - ((price - minPrice) / adjustedRange) * chartHeight
+    const curve = (key, toY, color) => {
+        const items = indicators[key].slice(start,end), valid = items.map((v,i) => Number.isFinite(v) ? i : -1).filter(i => i >= 0)
+        return <g key={key} data-indicator={key}><path data-testid={`indicator-${key}`} d={line(indicators[key],toY)} fill="none" stroke={color} strokeWidth="1.5" />{valid.length === 1 && <circle cx={x(valid[0])} cy={toY(items[valid[0]])} r="2.5" fill={color} />}</g>
     }
-
-    const candleWidth = Math.max(Math.min(chartWidth / candleData.length * 0.7, 12), 3)
-    const gap = chartWidth / candleData.length
-
-    // SMA 계산
-    const sma5 = showSMA.sma5 && prices.length >= 5 ? calculateSMA(prices, 5) : null
-    const sma20 = showSMA.sma20 && prices.length >= 20 ? calculateSMA(prices, 20) : null
-    const sma60 = showSMA.sma60 && prices.length >= 60 ? calculateSMA(prices, 60) : null
-
-    // Y축 그리드
-    const yTicks = []
-    const tickCount = 5
-    for (let i = 0; i <= tickCount; i++) {
-        yTicks.push(minPrice + (adjustedRange / tickCount) * i)
+    const indexAt = event => {
+        const rect = event.currentTarget.getBoundingClientRect(), px = (event.clientX - rect.left) * w / Math.max(1,rect.width)
+        return Math.max(0,Math.min(n - 1,Math.floor((px - left) / plotWidth * n)))
     }
-
-    // 캔들 렌더링
-    const candles = candleData.map((candle, i) => {
-        const x = padding.left + (i * gap) + gap / 2
-        const isUp = candle.close >= candle.open
-        const color = isUp ? '#26a69a' : '#ef5350'
-
-        const yHigh = priceToY(candle.high)
-        const yLow = priceToY(candle.low)
-        const yOpen = priceToY(candle.open)
-        const yClose = priceToY(candle.close)
-
-        const bodyTop = Math.min(yOpen, yClose)
-        const bodyHeight = Math.max(Math.abs(yOpen - yClose), 1)
-
-        return (
-            <g key={i}>
-                <line x1={x} y1={yHigh} x2={x} y2={Math.min(yOpen, yClose)} stroke={color} strokeWidth={1} />
-                <line x1={x} y1={Math.max(yOpen, yClose)} x2={x} y2={yLow} stroke={color} strokeWidth={1} />
-                <rect x={x - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={color} />
-            </g>
-        )
-    })
-
-    // SMA 라인 생성 함수
-    const createSMAPath = (smaData, offset) => {
-        if (!smaData || smaData.length === 0) return null
-        return smaData.map((value, i) => {
-            const dataIndex = offset + i
-            if (dataIndex >= candleData.length) return null
-            const x = padding.left + (dataIndex * gap) + gap / 2
-            const y = priceToY(value)
-            return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
-        }).filter(Boolean).join(' ')
+    const pin = index => {
+        const candle = candleData[Math.max(0,Math.min(candleData.length - 1,index))]; if (!candle) return
+        setSelectedId(candle.id); setHoverId(null)
+        const targetEnd = index < start ? Math.min(candleData.length,index + windowSize) : index >= end ? index + 1 : end
+        setEndId(candleData[Math.max(0,targetEnd - 1)]?.id || null)
     }
-
-    // 볼린저 밴드 영역 생성
-    const createBBArea = () => {
-        if (!bb || bb.upper.length === 0) return null
-        const offset = prices.length - bb.upper.length
-
-        const upperPath = bb.upper.map((value, i) => {
-            const dataIndex = offset + i
-            if (dataIndex >= candleData.length) return null
-            const x = padding.left + (dataIndex * gap) + gap / 2
-            const y = priceToY(value)
-            return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
-        }).filter(Boolean).join(' ')
-
-        const lowerPath = [...bb.lower].reverse().map((value, i) => {
-            const originalIndex = bb.lower.length - 1 - i
-            const dataIndex = offset + originalIndex
-            if (dataIndex >= candleData.length) return null
-            const x = padding.left + (dataIndex * gap) + gap / 2
-            const y = priceToY(value)
-            return `L ${x} ${y}`
-        }).filter(Boolean).join(' ')
-
-        return upperPath + ' ' + lowerPath + ' Z'
+    const keyboard = event => {
+        if (!['ArrowLeft','ArrowRight','Home','End','Escape'].includes(event.key)) return
+        if (event.key === 'Escape' && !endId && !selectedId && !hoverId) return
+        event.preventDefault(); event.stopPropagation()
+        if (event.key === 'Escape') { setSelectedId(null); setEndId(null); setHoverId(null); return }
+        const index = selectedGlobal < 0 ? end - 1 : selectedGlobal
+        pin(event.key === 'Home' ? 0 : event.key === 'End' ? candleData.length - 1 : index + (event.key === 'ArrowLeft' ? -1 : 1))
     }
-
-    const lastIsUp = currentPrice >= candleData[candleData.length - 1].open
-    const lastY = priceToY(currentPrice)
-
-    return (
-        <svg width={width} height={height} className="technical-chart-svg">
-            {/* 그리드 */}
-            {yTicks.map((price, i) => {
-                const y = priceToY(price)
-                return (
-                    <g key={i}>
-                        <line x1={padding.left} y1={y} x2={width - padding.right} y2={y}
-                            stroke="rgba(255,255,255,0.1)" strokeDasharray="3 3" />
-                        <text x={width - padding.right + 5} y={y + 4} fill="#888" fontSize="10">
-                            {formatCompact(price)}
-                        </text>
-                    </g>
-                )
-            })}
-
-            {/* 볼린저 밴드 영역 */}
-            {showBB && bb && (
-                <path d={createBBArea()} fill="rgba(147, 112, 219, 0.15)" />
-            )}
-
-            {/* 캔들 */}
-            {candles}
-
-            {/* SMA 라인들 */}
-            {showSMA.sma5 && sma5 && (
-                <path d={createSMAPath(sma5, prices.length - sma5.length)}
-                    fill="none" stroke={INDICATOR_CONFIGS.sma5.color} strokeWidth="1.5" />
-            )}
-            {showSMA.sma20 && sma20 && (
-                <path d={createSMAPath(sma20, prices.length - sma20.length)}
-                    fill="none" stroke={INDICATOR_CONFIGS.sma20.color} strokeWidth="1.5" />
-            )}
-            {showSMA.sma60 && sma60 && (
-                <path d={createSMAPath(sma60, prices.length - sma60.length)}
-                    fill="none" stroke={INDICATOR_CONFIGS.sma60.color} strokeWidth="1.5" />
-            )}
-
-            {/* 볼린저 밴드 중심선 */}
-            {showBB && bb && (
-                <path d={createSMAPath(bb.middle, prices.length - bb.middle.length)}
-                    fill="none" stroke={INDICATOR_CONFIGS.bb.middleColor} strokeWidth="1" strokeDasharray="4 2" />
-            )}
-
-            {/* 현재가 라인 */}
-            <line x1={padding.left} y1={lastY} x2={width - padding.right} y2={lastY}
-                stroke={lastIsUp ? '#26a69a' : '#ef5350'} strokeWidth={1} strokeDasharray="5 3" />
-            <rect x={width - padding.right} y={lastY - 10} width={55} height={20}
-                fill={lastIsUp ? '#26a69a' : '#ef5350'} rx={3} />
-            <text x={width - padding.right + 5} y={lastY + 4} fill="white" fontSize="11" fontWeight="bold">
-                {formatCompact(currentPrice)}
-            </text>
+    if (!n) return <div className="chart-empty" role="status">관찰 기록이 아직 없습니다. 시뮬레이션에서 실제로 관찰한 가격만 표시합니다.</div>
+    const ticks = [...new Set([0,Math.floor((n - 1)/2),n - 1])]
+    const selectedLocal = selectedGlobal - start
+    return <section className="technical-chart-container" aria-label="관찰 가격 차트">
+        <div className="chart-toolbar">
+            <div className="chart-window-actions"><label>표시 봉 <select value={windowSize} onChange={e => setWindowSize(Number(e.target.value))}><option value="30">30</option><option value="60">60</option><option value="120">120</option></select></label>
+                <button onClick={() => { setSelectedId(null); setHoverId(null); setEndId(null) }} aria-pressed={!endId}>최신 따라가기</button></div>
+            <span>{endId ? '선택 구간 고정' : '최신 관찰 추적'} · {start + 1}–{end} / {candleData.length}봉</span>
+        </div>
+        {showIndicatorPanel && <div className="indicator-toggles" aria-label="가격 보조지표">{[['sma5','MA 5'],['sma20','MA 20'],['sma60','MA 60'],['bb','볼린저 밴드']].map(([key,label]) => <button key={key} aria-pressed={shown[key]} onClick={() => setShown(previous => ({...previous,[key]:!previous[key]}))} style={{'--indicator-color':COLORS[key] || COLORS.bbMiddle}}>{label}</button>)}</div>}
+        <div className="candle-readout" data-testid="candle-readout" data-candle-id={selected.id} data-first-sequence={selected.firstSequence} data-last-sequence={selected.lastSequence}>
+            <div className="candle-time"><strong>{observationTime(selected)} → {observationTime(selected,true)}</strong><span>{selected.complete ? '집계 완료' : '진행 중'}{selected.partial ? ' · 일부 구간만 관찰' : ''} · 관찰 {selected.count}회</span></div>
+            <dl>{fields.map(([key,label]) => <div key={key}><dt>{label}</dt><dd data-ohlc={key} data-value={selected[key]}>{formatChartPrice(selected[key])}</dd></div>)}</dl>
+            {showIndicatorPanel && <p className="selected-indicators">RSI <output data-selected-indicator="rsi" data-value={indicators.rsi[selectedGlobal] ?? ''}>{formatChartPrice(indicators.rsi[selectedGlobal])}</output> · MACD <output data-selected-indicator="macd" data-value={indicators.macd[selectedGlobal] ?? ''}>{formatChartPrice(indicators.macd[selectedGlobal])}</output> · Signal <output data-selected-indicator="signal" data-value={indicators.signal[selectedGlobal] ?? ''}>{formatChartPrice(indicators.signal[selectedGlobal])}</output></p>}
+        </div>
+        {expired && <p role="status" className="chart-help">선택한 기록이 이번 실행의 보관 범위를 벗어났습니다.</p>}
+        <svg className="technical-chart-svg" viewBox={`0 0 ${w} ${height}`} width="100%" height={height} role="group" aria-label="가격과 지표. 방향키로 봉 선택, Home과 End로 처음과 마지막, Escape로 최신 추적" tabIndex="0" onKeyDown={keyboard}
+            onPointerMove={e => setHoverId(visible[indexAt(e)]?.id || null)} onPointerLeave={() => setHoverId(null)} onPointerDown={e => { e.currentTarget.focus(); pin(start + indexAt(e)) }}>
+            <rect width={w} height={height} fill="transparent" />
+            {Array.from({length:5},(_,i) => { const price = domain.min + (domain.max-domain.min)*i/4; return <g key={i}><line x1={left} x2={w-right} y1={y(price)} y2={y(price)} className="chart-grid"/><text x={w-right+6} y={y(price)+4} className="axis-label">{formatChartPrice(price,(domain.max-domain.min)/4)}</text></g> })}
+            {showIndicatorPanel && shown.bb && <g data-testid="bollinger-band">{curve('bbUpper',y,'#8977c5')}{curve('bbLower',y,'#8977c5')}{curve('bbMiddle',y,COLORS.bbMiddle)}</g>}
+            {visible.map((c,i) => { const up=c.close>=c.open,bodyHeight=Math.abs(y(c.open)-y(c.close)),bodyWidth=Math.max(.5,Math.min(11,plotWidth/n*.64));return <g key={c.id} className={up?'candle-up':'candle-down'} data-candle-id={c.id} data-first-sequence={c.firstSequence} data-last-sequence={c.lastSequence} data-open={c.open} data-high={c.high} data-low={c.low} data-close={c.close} data-x={x(i)}>
+                <title>{observationTime(c)} 시가 {formatChartPrice(c.open)}, 고가 {formatChartPrice(c.high)}, 저가 {formatChartPrice(c.low)}, 종가 {formatChartPrice(c.close)}</title>
+                <line x1={x(i)} x2={x(i)} y1={y(c.high)} y2={y(c.low)} stroke="currentColor" />
+                {bodyHeight<.8 ? <line x1={x(i)-bodyWidth/2} x2={x(i)+bodyWidth/2} y1={y(c.close)} y2={y(c.close)} stroke="currentColor" strokeWidth="1.5"/> : <rect x={x(i)-bodyWidth/2} y={Math.min(y(c.open),y(c.close))} width={bodyWidth} height={bodyHeight} fill="currentColor"/>}
+            </g>})}
+            {showIndicatorPanel && ['sma5','sma20','sma60'].filter(key=>shown[key]).map(key=>curve(key,y,COLORS[key]))}
+            {live && Number.isFinite(currentPrice) && <g data-testid="current-price-marker" data-value={currentPrice}><line x1={left} x2={w-right} y1={y(currentPrice)} y2={y(currentPrice)} stroke="#b3c8d9" strokeDasharray="4 4"/><rect x={w-right} y={y(currentPrice)-10} width={right} height="20" fill="#284452"/><text x={w-right+5} y={y(currentPrice)+4} className="current-price-label">{formatChartPrice(currentPrice)}</text></g>}
+            {ticks.map(i=><text key={i} x={x(i)} y={267} textAnchor={i===0?'start':i===n-1?'end':'middle'} className="axis-label">{observationTime(visible[i])}</text>)}
+            {showIndicatorPanel && <>
+                <text x={left} y={290} className="pane-label">RSI 14 · {candleData.length<15?'15봉 필요':'동일한 봉 시각'}</text>
+                {[30,50,70].map(value=><g key={value}><line x1={left} x2={w-right} y1={rsiY(value)} y2={rsiY(value)} className="chart-grid"/><text x={w-right+6} y={rsiY(value)+4} className="axis-label">{value}</text></g>)}
+                {curve('rsi',rsiY,'#baa5ef')}
+                <text x={left} y={407} className="pane-label">MACD 12 / 26 / 9 · {candleData.length<34?'34봉 필요':'동일한 봉 시각'}</text>
+                <line x1={left} x2={w-right} y1={macdY(0)} y2={macdY(0)} className="chart-grid"/>
+                <text x={w-right+6} y={macdY(0)+4} className="axis-label">0</text>
+                {indicators.histogram.slice(start,end).map((value,i)=>Number.isFinite(value)&&<rect key={visible[i].id} data-indicator="histogram" data-x={x(i)} data-value={value} x={x(i)-Math.max(.5,plotWidth/n*.5)/2} y={Math.min(macdY(0),macdY(value))} width={Math.max(.5,plotWidth/n*.5)} height={Math.max(.5,Math.abs(macdY(value)-macdY(0)))} fill={value>=0?'#397f75':'#ac6264'}/>)}
+                {curve('macd',macdY,COLORS.macd)}{curve('signal',macdY,COLORS.signal)}
+                {ticks.map(i=><text key={i} x={x(i)} y={519} textAnchor={i===0?'start':i===n-1?'end':'middle'} className="axis-label">{observationTime(visible[i])}</text>)}
+            </>}
+            {selectedLocal>=0 && selectedLocal<n && <g data-testid="chart-crosshair" data-candle-id={selected.id}><line x1={x(selectedLocal)} x2={x(selectedLocal)} y1={priceTop} y2={showIndicatorPanel?macdBottom:priceBottom} stroke="#dfebf5" strokeDasharray="3 3" opacity=".65"/><circle cx={x(selectedLocal)} cy={y(selected.close)} r="3" fill="#dfebf5"/></g>}
         </svg>
-    )
-})
-
-/**
- * RSI 차트
- */
-const RSIChart = memo(function RSIChart({ priceHistory, width, height }) {
-    const rsi = useMemo(() => {
-        if (!priceHistory || priceHistory.length < 15) return null
-        return calculateRSI(priceHistory)
-    }, [priceHistory])
-
-    if (!rsi || rsi.length === 0 || !width || !height) {
-        return <div className="indicator-chart rsi-chart">RSI 데이터 부족</div>
-    }
-
-    const padding = { top: 10, right: 60, bottom: 20, left: 10 }
-    const chartWidth = width - padding.left - padding.right
-    const chartHeight = height - padding.top - padding.bottom
-
-    const gap = chartWidth / rsi.length
-    const valueToY = (value) => padding.top + chartHeight - (value / 100) * chartHeight
-
-    const pathD = rsi.map((value, i) => {
-        const x = padding.left + i * gap + gap / 2
-        const y = valueToY(value)
-        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
-    }).join(' ')
-
-    const currentRSI = rsi[rsi.length - 1]
-    const rsiColor = currentRSI > 70 ? '#ef5350' : currentRSI < 30 ? '#26a69a' : '#888'
-
-    return (
-        <div className="indicator-chart rsi-chart">
-            <div className="indicator-label">
-                <span>RSI (14)</span>
-                <span className="indicator-value" style={{ color: rsiColor }}>
-                    {currentRSI.toFixed(1)}
-                </span>
-            </div>
-            <svg width={width} height={height}>
-                {/* 과매수/과매도 영역 */}
-                <rect x={padding.left} y={valueToY(100)} width={chartWidth} height={valueToY(70) - valueToY(100)}
-                    fill="rgba(239, 83, 80, 0.1)" />
-                <rect x={padding.left} y={valueToY(30)} width={chartWidth} height={valueToY(0) - valueToY(30)}
-                    fill="rgba(38, 166, 154, 0.1)" />
-
-                {/* 기준선 */}
-                <line x1={padding.left} y1={valueToY(70)} x2={width - padding.right} y2={valueToY(70)}
-                    stroke="rgba(239, 83, 80, 0.5)" strokeDasharray="3 3" />
-                <line x1={padding.left} y1={valueToY(50)} x2={width - padding.right} y2={valueToY(50)}
-                    stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
-                <line x1={padding.left} y1={valueToY(30)} x2={width - padding.right} y2={valueToY(30)}
-                    stroke="rgba(38, 166, 154, 0.5)" strokeDasharray="3 3" />
-
-                {/* RSI 라인 */}
-                <path d={pathD} fill="none" stroke="#9370DB" strokeWidth="2" />
-
-                {/* 레이블 */}
-                <text x={width - padding.right + 5} y={valueToY(70) + 4} fill="#ef5350" fontSize="9">70</text>
-                <text x={width - padding.right + 5} y={valueToY(50) + 4} fill="#888" fontSize="9">50</text>
-                <text x={width - padding.right + 5} y={valueToY(30) + 4} fill="#26a69a" fontSize="9">30</text>
-            </svg>
-        </div>
-    )
-})
-
-/**
- * MACD 차트
- */
-const MACDChart = memo(function MACDChart({ priceHistory, width, height }) {
-    const macd = useMemo(() => {
-        if (!priceHistory || priceHistory.length < 35) return null
-        return calculateMACD(priceHistory)
-    }, [priceHistory])
-
-    if (!macd || macd.histogram.length === 0 || !width || !height) {
-        return <div className="indicator-chart macd-chart">MACD 데이터 부족</div>
-    }
-
-    const padding = { top: 10, right: 60, bottom: 20, left: 10 }
-    const chartWidth = width - padding.left - padding.right
-    const chartHeight = height - padding.top - padding.bottom
-
-    const allValues = [...macd.macdLine, ...macd.signalLine, ...macd.histogram]
-    const maxAbs = Math.max(...allValues.map(Math.abs))
-    const range = maxAbs * 2
-
-    const gap = chartWidth / macd.histogram.length
-    const valueToY = (value) => padding.top + chartHeight / 2 - (value / range) * chartHeight
-
-    const macdPathD = macd.macdLine.map((value, i) => {
-        const x = padding.left + i * gap + gap / 2
-        const y = valueToY(value)
-        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
-    }).join(' ')
-
-    const signalPathD = macd.signalLine.map((value, i) => {
-        const x = padding.left + i * gap + gap / 2
-        const y = valueToY(value)
-        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
-    }).join(' ')
-
-    const currentHist = macd.histogram[macd.histogram.length - 1]
-
-    return (
-        <div className="indicator-chart macd-chart">
-            <div className="indicator-label">
-                <span>MACD (12,26,9)</span>
-                <span className="indicator-value" style={{ color: currentHist >= 0 ? '#26a69a' : '#ef5350' }}>
-                    {currentHist.toFixed(0)}
-                </span>
-            </div>
-            <svg width={width} height={height}>
-                {/* 제로 라인 */}
-                <line x1={padding.left} y1={valueToY(0)} x2={width - padding.right} y2={valueToY(0)}
-                    stroke="rgba(255,255,255,0.3)" />
-
-                {/* 히스토그램 */}
-                {macd.histogram.map((value, i) => {
-                    const x = padding.left + i * gap + gap / 2
-                    const barWidth = Math.max(gap * 0.6, 2)
-                    const barHeight = Math.abs(valueToY(value) - valueToY(0))
-                    const y = value >= 0 ? valueToY(value) : valueToY(0)
-                    const color = value >= 0 ? 'rgba(38, 166, 154, 0.6)' : 'rgba(239, 83, 80, 0.6)'
-                    return <rect key={i} x={x - barWidth / 2} y={y} width={barWidth} height={barHeight} fill={color} />
-                })}
-
-                {/* MACD 라인 */}
-                <path d={macdPathD} fill="none" stroke="#00BFFF" strokeWidth="1.5" />
-
-                {/* 시그널 라인 */}
-                <path d={signalPathD} fill="none" stroke="#FF6B6B" strokeWidth="1.5" />
-            </svg>
-        </div>
-    )
-})
-
-/**
- * 신호 패널
- */
-const SignalPanel = memo(function SignalPanel({ priceHistory }) {
-    const analysis = useMemo(() => {
-        if (!priceHistory || priceHistory.length < 30) return null
-        return {
-            trend: analyzeTrend(priceHistory),
-            signals: generateSignals(priceHistory)
-        }
-    }, [priceHistory])
-
-    if (!analysis) {
-        return <div className="signal-panel">데이터 부족</div>
-    }
-
-    const { trend, signals } = analysis
-    const trendColor = trend.trend === 'uptrend' ? '#26a69a' : trend.trend === 'downtrend' ? '#ef5350' : '#888'
-    const trendIcon = trend.trend === 'uptrend' ? '📈' : trend.trend === 'downtrend' ? '📉' : '➡️'
-    const trendLabel = trend.trend === 'uptrend' ? '상승 추세' : trend.trend === 'downtrend' ? '하락 추세' : '횡보'
-
-    return (
-        <div className="signal-panel">
-            <div className="trend-indicator" style={{ borderColor: trendColor }}>
-                <span className="trend-icon">{trendIcon}</span>
-                <div className="trend-info">
-                    <span className="trend-label" style={{ color: trendColor }}>{trendLabel}</span>
-                    <div className="trend-strength">
-                        <div className="strength-bar">
-                            <div className="strength-fill" style={{ width: `${trend.strength}%`, backgroundColor: trendColor }} />
-                        </div>
-                        <span>{trend.strength}%</span>
-                    </div>
-                </div>
-            </div>
-
-            {signals.length > 0 && (
-                <div className="signals-list">
-                    {signals.slice(0, 3).map((signal, i) => (
-                        <div key={i} className={`signal-item signal-${signal.type}`}>
-                            <span className="signal-type">{signal.type === 'buy' ? '🟢 매수' : '🔴 매도'}</span>
-                            <span className="signal-message">{signal.message}</span>
-                            <span className={`signal-strength strength-${signal.strength}`}>
-                                {signal.strength === 'strong' ? '강함' : '보통'}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {signals.length === 0 && (
-                <div className="no-signals">현재 특별한 신호 없음</div>
-            )}
-
-            {(trend.goldenCross || trend.deathCross) && (
-                <div className="cross-alert">
-                    {trend.goldenCross && <span className="golden-cross">✨ 골든 크로스!</span>}
-                    {trend.deathCross && <span className="death-cross">💀 데드 크로스!</span>}
-                </div>
-            )}
-        </div>
-    )
-})
-
-/**
- * 메인 컴포넌트
- */
-export default function TechnicalChart({
-    candleData,
-    priceHistory,
-    currentPrice,
-    width = 600,
-    height = 400,
-    showIndicatorPanel = true
-}) {
-    const [showSMA, setShowSMA] = useState({ sma5: true, sma20: true, sma60: false })
-    const [showBB, setShowBB] = useState(false)
-    const [activeIndicator, setActiveIndicator] = useState('rsi') // 'rsi', 'macd', 'both'
-
-    const prices = useMemo(() => {
-        if (priceHistory && priceHistory.length > 0) return priceHistory
-        if (candleData && candleData.length > 0) return candleData.map(d => d.close)
-        return []
-    }, [priceHistory, candleData])
-
-    const mainChartHeight = showIndicatorPanel ? height * 0.6 : height
-    const indicatorHeight = showIndicatorPanel ? (height * 0.4) / (activeIndicator === 'both' ? 2 : 1) : 0
-
-    return (
-        <div className="technical-chart-container">
-            {/* 지표 토글 버튼 */}
-            <div className="indicator-toggles">
-                <div className="toggle-group">
-                    <button
-                        className={`toggle-btn ${showSMA.sma5 ? 'active' : ''}`}
-                        onClick={() => setShowSMA(prev => ({ ...prev, sma5: !prev.sma5 }))}
-                        style={{ '--indicator-color': INDICATOR_CONFIGS.sma5.color }}
-                    >
-                        MA5
-                    </button>
-                    <button
-                        className={`toggle-btn ${showSMA.sma20 ? 'active' : ''}`}
-                        onClick={() => setShowSMA(prev => ({ ...prev, sma20: !prev.sma20 }))}
-                        style={{ '--indicator-color': INDICATOR_CONFIGS.sma20.color }}
-                    >
-                        MA20
-                    </button>
-                    <button
-                        className={`toggle-btn ${showSMA.sma60 ? 'active' : ''}`}
-                        onClick={() => setShowSMA(prev => ({ ...prev, sma60: !prev.sma60 }))}
-                        style={{ '--indicator-color': INDICATOR_CONFIGS.sma60.color }}
-                    >
-                        MA60
-                    </button>
-                    <button
-                        className={`toggle-btn ${showBB ? 'active' : ''}`}
-                        onClick={() => setShowBB(!showBB)}
-                        style={{ '--indicator-color': INDICATOR_CONFIGS.bb.middleColor }}
-                    >
-                        BB
-                    </button>
-                </div>
-
-                {showIndicatorPanel && (
-                    <div className="toggle-group">
-                        <button
-                            className={`toggle-btn ${activeIndicator === 'rsi' ? 'active' : ''}`}
-                            onClick={() => setActiveIndicator('rsi')}
-                        >
-                            RSI
-                        </button>
-                        <button
-                            className={`toggle-btn ${activeIndicator === 'macd' ? 'active' : ''}`}
-                            onClick={() => setActiveIndicator('macd')}
-                        >
-                            MACD
-                        </button>
-                        <button
-                            className={`toggle-btn ${activeIndicator === 'both' ? 'active' : ''}`}
-                            onClick={() => setActiveIndicator('both')}
-                        >
-                            둘다
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            {/* 메인 차트 */}
-            <div className="main-chart-area" style={{ height: mainChartHeight }}>
-                <PriceChart
-                    candleData={candleData}
-                    priceHistory={prices}
-                    width={width}
-                    height={mainChartHeight}
-                    showSMA={showSMA}
-                    showBB={showBB}
-                    currentPrice={currentPrice}
-                />
-            </div>
-
-            {/* 보조 지표 */}
-            {showIndicatorPanel && (
-                <div className="indicator-charts-area">
-                    {(activeIndicator === 'rsi' || activeIndicator === 'both') && (
-                        <RSIChart priceHistory={prices} width={width} height={indicatorHeight} />
-                    )}
-                    {(activeIndicator === 'macd' || activeIndicator === 'both') && (
-                        <MACDChart priceHistory={prices} width={width} height={indicatorHeight} />
-                    )}
-                </div>
-            )}
-
-            {/* 신호 패널 */}
-            <SignalPanel priceHistory={prices} />
-        </div>
-    )
+        <p className="chart-help">클릭·터치로 구간 고정 · ← → 봉 이동 · Home / End · Escape 최신 추적. 시가·종가는 관찰한 첫 값과 마지막 값이며 실제 체결 데이터가 아닙니다.</p>
+        {showIndicatorPanel && <div className="signal-panel"><strong>최신 관찰봉의 계산 조건</strong><span>{signals.length ? signals.map(signal=>signal.message).join(' · ') : candleData.length<30 ? '조건 비교에는 30봉 이상이 필요합니다.' : '현재 교차·경계 조건 없음'}</span><small>진행 중인 봉을 포함한 지표 설명입니다. 게임 가격에서 계산하며 실제 투자 결과를 보장하지 않습니다.</small></div>}
+    </section>
 }

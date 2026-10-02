@@ -6,6 +6,7 @@
 import { useCallback } from 'react'
 import { generateId } from '../utils'
 import { SHORT_SELLING, CREDIT_TRADING } from '../constants'
+import { getShortPositionMargin } from '../utils/calculations'
 
 const normalizePositiveInteger = (value) => {
     const numericValue = Number(value)
@@ -174,6 +175,7 @@ export const useTrading = ({
             price: stock.price,
             total: proceeds,
             profit,
+            borrowedRepayment,
             timestamp: Date.now()
         }
         setTradeHistory(prev => [...prev, trade])
@@ -227,7 +229,7 @@ export const useTrading = ({
                 const avgPrice = (existing.entryPrice * existing.quantity + stock.price * normalizedQty) / totalQty
                 return {
                     ...prev,
-                    [stock.id]: { quantity: totalQty, entryPrice: avgPrice, margin: existing.margin + marginRequired, openTime: existing.openTime }
+                    [stock.id]: { ...existing, quantity: totalQty, entryPrice: avgPrice, margin: getShortPositionMargin(existing) + marginRequired, openTime: existing.openTime }
                 }
             }
             return {
@@ -263,7 +265,8 @@ export const useTrading = ({
         }
 
         const pnl = (position.entryPrice - stock.price) * normalizedQty
-        const marginReturn = (position.margin / position.quantity) * normalizedQty
+        const marginTotal = getShortPositionMargin(position)
+        const marginReturn = (marginTotal / position.quantity) * normalizedQty
 
         setCash(prev => prev + marginReturn + pnl)
         setShortPositions(prev => {
@@ -275,11 +278,19 @@ export const useTrading = ({
             }
             return {
                 ...prev,
-                [stock.id]: { ...position, quantity: remainingQty, margin: position.margin - marginReturn }
+                [stock.id]: { ...position, quantity: remainingQty, margin: marginTotal - marginReturn }
             }
         })
 
+        const timestamp = Date.now()
+        setTradeHistory(prev => [...prev, {
+            id: `cover-${timestamp}-${stock.id}-${position.quantity}`,
+            type: 'cover', stockId: stock.id, quantity: normalizedQty,
+            price: stock.price, total: marginReturn + pnl, profit: pnl,
+            marginReturned: marginReturn, timestamp
+        }])
         setTotalTrades(prev => prev + 1)
+        setDailyTrades(prev => prev + 1)
         recordTrade?.('COVER', String(stock.id), normalizedQty, { orderType: 'market' })
         setTotalProfit(prev => prev + pnl)
         setDailyProfit(prev => prev + pnl)
@@ -290,7 +301,7 @@ export const useTrading = ({
         playSound?.('buy')
         showNotification(`🐻 ${stock.name} 청산 (${pnl >= 0 ? '+' : ''}${formatCompact(pnl)})`, pnl >= 0 ? 'success' : 'error')
         return true
-    }, [shortPositions, showNotification, playSound, setCash, setShortPositions, setTotalTrades, setTotalProfit, setDailyProfit, setWinStreak, recordTrade, formatCompact])
+    }, [shortPositions, showNotification, playSound, setCash, setShortPositions, setTradeHistory, setTotalTrades, setDailyTrades, setTotalProfit, setDailyProfit, setWinStreak, recordTrade, formatCompact])
 
     // 신용 거래 - 대출
     const handleBorrowCredit = useCallback((amount) => {

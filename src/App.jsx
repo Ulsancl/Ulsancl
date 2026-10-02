@@ -3,8 +3,10 @@
  * Composes contexts and game hooks into a single UI tree.
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import './App.css'
+import { useMarketObservations } from './hooks/useMarketObservations'
+import { useSaveStatus } from './hooks/useSaveStatus'
 
 // Constants and utilities
 import {
@@ -17,7 +19,7 @@ import {
   COMMODITY_PRODUCTS,
   SHORT_SELLING
 } from './constants'
-import { consumeSeasonResetNotice, formatNumber, formatCompact } from './utils'
+import { consumeSeasonResetNotice, formatNumber, formatCompact, getSaveStatus } from './utils'
 
 // Game engine
 import { checkAchievements, resetCrisisState, resetNewsSystem } from './engine'
@@ -108,6 +110,7 @@ function App() {
 
   // Load user settings
   const { settings, setSettings } = useSettings()
+  const storageStatus = useSaveStatus()
 
   // Modal context state
   const {
@@ -186,8 +189,8 @@ function App() {
     alerts, setAlerts,
     setTotalDividends,
     gameStartTime,
-    setCurrentDay,
-    resetGameState
+    currentDay, setCurrentDay,
+    resetGameState, saveGameState, getSaveSnapshot
   } = usePersistentGameState({
     allProducts,
     settings,
@@ -201,6 +204,7 @@ function App() {
     return initial
   })
   const [priceChanges, setPriceChanges] = useState({})
+  const { observations, recordObservation } = useMarketObservations({ stocks, gameStartTime, isInitialized })
 
   // In-game time state
   const [gameTime, setGameTime] = useState({ day: 1, hour: 9, minute: 0, displayDate: 'D+1', displayTime: '09:00' })
@@ -217,6 +221,7 @@ function App() {
     canShortSell,
     canUseCredit,
     stockValue,
+    shortValue, shortMargin, shortEquity, leverageDebt, totalDebt,
     totalAssets,
     profitRate,
     currentLeverage,
@@ -290,6 +295,7 @@ function App() {
   }, [openModal, closeModal])
 
   useGameLoop({
+    currentDay, isInitialized,
     stocks,
     setStocks,
     cash,
@@ -333,6 +339,7 @@ function App() {
     playSound,
     formatNumber,
     onTick: tradeLog.advanceTick,
+    onObservation: recordObservation,
     recordTrade: tradeLog.recordTrade
   })
 
@@ -408,6 +415,19 @@ function App() {
     showNotification(`🎉 ${gameTime.year + 1}년 시즌 시작!`, 'success')
   }, [closeModal, gameTime.year, resetGameState, showNotification, tradeLog])
 
+  useLayoutEffect(() => {
+    // Capture every committed render; never combine mutable refs with older derived values.
+    const snapshot = { ...getSaveSnapshot(), isInitialized, gameTime,
+      totalAssets, profitRate, stockValue, shortValue, shortMargin, shortEquity, leverageDebt, totalDebt,
+      availableCredit, maxCreditLimit,
+      observationCounts: Object.fromEntries(Object.entries(observations).map(([id, values]) => [id, values.length])) }
+    const getState = () => structuredClone(snapshot)
+    window.stockLab = { getState, getObservations: id => structuredClone(observations[id] || []),
+      getStorageState: getSaveStatus, saveNow: saveGameState }
+    window.render_game_to_text = () => JSON.stringify(getState())
+    return () => { delete window.stockLab; delete window.render_game_to_text }
+  })
+
   return (
     <div className={`app theme-${settings.theme}`}>
       <Confetti trigger={showConfetti} />
@@ -422,13 +442,21 @@ function App() {
         >
           <div className="season-reset-notice-modal" onClick={(e) => e.stopPropagation()}>
             <h3>신규 시즌 전환 안내</h3>
+            <p>{storageStatus.backupCount > 0 ? '이전 저장 원문은 설정 → 저장 데이터에서 다운로드할 수 있습니다.' : '저장 상태는 설정 → 저장 데이터에서 확인할 수 있습니다.'}</p>
             <p>신규 시즌 전환으로 기존 로컬 진행 데이터가 초기화되었습니다.</p>
             <button data-testid="season-reset-notice-confirm" onClick={() => setShowSeasonResetNotice(false)}>확인</button>
           </div>
         </div>
       )}
 
+      {storageStatus.mode !== 'normal' && <div className={`storage-notice ${storageStatus.mode}`} role={storageStatus.mode === 'memory' ? 'alert' : 'status'}>
+        <span>{storageStatus.mode === 'memory' ? '저장 중단: 탭을 닫기 전에 현재 진행을 다운로드하세요.' : `이전 저장 원문 ${storageStatus.backupCount}개를 별도로 보존하고 있습니다.`}</span>
+        <button onClick={() => openModal(MODAL_NAMES.SETTINGS)}>저장 데이터 확인</button>
+      </div>}
+
       <AppModalsContainer
+        observations={observations}
+        getSaveSnapshot={getSaveSnapshot}
         stocks={stocks}
         stocksById={stocksById}
         tradeHistory={tradeHistory}
@@ -507,6 +535,7 @@ function App() {
       </div>
 
       <DashboardPanel
+        shortMargin={shortMargin} shortValue={shortValue} leverageDebt={leverageDebt}
         totalAssets={totalAssets}
         profitRate={profitRate}
         cash={cash}

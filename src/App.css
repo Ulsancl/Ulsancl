@@ -5,6 +5,7 @@
 /* App Container */
 .app {
   min-height: 100vh;
+  color: var(--color-text-primary);
   padding-bottom: var(--spacing-2xl);
 }
 
@@ -1654,6 +1655,10 @@
 
 /* 테마별 스타일 */
 .app.theme-light {
+  background: var(--color-bg-primary);
+  --gradient-card: linear-gradient(180deg, #ffffff 0%, #f2f4f9 100%);
+  --color-bg-hover: #e8edf5;
+  --color-text-muted: #667085;
   --color-bg-primary: #f5f5f7;
   --color-bg-secondary: #ffffff;
   --color-bg-card: #ffffff;
@@ -1693,6 +1698,8 @@
 .app.theme-light .header {
   background: linear-gradient(180deg, #ffffff 0%, transparent 100%);
 }
+.app.theme-light .logo h1 { background: none; -webkit-text-fill-color: var(--color-text-primary); color: var(--color-text-primary); }
+.app.theme-light .asset-chart-panel { background: var(--color-bg-secondary); color: var(--color-text-primary); }
 
 /* 뷰 섹션 */
 .view-section {
@@ -2237,3 +2244,23 @@ input:focus-visible {
   }
 }
 
+
+.account-detail{margin:12px 0 0;padding:0 18px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-bg-card)}
+.account-detail summary{cursor:pointer;padding:14px 0;font-size:13px;font-weight:600}.account-detail summary>span{font-size:11px;color:var(--color-text-secondary);margin-left:12px;font-weight:400}
+.account-detail { color: var(--color-text-primary); }
+.account-detail-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:6px 0 12px}.account-detail-grid>div{display:grid;gap:7px;border-left:2px solid var(--color-border);padding-left:10px;min-width:0}.account-detail-grid span{font-size:11px;color:var(--color-text-secondary)}.account-detail-grid output{font-size:13px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.account-detail>p{margin:0 0 14px;font-size:11px;line-height:1.7;color:var(--color-text-secondary)}
+@media(max-width:720px){.account-detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.account-detail{padding:0 12px}.account-detail summary>span{margin-left:8px}}
+.storage-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px auto; padding: 12px 18px; max-width: 1400px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-card); color: var(--color-text-secondary); font-size: .8rem; line-height: 1.6; }
+.storage-notice.memory { border-color: var(--color-loss); color: var(--color-loss); }
+.storage-notice button { color: var(--color-text-primary); background: transparent; border: 1px solid var(--color-border); padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+.game-season, .live-indicator { white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 768px) {
+  .header { padding: 14px 16px; }
+  .header-left { width: 100%; min-width: 0; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .header-left .logo { flex-basis: 100%; justify-content: center; }
+  .header-divider { display: none; }
+  .header-left .game-time { flex-shrink: 0; }
+  .header-actions { gap: 8px; }
+  .header-actions .menu-grid { grid-template-columns: repeat(5, 36px); gap: 4px; }
+  .header-actions .header-btn { width: 36px; height: 36px; min-width: 0; }
+}

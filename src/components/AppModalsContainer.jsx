@@ -19,6 +19,7 @@ const LeaderboardPanel = lazy(() => import('./LeaderboardPanel'))
 const lazyFallback = <div className="modal-loading-fallback">로딩 중...</div>
 
 const AppModalsContainer = ({
+    observations = {}, getSaveSnapshot,
     stocks,
     stocksById,
     tradeHistory,
@@ -106,6 +107,7 @@ const AppModalsContainer = ({
 
             {isOpen(MODAL_NAMES.SETTINGS) && (
                 <SettingsPanel
+                    getSaveSnapshot={getSaveSnapshot}
                     settings={settings}
                     onUpdateSettings={onUpdateSettings}
                     onClose={() => closeModal(MODAL_NAMES.SETTINGS)}
@@ -242,9 +244,10 @@ const AppModalsContainer = ({
                 >
                     <Suspense fallback={lazyFallback}>
                         <StockChartModal
-                            stock={chartStock}
+                            stock={stocksById.get(chartStock.id) ?? chartStock}
+                            observations={observations[chartStock.id] || []}
                             onClose={() => closeModal(MODAL_NAMES.CHART)}
-                            currentPrice={stocksById.get(chartStock.id)?.price || chartStock.price}
+                            currentPrice={stocksById.get(chartStock.id)?.price ?? chartStock.price}
                             portfolio={portfolio}
                             shortPositions={shortPositions}
                             canShortSell={canShortSell}

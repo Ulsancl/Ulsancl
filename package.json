@@ -1,11 +1,11 @@
 {
   "name": "stock-trading-game",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.15.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/finalize-web-build.mjs",
     "lint": "eslint src --ext .ts,.tsx,.js,.jsx",
     "lint:fix": "eslint src --ext .ts,.tsx,.js,.jsx --fix",
     "preview": "vite preview",
@@ -18,7 +18,9 @@
     "test:e2e:report": "playwright show-report",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css}\"",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test:detail": "node scripts/detail-browser.mjs",
+    "test:offline": "node scripts/offline-browser.mjs"
   },
   "dependencies": {
     "firebase": "^12.7.0",

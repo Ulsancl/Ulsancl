@@ -1,8 +1,9 @@
 // Save/load helpers and common utilities for the game
 
 import { INITIAL_CAPITAL } from './constants'
+import { readProtectedSave, writeProtectedSave, resetProtectedSave, validCurrentSave, reportInvalidSave } from './utils/saveProtection'
+export { getSaveStatus, listSaveBackups, readSaveBackup } from './utils/saveProtection'
 
-const SAVE_KEY = 'stockTradingGame'
 const SEASON_RESET_NOTICE_KEY = 'stockGameSeasonResetNoticePending'
 
 const markSeasonResetNoticePending = () => {
@@ -184,30 +185,23 @@ const migrateSaveData = (rawData) => {
     return data
 }
 
-// Save game state
+// Current-save download has exactly the existing v4 format, without touching
+// browser storage or including the independent original-text vault.
+export const createSaveExport = (gameState) => {
+    if (!validCurrentSave(gameState)) throw new TypeError('저장할 현재 게임 상태가 올바르지 않습니다.')
+    return JSON.stringify(sanitizeSaveData({ ...gameState, savedAt: Date.now(), version: SAVE_VERSION }))
+}
+
 export const saveGame = (gameState) => {
-    try {
-        const saveData = sanitizeSaveData({
-            ...gameState,
-            savedAt: Date.now(),
-            version: SAVE_VERSION
-        })
-        localStorage.setItem(SAVE_KEY, JSON.stringify(saveData))
-        return true
-    } catch (error) {
-        console.error('Save game failed:', error)
-        return false
-    }
+    try { return writeProtectedSave(createSaveExport(gameState)) }
+    catch { reportInvalidSave(); return false }
 }
 
 // Load game state
 export const loadGame = () => {
     try {
-        const saved = localStorage.getItem(SAVE_KEY)
-        if (!saved) return null
-
-        let data = JSON.parse(saved)
-        if (!isPlainObject(data)) return null
+        let data = readProtectedSave()
+        if (!data) return null
         data = sanitizeSaveData(migrateSaveData(data))
         return data
     } catch (error) {
@@ -218,7 +212,7 @@ export const loadGame = () => {
 
 // Reset saved state
 export const resetGame = () => {
-    localStorage.removeItem(SAVE_KEY)
+    return resetProtectedSave()
 }
 
 // Configure auto-save interval

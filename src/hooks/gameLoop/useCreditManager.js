@@ -5,7 +5,7 @@
 
 import { useCallback, useRef, useLayoutEffect } from 'react'
 import { CREDIT_TRADING, SHORT_SELLING } from '../../constants'
-import { calculateStockValueFromMap, calculateShortValueFromMap } from '../../utils/index.js'
+import { calculateAssets, getShortPositionMargin } from '../../utils/index.js'
 
 export const useCreditManager = ({
     cash,
@@ -54,9 +54,9 @@ export const useCreditManager = ({
             return { marginCallActive: false }
         }
 
-        const stockValueNow = calculateStockValueFromMap(stockMap, currentPortfolio)
-        const shortValueNow = calculateShortValueFromMap(stockMap, currentShortPositions)
-        const grossAssetsNow = currentCash + stockValueNow + shortValueNow
+        const { grossAssets: grossAssetsNow } = calculateAssets({
+            cash: currentCash, portfolio: currentPortfolio, shortPositions: currentShortPositions, stockMap
+        })
         const currentMarginRatio = grossAssetsNow / currentCreditUsed
 
         if (currentMarginRatio <= CREDIT_TRADING.liquidationMargin) {
@@ -64,12 +64,22 @@ export const useCreditManager = ({
             showNotificationCurrent('⚠️ 마진콜! 담보 부족으로 포지션 강제 청산됩니다!', 'error')
 
             let workingCash = currentCash
+            const remainingPortfolio = { ...currentPortfolio }
+            const trades = []
             Object.keys(currentPortfolio).forEach(stockId => {
                 const holding = currentPortfolio[stockId]
                 const stock = stockMap.get(parseInt(stockId))
                 if (stock && holding.quantity > 0) {
                     const saleAmount = Math.floor(stock.price * holding.quantity * 0.95)
-                    workingCash += saleAmount
+                    const borrowedRepayment = holding.borrowed || 0
+                    workingCash += saleAmount - borrowedRepayment
+                    delete remainingPortfolio[stockId]
+                    trades.push({
+                        type: 'sell', stockId: stock.id, quantity: holding.quantity,
+                        price: stock.price, total: saleAmount,
+                        profit: saleAmount - holding.totalCost, borrowedRepayment,
+                        reason: 'credit-liquidation'
+                    })
                 }
             })
 
@@ -88,9 +98,10 @@ export const useCreditManager = ({
                 marginCallActive: true,
                 forceLiquidation: true,
                 cash: workingCash,
-                portfolio: {},
+                portfolio: remainingPortfolio,
                 creditUsed: newCreditUsed,
-                creditInterest: newCreditInterest
+                creditInterest: newCreditInterest,
+                trades
             }
         } else if (currentMarginRatio <= CREDIT_TRADING.maintenanceMargin) {
             if (!currentMarginCallActive) {
@@ -116,7 +127,7 @@ export const useCreditManager = ({
         }
 
         let newCash = currentCash
-        const updatedShorts = {}
+        const updatedShorts = { ...currentShortPositions }
         const liquidated = []
 
         Object.entries(currentShortPositions).forEach(([stockId, position]) => {
@@ -127,25 +138,27 @@ export const useCreditManager = ({
             newCash -= interest
 
             const pnl = (position.entryPrice - stock.price) * position.quantity
-            const marginUsed = position.entryPrice * position.quantity * SHORT_SELLING.marginRate
+            const marginUsed = getShortPositionMargin(position)
 
             if (pnl < -marginUsed * 0.5) {
                 liquidated.push({ stockId, position, stock, pnl })
-            } else {
-                updatedShorts[stockId] = position
+                delete updatedShorts[stockId]
             }
         })
 
         if (liquidated.length > 0) {
-            liquidated.forEach(({ position, stock, pnl }) => {
-                const marginReturn = typeof position.margin === 'number'
-                    ? position.margin
-                    : position.entryPrice * position.quantity * SHORT_SELLING.marginRate
+            const trades = liquidated.map(({ position, stock, pnl }) => {
+                const marginReturn = getShortPositionMargin(position)
                 newCash += marginReturn + pnl
                 showNotificationCurrent(`⚠️ ${stock.name} 공매도 강제청산!`, 'error')
                 playSoundCurrent('error')
+                return {
+                    type: 'cover', stockId: stock.id, quantity: position.quantity,
+                    price: stock.price, total: marginReturn + pnl, profit: pnl,
+                    marginReturned: marginReturn, reason: 'short-liquidation'
+                }
             })
-            return { cash: newCash, shortPositions: updatedShorts }
+            return { cash: newCash, shortPositions: updatedShorts, trades }
         }
 
         return { cash: newCash, shortPositions: currentShortPositions }

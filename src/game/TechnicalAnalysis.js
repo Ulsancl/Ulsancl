@@ -79,8 +79,7 @@ export const calculateRSI = (prices, period = 14) => {
             avgLoss = (avgLoss * (period - 1) + loss) / period
         }
 
-        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss
-        rsi.push(100 - (100 / (1 + rs)))
+        rsi.push(avgLoss === 0 ? (avgGain === 0 ? 50 : 100) : avgGain === 0 ? 0 : 100 - (100 / (1 + avgGain / avgLoss)))
     }
 
     return rsi
@@ -94,7 +93,7 @@ export const calculateRSI = (prices, period = 14) => {
  * @param {number} signalPeriod - 시그널 EMA (기본 9)
  */
 export const calculateMACD = (prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) => {
-    if (prices.length < slowPeriod + signalPeriod) return null
+    if (prices.length < slowPeriod + signalPeriod - 1) return null
 
     const fastEMA = calculateEMA(prices, fastPeriod)
     const slowEMA = calculateEMA(prices, slowPeriod)
@@ -305,7 +304,7 @@ export const analyzeTrend = (prices) => {
     const deathCross = prevSma5 >= prevSma20 && currentSma5 < currentSma20
 
     // 추세 강도 계산
-    const diff = (currentSma5 - currentSma20) / currentSma20 * 100
+    const diff = currentSma20 === 0 ? 0 : (currentSma5 - currentSma20) / currentSma20 * 100
     const priceAboveSma = currentPrice > currentSma5 ? 1 : -1
 
     let trend = 'neutral'
@@ -373,9 +372,9 @@ export const generateSignals = (prices) => {
         const lower = bb.lower[bb.lower.length - 1]
         const upper = bb.upper[bb.upper.length - 1]
 
-        if (currentPrice <= lower) {
+        if (upper > lower && currentPrice <= lower) {
             signals.push({ type: 'buy', indicator: 'BB', message: '볼린저 밴드 하단 터치', strength: 'medium' })
-        } else if (currentPrice >= upper) {
+        } else if (upper > lower && currentPrice >= upper) {
             signals.push({ type: 'sell', indicator: 'BB', message: '볼린저 밴드 상단 터치', strength: 'medium' })
         }
     }

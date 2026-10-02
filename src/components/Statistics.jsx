@@ -1,98 +1,81 @@
 // 고급 통계 컴포넌트
 import { useMemo } from 'react'
-import { formatPercent, formatCompact } from '../utils'
+import { formatPercent } from '../utils'
+import { formatChartPrice } from '../utils/chart-observations'
 import { INITIAL_CAPITAL } from '../constants'
 import './Statistics.css'
 
+function calculateTradeStatistics(tradeHistory, assetHistory = [], totalAssets) {
+    if (!tradeHistory?.length) return null
+    const closed = tradeHistory.filter(t => t.type === 'sell' || t.type === 'cover')
+    const settled = closed.filter(t => Number.isFinite(t.profit))
+    const wins = settled.filter(t => t.profit > 0)
+    const losses = settled.filter(t => t.profit < 0)
+    const totalGain = wins.reduce((sum, t) => sum + t.profit, 0)
+    const totalLoss = -losses.reduce((sum, t) => sum + t.profit, 0)
+
+    // Only the retained observations define this drawdown window, not an invented lifetime peak.
+    let peak = null, maxDrawdown = null
+    const history = Array.isArray(assetHistory) ? assetHistory : []
+    history.forEach(point => {
+        if (!Number.isFinite(point?.value)) return
+        peak = peak === null ? point.value : Math.max(peak, point.value)
+        if (peak > 0) maxDrawdown = Math.max(maxDrawdown ?? 0, (peak - point.value) / peak * 100)
+    })
+
+    const returns = []
+    for (let i = 1; i < history.length; i++) {
+        const previous = history[i - 1]?.value, current = history[i]?.value
+        if (!Number.isFinite(previous) || previous <= 0 || !Number.isFinite(current)) continue
+        const value = (current - previous) / previous
+        if (Number.isFinite(value)) returns.push(value)
+    }
+    const meanReturn = returns.length ? returns.reduce((sum, value) => sum + value, 0) / returns.length : null
+    const returnStdDev = returns.length >= 2
+        ? Math.sqrt(returns.reduce((sum, value) => sum + (value - meanReturn) ** 2, 0) / returns.length)
+        : null
+
+    let maxWinStreak = 0, maxLossStreak = 0, winStreak = 0, lossStreak = 0
+    closed.forEach(trade => {
+        if (Number.isFinite(trade.profit) && trade.profit > 0) {
+            winStreak++
+            lossStreak = 0
+        } else if (Number.isFinite(trade.profit) && trade.profit < 0) {
+            lossStreak++
+            winStreak = 0
+        } else {
+            // Break-even or unrecorded P/L ends a streak; neither is a loss.
+            winStreak = 0
+            lossStreak = 0
+        }
+        maxWinStreak = Math.max(maxWinStreak, winStreak)
+        maxLossStreak = Math.max(maxLossStreak, lossStreak)
+    })
+
+    return {
+        totalTrades: tradeHistory.length,
+        buyTrades: tradeHistory.filter(t => t.type === 'buy').length,
+        sellTrades: tradeHistory.filter(t => t.type === 'sell').length,
+        shortTrades: tradeHistory.filter(t => t.type === 'short').length,
+        coverTrades: tradeHistory.filter(t => t.type === 'cover').length,
+        settledTrades: settled.length, closedTrades: closed.length,
+        wins: wins.length, losses: losses.length, breakEven: settled.length - wins.length - losses.length,
+        winRate: settled.length ? wins.length / settled.length * 100 : null,
+        avgProfit: wins.length ? totalGain / wins.length : null,
+        avgLoss: losses.length ? totalLoss / losses.length : null,
+        profitFactor: totalLoss > 0 ? totalGain / totalLoss : totalGain > 0 ? Infinity : null,
+        totalReturn: Number.isFinite(totalAssets) ? (totalAssets - INITIAL_CAPITAL) / INITIAL_CAPITAL * 100 : null,
+        maxDrawdown, meanReturn, returnStdDev,
+        returnIntervals: returns.length, candidateIntervals: Math.max(0, history.length - 1),
+        maxWinStreak, maxLossStreak
+    }
+}
+
+const percent = (value, digits = 1) => Number.isFinite(value) ? `${value.toFixed(digits)}%` : '—'
+const money = value => Number.isFinite(value) ? `${formatChartPrice(value)}원` : '—'
+
 export default function StatisticsPanel({ tradeHistory, assetHistory, totalAssets, onClose }) {
-    const stats = useMemo(() => {
-        if (!tradeHistory || tradeHistory.length === 0) {
-            return null
-        }
-
-        const sells = tradeHistory.filter(t => t.type === 'sell')
-        const wins = sells.filter(t => t.profit > 0)
-        const losses = sells.filter(t => t.profit < 0)
-
-        // 기본 통계
-        const totalTrades = tradeHistory.length
-        const winRate = sells.length > 0 ? (wins.length / sells.length) * 100 : 0
-
-        // 평균 손익
-        const totalProfit = wins.reduce((sum, t) => sum + t.profit, 0)
-        const totalLoss = Math.abs(losses.reduce((sum, t) => sum + t.profit, 0))
-        const avgProfit = wins.length > 0 ? totalProfit / wins.length : 0
-        const avgLoss = losses.length > 0 ? totalLoss / losses.length : 0
-
-        // 손익비 (Profit Factor)
-        const profitFactor = totalLoss > 0 ? totalProfit / totalLoss : totalProfit > 0 ? Infinity : 0
-
-        // 총 수익률
-        const totalReturn = ((totalAssets - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100
-
-        // 최대 낙폭 (MDD)
-        let maxDrawdown = 0
-        let peak = INITIAL_CAPITAL
-        if (assetHistory && assetHistory.length > 0) {
-            assetHistory.forEach(h => {
-                if (h.value > peak) peak = h.value
-                const drawdown = ((peak - h.value) / peak) * 100
-                if (drawdown > maxDrawdown) maxDrawdown = drawdown
-            })
-        }
-
-        // 샤프 비율 (간단화된 버전)
-        let sharpeRatio = 0
-        if (assetHistory && assetHistory.length > 1) {
-            const returns = []
-            for (let i = 1; i < assetHistory.length; i++) {
-                const r = (assetHistory[i].value - assetHistory[i - 1].value) / assetHistory[i - 1].value
-                returns.push(r)
-            }
-            const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length
-            const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length
-            const stdDev = Math.sqrt(variance)
-            sharpeRatio = stdDev > 0 ? avgReturn / stdDev : 0
-        }
-
-        // 평균 보유 시간 계산 (간단화)
-        const avgHoldingTime = sells.length > 0
-            ? sells.reduce((sum, t) => sum + (t.holdingTime || 60), 0) / sells.length
-            : 0
-
-        // 연속 승/패
-        let maxWinStreak = 0, maxLossStreak = 0
-        let currentWinStreak = 0, currentLossStreak = 0
-        sells.forEach(t => {
-            if (t.profit > 0) {
-                currentWinStreak++
-                currentLossStreak = 0
-                if (currentWinStreak > maxWinStreak) maxWinStreak = currentWinStreak
-            } else {
-                currentLossStreak++
-                currentWinStreak = 0
-                if (currentLossStreak > maxLossStreak) maxLossStreak = currentLossStreak
-            }
-        })
-
-        return {
-            totalTrades,
-            sellTrades: sells.length,
-            buyTrades: tradeHistory.filter(t => t.type === 'buy').length,
-            winRate,
-            avgProfit,
-            avgLoss,
-            profitFactor,
-            totalReturn,
-            maxDrawdown,
-            sharpeRatio,
-            avgHoldingTime,
-            maxWinStreak,
-            maxLossStreak,
-            wins: wins.length,
-            losses: losses.length,
-        }
-    }, [tradeHistory, assetHistory, totalAssets])
+    const stats = useMemo(() => calculateTradeStatistics(tradeHistory, assetHistory, totalAssets), [tradeHistory, assetHistory, totalAssets])
 
     return (
         <div className="statistics-overlay" onClick={onClose}>
@@ -113,19 +96,19 @@ export default function StatisticsPanel({ tradeHistory, assetHistory, totalAsset
                         <div className="stats-summary">
                             <div className={`summary-card ${stats.totalReturn >= 0 ? 'profit' : 'loss'}`}>
                                 <span className="summary-label">총 수익률</span>
-                                <span className="summary-value">{formatPercent(stats.totalReturn)}</span>
+                                <span className="summary-value">{stats.totalReturn === null ? '—' : formatPercent(stats.totalReturn)}</span>
                             </div>
                             <div className="summary-card">
                                 <span className="summary-label">승률</span>
-                                <span className="summary-value">{stats.winRate.toFixed(1)}%</span>
+                                <span className="summary-value">{percent(stats.winRate)}</span>
                             </div>
                             <div className="summary-card">
-                                <span className="summary-label">손익비</span>
-                                <span className="summary-value">{stats.profitFactor === Infinity ? '∞' : stats.profitFactor.toFixed(2)}</span>
+                                <span className="summary-label">총이익 / 총손실</span>
+                                <span className="summary-value">{stats.profitFactor === Infinity ? '∞' : stats.profitFactor?.toFixed(2) ?? '—'}</span>
                             </div>
                             <div className={`summary-card ${stats.maxDrawdown < 10 ? 'good' : 'warning'}`}>
-                                <span className="summary-label">MDD</span>
-                                <span className="summary-value">-{stats.maxDrawdown.toFixed(1)}%</span>
+                                <span className="summary-label">기록 구간 최대낙폭</span>
+                                <span className="summary-value">{percent(stats.maxDrawdown)}</span>
                             </div>
                         </div>
 
@@ -140,22 +123,38 @@ export default function StatisticsPanel({ tradeHistory, assetHistory, totalAsset
                                 <span className="stat-value">{stats.buyTrades} / {stats.sellTrades}</span>
                             </div>
                             <div className="stat-row">
-                                <span className="stat-label">승리 / 패배</span>
+                                <span className="stat-label">공매도 / 공매도 청산</span>
+                                <span className="stat-value">{stats.shortTrades} / {stats.coverTrades}</span>
+                            </div>
+                            <div className="stat-row">
+                                <span className="stat-label">수익 / 손실 / 본전</span>
                                 <span className="stat-value">
-                                    <span className="win">{stats.wins}</span> / <span className="loss">{stats.losses}</span>
+                                    <span className="win">{stats.wins}</span> / <span className="loss">{stats.losses}</span> / {stats.breakEven}
                                 </span>
                             </div>
                             <div className="stat-row">
                                 <span className="stat-label">평균 수익</span>
-                                <span className="stat-value profit">{formatCompact(stats.avgProfit)}</span>
+                                <span className="stat-value profit">{money(stats.avgProfit)}</span>
                             </div>
                             <div className="stat-row">
                                 <span className="stat-label">평균 손실</span>
-                                <span className="stat-value loss">-{formatCompact(stats.avgLoss)}</span>
+                                <span className="stat-value loss">{stats.avgLoss === null ? '—' : money(-stats.avgLoss)}</span>
                             </div>
                             <div className="stat-row">
-                                <span className="stat-label">샤프 비율</span>
-                                <span className="stat-value">{stats.sharpeRatio.toFixed(3)}</span>
+                                <span className="stat-label">기록 수익률 평균</span>
+                                <span className="stat-value">{percent(stats.meanReturn === null ? null : stats.meanReturn * 100, 3)}</span>
+                            </div>
+                            <div className="stat-row">
+                                <span className="stat-label">기록 수익률 변동성</span>
+                                <span className="stat-value">{percent(stats.returnStdDev === null ? null : stats.returnStdDev * 100, 3)}</span>
+                            </div>
+                            <div className="stat-row">
+                                <span className="stat-label">유효 수익률 구간</span>
+                                <span className="stat-value">{stats.returnIntervals} / {stats.candidateIntervals}</span>
+                            </div>
+                            <div className="stat-row">
+                                <span className="stat-label">청산 손익 기록</span>
+                                <span className="stat-value">{stats.settledTrades} / {stats.closedTrades}</span>
                             </div>
                             <div className="stat-row">
                                 <span className="stat-label">최대 연승</span>
@@ -174,18 +173,20 @@ export default function StatisticsPanel({ tradeHistory, assetHistory, totalAsset
                                 <div className="bar-item">
                                     <span className="bar-label">승률</span>
                                     <div className="bar-track">
-                                        <div className="bar-fill win" style={{ width: `${stats.winRate}%` }}></div>
+                                        <div className="bar-fill win" style={{ width: `${stats.winRate ?? 0}%` }}></div>
                                     </div>
-                                    <span className="bar-value">{stats.winRate.toFixed(0)}%</span>
+                                    <span className="bar-value">{percent(stats.winRate, 0)}</span>
                                 </div>
                                 <div className="bar-item">
-                                    <span className="bar-label">리스크</span>
+                                    <span className="bar-label">기록 낙폭</span>
                                     <div className="bar-track">
-                                        <div className="bar-fill risk" style={{ width: `${Math.min(100, stats.maxDrawdown * 2)}%` }}></div>
+                                        <div className="bar-fill risk" style={{ width: `${Math.min(100, stats.maxDrawdown ?? 0)}%` }}></div>
                                     </div>
-                                    <span className="bar-value">{stats.maxDrawdown.toFixed(0)}%</span>
+                                    <span className="bar-value">{percent(stats.maxDrawdown, 0)}</span>
                                 </div>
                             </div>
+                            <p>승률은 손익이 기록된 매도·공매도 청산 중 수익 거래 비율입니다. 본전 거래는 연승·연패를 끊습니다.</p>
+                            <p>수익률 평균·변동성은 보존된 자산 기록 사이의 단순수익률과 표준편차이며 연율 수치가 아닙니다. 직전 자산이 0 이하인 구간은 제외합니다. 낙폭도 이 기록 구간에 한정됩니다.</p>
                         </div>
                     </div>
                 )}

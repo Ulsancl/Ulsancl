@@ -120,8 +120,13 @@ export const processOrders = (orders, stocks, cash, portfolio, options = {}) => 
                     newCash -= totalCost
                     const existing = newPortfolio[order.stockId] || { quantity: 0, totalCost: 0 }
                     newPortfolio[order.stockId] = {
+                        ...existing,
                         quantity: existing.quantity + order.quantity,
-                        totalCost: existing.totalCost + totalCost
+                        totalCost: existing.totalCost + totalCost,
+                        borrowed: existing.borrowed || 0,
+                        margin: (existing.margin || 0) + rawTotal,
+                        leverage: existing.leverage || 1,
+                        firstBuyTime: existing.firstBuyTime || Date.now()
                     }
                     executedOrders.push({
                         ...order,
@@ -139,8 +144,11 @@ export const processOrders = (orders, stocks, cash, portfolio, options = {}) => 
                 const holding = newPortfolio[order.stockId]
                 if (holding && holding.quantity >= order.quantity) {
                     const netTotal = rawTotal - fee
-                    newCash += netTotal
                     const avgPrice = holding.totalCost / holding.quantity
+                    const soldFraction = order.quantity / holding.quantity
+                    const borrowedRepayment = (holding.borrowed || 0) * soldFraction
+                    const marginReturn = (holding.margin || 0) * soldFraction
+                    newCash += netTotal - borrowedRepayment
                     const remainingQty = holding.quantity - order.quantity
                     const profit = netTotal - (avgPrice * order.quantity)
 
@@ -148,8 +156,11 @@ export const processOrders = (orders, stocks, cash, portfolio, options = {}) => 
                         delete newPortfolio[order.stockId]
                     } else {
                         newPortfolio[order.stockId] = {
+                            ...holding,
                             quantity: remainingQty,
-                            totalCost: avgPrice * remainingQty
+                            totalCost: avgPrice * remainingQty,
+                            borrowed: Math.max(0, (holding.borrowed || 0) - borrowedRepayment),
+                            margin: Math.max(0, (holding.margin || 0) - marginReturn)
                         }
                     }
                     executedOrders.push({
@@ -160,6 +171,7 @@ export const processOrders = (orders, stocks, cash, portfolio, options = {}) => 
                         total: netTotal,
                         fee,
                         profit,
+                        borrowedRepayment,
                         executedAt: Date.now()
                     })
                 } else {
