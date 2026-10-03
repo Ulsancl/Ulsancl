@@ -13,7 +13,7 @@
  * @version 3.0.0
  */
 
-import * as admin from 'firebase-admin';
+import type { Firestore } from 'firebase-admin/firestore';
 
 // ============================================
 // TYPES
@@ -54,7 +54,7 @@ interface LeaderboardSnapshot {
  */
 export async function updateLeaderboardSnapshot(
     seasonId: string,
-    db: admin.firestore.Firestore
+    db: Firestore
 ): Promise<{ success: boolean; entriesCount: number }> {
 
     const startTime = Date.now();
@@ -136,7 +136,7 @@ export async function updateLeaderboardSnapshot(
  * Called by scheduled function
  */
 export async function updateAllActiveSnapshots(
-    db: admin.firestore.Firestore
+    db: Firestore
 ): Promise<{ updated: number; failed: number }> {
 
     console.log('[updateAllActiveSnapshots] Starting...');

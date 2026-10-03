@@ -12,7 +12,9 @@
  * @version 3.0.0
  */
 
-import * as admin from 'firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
+import { FieldValue } from 'firebase-admin/firestore';
+import type { Firestore, QueryDocumentSnapshot, Timestamp } from 'firebase-admin/firestore';
 import { replayGame, TradeAction, ReplayResult } from '../replay/engine';
 import { isVersionCompatible, ENGINE_VERSION } from '../shared/version';
 
@@ -52,8 +54,8 @@ interface SeasonData {
     active: boolean;
     initialCapital: number;
     gameDuration: number;
-    startDate: admin.firestore.Timestamp;
-    endDate: admin.firestore.Timestamp;
+    startDate: Timestamp;
+    endDate: Timestamp;
 }
 
 interface SeasonSecretData {
@@ -68,6 +70,9 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 5;
 const MAX_TRADE_LOG_LENGTH = 100000; // Prevent abuse
 const MIN_TRADE_LOG_LENGTH = 0; // Allow zero trades (hold strategy)
+// One client year is roughly 109,500 one-second ticks. Keep a small margin
+// without allowing a caller to request an unbounded replay in a 120s function.
+const MAX_REPLAY_TICKS = 120000;
 
 function logSubmissionEvent(event: string, payload: Record<string, unknown>) {
     console.log('[submitScore:event]', JSON.stringify({ event, ...payload }));
@@ -89,7 +94,7 @@ function logSubmissionEvent(event: string, payload: Record<string, unknown>) {
 export async function submitScore(
     payload: ClientPayload,
     uid: string,
-    db: admin.firestore.Firestore
+    db: Firestore
 ): Promise<VerificationResult> {
 
     const startTime = Date.now();
@@ -145,14 +150,15 @@ export async function submitScore(
         return createError(`Trade log is too short (${MIN_TRADE_LOG_LENGTH})`, 'INVALID_INPUT');
     }
 
-    // Validate trade log structure
-    const validationResult = validateTradeLogs(tradeLogs);
-    if (!validationResult.valid) {
-        return createError(`Invalid trade log: ${validationResult.error}`, 'INVALID_INPUT');
+    if (!Number.isSafeInteger(meta.totalTicks) || meta.totalTicks <= 0 ||
+        meta.totalTicks > MAX_REPLAY_TICKS) {
+        return createError('Invalid totalTicks', 'INVALID_INPUT');
     }
 
-    if (!meta.totalTicks || meta.totalTicks <= 0) {
-        return createError('Invalid totalTicks', 'INVALID_INPUT');
+    // Reject trades outside the replay horizon and non-integer quantities.
+    const validationResult = validateTradeLogs(tradeLogs, meta.totalTicks);
+    if (!validationResult.valid) {
+        return createError(`Invalid trade log: ${validationResult.error}`, 'INVALID_INPUT');
     }
 
     // ========================================
@@ -294,7 +300,7 @@ export async function submitScore(
             entriesRef.where('uid', '==', uid).limit(1)
         );
 
-        let existingDoc: admin.firestore.QueryDocumentSnapshot | null = null;
+        let existingDoc: QueryDocumentSnapshot | null = null;
         let existingScore = 0;
 
         if (!existingQuery.empty) {
@@ -418,7 +424,7 @@ function createError(
 /**
  * Validate trade log structure
  */
-function validateTradeLogs(tradeLogs: TradeAction[]): { valid: boolean; error?: string } {
+function validateTradeLogs(tradeLogs: TradeAction[], totalTicks = MAX_REPLAY_TICKS): { valid: boolean; error?: string } {
     const validTypes = ['BUY', 'SELL', 'SHORT', 'COVER'];
     let lastTick = -1;
 
@@ -426,7 +432,7 @@ function validateTradeLogs(tradeLogs: TradeAction[]): { valid: boolean; error?: 
         const trade = tradeLogs[i];
 
         // Check required fields
-        if (typeof trade.tick !== 'number' || trade.tick < 0) {
+        if (!trade || !Number.isSafeInteger(trade.tick) || trade.tick < 0 || trade.tick > totalTicks) {
             return { valid: false, error: `Invalid tick at index ${i}` };
         }
 
@@ -438,7 +444,7 @@ function validateTradeLogs(tradeLogs: TradeAction[]): { valid: boolean; error?: 
             return { valid: false, error: `Invalid stockId at index ${i}` };
         }
 
-        if (typeof trade.quantity !== 'number' || trade.quantity <= 0) {
+        if (!Number.isSafeInteger(trade.quantity) || trade.quantity <= 0) {
             return { valid: false, error: `Invalid quantity at index ${i}` };
         }
 
@@ -457,7 +463,7 @@ function validateTradeLogs(tradeLogs: TradeAction[]): { valid: boolean; error?: 
  */
 async function checkRateLimit(
     uid: string,
-    db: admin.firestore.Firestore
+    db: Firestore
 ): Promise<{ allowed: boolean; retryAfter?: number }> {
 
     const rateLimitRef = db.doc(`rateLimits/${uid}`);
@@ -490,7 +496,7 @@ async function checkRateLimit(
 
         // Increment counter
         transaction.update(rateLimitRef, {
-            count: admin.firestore.FieldValue.increment(1)
+            count: FieldValue.increment(1)
         });
         return { allowed: true };
     });
@@ -530,7 +536,7 @@ function djb2Hash(str: string): string {
 async function getDisplayName(uid: string): Promise<string> {
     try {
         // Try Firebase Auth first
-        const userRecord = await admin.auth().getUser(uid);
+        const userRecord = await getAuth().getUser(uid);
         if (userRecord.displayName) {
             return userRecord.displayName;
         }

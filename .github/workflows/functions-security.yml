@@ -1,0 +1,42 @@
+name: Functions security
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - 'scripts/copy-engine.cjs'
+      - 'src/engine/**'
+      - 'src/constants/**'
+      - '.github/workflows/functions-security.yml'
+  pull_request:
+    paths:
+      - 'functions/**'
+      - 'scripts/copy-engine.cjs'
+      - 'src/engine/**'
+      - 'src/constants/**'
+      - '.github/workflows/functions-security.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit
+        working-directory: functions
+      - run: npm run lint
+        working-directory: functions
+      - run: npm run build
+        working-directory: functions
+      - run: node --test tests/security-replay.test.cjs
+        working-directory: functions
+      - run: npm audit --audit-level=low
+        working-directory: functions

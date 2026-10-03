@@ -14,7 +14,7 @@
 import { createRng } from '../shared/rng';
 import { calculatePriceChange } from '../shared/priceCalculator';
 import { updateMarketState } from '../shared/marketState';
-import { INITIAL_STOCKS, INITIAL_CAPITAL } from '../shared/constants';
+import { INITIAL_STOCKS, INITIAL_CAPITAL, SHORT_SELLING } from '../shared/constants';
 
 // ============================================
 // TYPES
@@ -80,6 +80,7 @@ interface ShortPosition {
     stockId: string;
     quantity: number;
     entryPrice: number;
+    margin: number;
 }
 
 interface MarketState {
@@ -439,24 +440,30 @@ function executeTrade(
         }
 
         case 'SHORT': {
-            // Short selling: borrow shares and sell
-            const netProceeds = totalValue - commission;
+            // Match the client: sale proceeds are held by the broker, while
+            // the player must post collateral from available cash.
+            const marginRequired = totalValue * SHORT_SELLING.marginRate;
+            if (!Number.isFinite(marginRequired) || marginRequired > cash) {
+                return { success: false, newCash: cash, error: 'Insufficient margin for SHORT' };
+            }
 
             const existing = shortPositions.get(trade.stockId);
             if (existing) {
                 const totalQuantity = existing.quantity + trade.quantity;
-                const totalValue = existing.entryPrice * existing.quantity + price * trade.quantity;
+                const totalEntryValue = existing.entryPrice * existing.quantity + totalValue;
                 existing.quantity = totalQuantity;
-                existing.entryPrice = totalValue / totalQuantity;
+                existing.entryPrice = totalEntryValue / totalQuantity;
+                existing.margin += marginRequired;
             } else {
                 shortPositions.set(trade.stockId, {
                     stockId: trade.stockId,
                     quantity: trade.quantity,
-                    entryPrice: price
+                    entryPrice: price,
+                    margin: marginRequired
                 });
             }
 
-            return { success: true, newCash: cash + netProceeds };
+            return { success: true, newCash: cash - marginRequired };
         }
 
         case 'COVER': {
@@ -466,23 +473,19 @@ function executeTrade(
                 return { success: false, newCash: cash, error: 'No short position to cover' };
             }
 
-            const coverCost = totalValue + commission;
-
-            if (cash < coverCost) {
-                return { success: false, newCash: cash, error: 'Insufficient funds to cover' };
-            }
-
-            // Calculate realized P/L (profit if current price < entry price)
-            const shortProceeds = existing.entryPrice * trade.quantity;
-            const realized = shortProceeds - totalValue - commission;
+            // Return the proportional collateral plus realized P/L, as the
+            // client does. The borrowed-sale proceeds never enter player cash.
+            const marginReturn = existing.margin / existing.quantity * trade.quantity;
+            const realized = (existing.entryPrice - price) * trade.quantity;
 
             existing.quantity -= trade.quantity;
+            existing.margin -= marginReturn;
 
             if (existing.quantity === 0) {
                 shortPositions.delete(trade.stockId);
             }
 
-            return { success: true, newCash: cash - coverCost, realized };
+            return { success: true, newCash: cash + marginReturn + realized, realized };
         }
 
         default:
@@ -509,14 +512,13 @@ function calculatePortfolioValue(
         }
     });
 
-    // Short positions (liability)
+    // Cash excludes collateral. An open short contributes its posted margin
+    // and unrealized P/L once, without counting sale proceeds as free cash.
     shortPositions.forEach((position, stockId) => {
         const stock = stocks.find(s => s.id === stockId);
         if (stock) {
-            // Short position value = entry proceeds - current value
-            const currentLiability = stock.price * position.quantity;
-            const entryProceeds = position.entryPrice * position.quantity;
-            totalValue += (entryProceeds - currentLiability);
+            totalValue += position.margin +
+                (position.entryPrice - stock.price) * position.quantity;
         }
     });
 
