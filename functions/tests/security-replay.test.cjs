@@ -7,7 +7,8 @@ const {
 } = require('../lib/replay/engine.js');
 const {
     submitScore,
-    validateTradeLogs
+    validateTradeLogs,
+    isScoreSubmissionEnabled
 } = require('../lib/verification/submitScore.js');
 
 const trade = (type, quantity) => ({ tick: 0, type, stockId: '1', quantity });
@@ -86,4 +87,66 @@ test('a caller cannot request an unbounded replay before database access', async
     assert.equal(result.success, false);
     assert.equal(result.errorCode, 'INVALID_INPUT');
     assert.match(result.error, /totalTicks/);
+});
+
+test('score submission is closed by default before database or replay work', async () => {
+    const previous = process.env.UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION;
+    delete process.env.UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION;
+    try {
+        const result = await submitScore({
+            meta: {
+                seasonId: 'test-season',
+                engineVersion: '3.0.0',
+                clientVersion: '3.0.0',
+                startedAt: 0,
+                endedAt: 1,
+                initialCapital: 1000,
+                totalTicks: 1
+            },
+            tradeLogs: [],
+            checksum: '00000000'
+        }, 'test-user', null);
+        assert.equal(result.success, false);
+        assert.equal(result.errorCode, 'SUBMISSION_DISABLED');
+    } finally {
+        if (previous === undefined) {
+            delete process.env.UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION;
+        } else {
+            process.env.UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION = previous;
+        }
+    }
+});
+
+test('unsafe override requires the exact true value and still validates input', async () => {
+    const previous = process.env.UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION;
+    try {
+        for (const value of ['1', 'TRUE', 'false', '']) {
+            process.env.UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION = value;
+            assert.equal(isScoreSubmissionEnabled(), false);
+        }
+        process.env.UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION = 'true';
+        assert.equal(isScoreSubmissionEnabled(), true);
+        const result = await submitScore({
+            meta: {
+                seasonId: 'test-season',
+                engineVersion: '3.0.0',
+                clientVersion: '3.0.0',
+                startedAt: 0,
+                endedAt: 1,
+                initialCapital: 1000,
+                totalTicks: 1
+            },
+            tradeLogs: [{ ...trade('BUY', 1), tick: 2 }],
+            checksum: '00000000'
+        }, 'test-user', null);
+        assert.equal(result.success, false);
+        assert.equal(result.errorCode, 'INVALID_INPUT');
+        assert.match(result.error, /trade log/);
+    } finally {
+        if (previous === undefined) {
+            delete process.env.UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION;
+        } else {
+            process.env.UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION = previous;
+        }
+    }
 });

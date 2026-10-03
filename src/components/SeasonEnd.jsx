@@ -61,6 +61,9 @@ function normalizeSubmitError(error) {
     if (code === 'REPLAY_MISMATCH') {
         return '서버 검증에 실패했습니다. 새 시즌에서 다시 제출해 주세요.'
     }
+    if (code === 'SUBMISSION_DISABLED') {
+        return '온라인 점수 등록은 검증 체계가 준비될 때까지 중단되어 있습니다.'
+    }
     if (code === 'INVALID_CHECKSUM') {
         return '기록 무결성 검증에 실패했습니다. 게임을 재시작 후 다시 시도해 주세요.'
     }

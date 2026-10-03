@@ -74,6 +74,15 @@ const MIN_TRADE_LOG_LENGTH = 0; // Allow zero trades (hold strategy)
 // without allowing a caller to request an unbounded replay in a 120s function.
 const MAX_REPLAY_TICKS = 120000;
 
+// This replay does not prove what happened in the browser game. Keep public
+// score writes closed until gameplay and verification share an authoritative
+// session and market outcome source. The override is only for isolated tests.
+const UNSAFE_SUBMISSION_OVERRIDE = 'UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION';
+
+function isScoreSubmissionEnabled(): boolean {
+    return process.env[UNSAFE_SUBMISSION_OVERRIDE] === 'true';
+}
+
 function logSubmissionEvent(event: string, payload: Record<string, unknown>) {
     console.log('[submitScore:event]', JSON.stringify({ event, ...payload }));
 }
@@ -153,6 +162,14 @@ export async function submitScore(
     if (!Number.isSafeInteger(meta.totalTicks) || meta.totalTicks <= 0 ||
         meta.totalTicks > MAX_REPLAY_TICKS) {
         return createError('Invalid totalTicks', 'INVALID_INPUT');
+    }
+
+    // A client-supplied tick count or timestamp is not proof of elapsed play.
+    // Reject before rate-limit/database/replay work while the verifier lacks
+    // a server-issued session and matching game engine.
+    if (!isScoreSubmissionEnabled()) {
+        return createError('Online score submissions are disabled until gameplay verification is authoritative',
+            'SUBMISSION_DISABLED');
     }
 
     // Reject trades outside the replay horizon and non-integer quantities.
@@ -551,4 +568,4 @@ async function getDisplayName(uid: string): Promise<string> {
 // EXPORTS
 // ============================================
 
-export { validateTradeLogs, calculateChecksum, checkRateLimit };
+export { validateTradeLogs, calculateChecksum, checkRateLimit, isScoreSubmissionEnabled };

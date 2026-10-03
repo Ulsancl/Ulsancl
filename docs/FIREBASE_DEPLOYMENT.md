@@ -1,5 +1,24 @@
 # Firebase Deployment Checklist
 
+## Leaderboard integrity status
+
+Online score submission is **disabled by default**. The callable returns
+`SUBMISSION_DISABLED` unless the Functions runtime environment contains
+`UNSAFE_ALLOW_UNVERIFIED_SCORE_SUBMISSION=true`. Do not set this variable on a
+public deployment. It is an explicit escape hatch for isolated development
+tests, not a security control that makes scores trustworthy.
+
+The browser's market currently uses `Math.random` and obtains the Firebase
+season only when the season-end dialog opens. The server instead replays a
+separate deterministic market using a season secret. Client-supplied ticks and
+timestamps can be forged. A valid server replay therefore does not prove the
+reported trades took place during actual play. Before enabling public ranking,
+the game needs a server-issued session, server-checked elapsed time, and one
+shared authoritative market and trade record. Revalidate the full client and
+server flow and remove the unsafe override as part of that redesign.
+
+Local gameplay and saved games remain available without Firebase.
+
 ## 1) Configure project values
 
 1. Copy `.env.example` to `.env` and fill all `VITE_FIREBASE_*` values.
