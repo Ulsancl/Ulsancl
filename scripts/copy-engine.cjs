@@ -30,7 +30,8 @@ const filesToCopy = [
 // Constants to copy
 const constantsToCopy = [
     'src/constants/stocks.js',
-    'src/constants/trading.js'
+    'src/constants/trading.js',
+    'src/constants/macro.js'
 ];
 
 /**

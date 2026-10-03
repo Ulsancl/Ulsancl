@@ -8,15 +8,17 @@
  * @version 3.0.0
  */
 
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
+import * as functions from 'firebase-functions/v1';
+import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { randomBytes } from 'crypto';
 
 // Initialize Firebase Admin
-admin.initializeApp();
+initializeApp();
 
 // Database reference
-const db = admin.firestore();
+const db = getFirestore();
 
 // Import verification and utility functions
 import { submitScore } from './verification/submitScore';
@@ -215,7 +217,7 @@ export const createSeason = functions.https.onRequest(async (req, res) => {
 
     try {
         // Verify the token is from an admin
-        const decodedToken = await admin.auth().verifyIdToken(token);
+        const decodedToken = await getAuth().verifyIdToken(token);
 
         // Check for admin claim (you should set this in Firebase Auth)
         if (!decodedToken.admin) {
@@ -242,12 +244,12 @@ export const createSeason = functions.https.onRequest(async (req, res) => {
         // Client-readable season metadata (seed excluded).
         batch.set(seasonRef, {
             name,
-            startDate: admin.firestore.Timestamp.fromDate(new Date(startDate)),
-            endDate: admin.firestore.Timestamp.fromDate(new Date(endDate)),
+            startDate: Timestamp.fromDate(new Date(startDate)),
+            endDate: Timestamp.fromDate(new Date(endDate)),
             initialCapital: initialCapital || 100000000,
             gameDuration: gameDuration || 36000,
             active: true,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
             createdBy: decodedToken.uid
         });
 
@@ -255,7 +257,7 @@ export const createSeason = functions.https.onRequest(async (req, res) => {
         batch.set(seasonSecretRef, {
             seasonId: seasonRef.id,
             seed,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
             createdBy: decodedToken.uid
         });
 
@@ -313,7 +315,7 @@ export const endSeason = functions.https.onRequest(async (req, res) => {
 
     try {
         const token = authHeader.split('Bearer ')[1];
-        const decodedToken = await admin.auth().verifyIdToken(token);
+        const decodedToken = await getAuth().verifyIdToken(token);
 
         if (!decodedToken.admin) {
             res.status(403).json({ error: 'Admin access required' });
@@ -330,7 +332,7 @@ export const endSeason = functions.https.onRequest(async (req, res) => {
         // Update season to inactive
         await db.doc(`seasons/${seasonId}`).update({
             active: false,
-            endedAt: admin.firestore.FieldValue.serverTimestamp(),
+            endedAt: FieldValue.serverTimestamp(),
             endedBy: decodedToken.uid
         });
 
