@@ -1,7 +1,7 @@
 import http from 'node:http'
 import path from 'node:path'
 import { createReadStream } from 'node:fs'
-import { realpath, stat } from 'node:fs/promises'
+import { readdir, realpath, stat } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
 export const HOST = '127.0.0.1'
@@ -36,10 +36,28 @@ export function requestPath(target) {
   return decoded === '/' ? '/index.html' : decoded
 }
 
+async function indexWebFiles(root) {
+  const files = new Map()
+  async function visit(folder, prefix = '') {
+    for (const entry of await readdir(folder, { withFileTypes: true })) {
+      if (entry.name.startsWith('.')) continue
+      const file = path.join(folder, entry.name)
+      const urlPath = `${prefix}/${entry.name}`
+      if (entry.isDirectory()) await visit(file, urlPath)
+      else if (entry.isFile()) files.set(urlPath, file)
+    }
+  }
+  await visit(root)
+  return files
+}
+
 export async function createRequestHandler(directory) {
   const root = await realpath(directory)
   if (!(await stat(root)).isDirectory()) throw new Error('웹 폴더가 없습니다.')
-  const index = await realpath(path.join(root, 'index.html'))
+  const files = await indexWebFiles(root)
+  const indexFile = files.get('/index.html')
+  if (!indexFile) throw new Error('웹 시작 파일이 없습니다.')
+  const index = await realpath(indexFile)
   if (!isWithin(root, index) || !(await stat(index)).isFile()) throw new Error('웹 시작 파일이 없습니다.')
   return async (request, response) => {
     const fail = (status, message) => {
@@ -51,15 +69,18 @@ export async function createRequestHandler(directory) {
     let requested
     try { requested = requestPath(request.url) } catch { return fail(400, '올바르지 않은 경로입니다.') }
     try {
-      let candidate = path.resolve(root, `.${requested}`)
-      if (!isWithin(root, candidate)) return fail(403, '허용되지 않은 경로입니다.')
+      let selected = files.get(requested)
+      if (!selected) {
+        // Navigation-only fallback. A missing script/image must remain a real 404.
+        if (!path.extname(requested) && request.headers.accept?.includes('text/html')) selected = index
+        else return fail(404, '파일을 찾을 수 없습니다.')
+      }
+      let candidate
       let info
-      try { candidate = await realpath(candidate); info = await stat(candidate) }
+      try { candidate = await realpath(selected); info = await stat(candidate) }
       catch (error) {
         if (!['ENOENT', 'ENOTDIR'].includes(error.code)) throw error
-        // Navigation-only fallback. A missing script/image must remain a real 404.
-        if (!path.extname(requested) && request.headers.accept?.includes('text/html')) { candidate = index; info = await stat(index) }
-        else return fail(404, '파일을 찾을 수 없습니다.')
+        return fail(404, '파일을 찾을 수 없습니다.')
       }
       if (!isWithin(root, candidate)) return fail(403, '허용되지 않은 경로입니다.')
       if (!info.isFile()) return fail(404, '파일을 찾을 수 없습니다.')

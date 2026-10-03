@@ -35,36 +35,6 @@ const constantsToCopy = [
 ];
 
 /**
- * Convert ES Module syntax to CommonJS for Node.js
- */
-function convertToCommonJS(content, filename) {
-    let converted = content;
-
-    // Convert export const/function to module.exports
-    converted = converted.replace(/^export const (\w+)/gm, 'const $1');
-    converted = converted.replace(/^export function (\w+)/gm, 'function $1');
-    converted = converted.replace(/^export \{[^}]+\}/gm, '');
-
-    // Remove import statements and replace with require
-    converted = converted.replace(
-        /import \{([^}]+)\} from ['"]([^'"]+)['"]/g,
-        (match, imports, modulePath) => {
-            const moduleFile = modulePath.replace('../', './').replace('./', '');
-            return `const {${imports}} = require('./${moduleFile}')`;
-        }
-    );
-
-    // Add exports at the end
-    const exportMatches = content.match(/export (?:const|function) (\w+)/g);
-    if (exportMatches) {
-        const exportNames = exportMatches.map(m => m.split(' ').pop());
-        converted += `\n\nmodule.exports = { ${exportNames.join(', ')} };\n`;
-    }
-
-    return converted;
-}
-
-/**
  * Main copy function
  */
 function copyEngineFiles() {
