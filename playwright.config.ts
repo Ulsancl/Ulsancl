@@ -73,9 +73,12 @@ export default defineConfig({
         },
     ],
 
-    // 테스트 전 개발 서버 시작
+    // CI builds dist before E2E. Measure the shipped bundle instead of Vite's
+    // on-demand development transforms in the first-load performance check.
     webServer: {
-        command: `npm run dev -- --host 127.0.0.1 --port ${port}`,
+        command: process.env.CI
+            ? `npm run preview -- --host 127.0.0.1 --port ${port}`
+            : `npm run dev -- --host 127.0.0.1 --port ${port}`,
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,

@@ -75,7 +75,7 @@ test.describe('성능', () => {
     test('페이지 로드 시간이 10초 이내', async ({ page }) => {
         await seedGameState(page)
         const startTime = Date.now()
-        await page.goto('/')
+        await page.goto('/classic')
         await page.waitForLoadState('networkidle')
         const loadTime = Date.now() - startTime
         expect(loadTime).toBeLessThan(10000)

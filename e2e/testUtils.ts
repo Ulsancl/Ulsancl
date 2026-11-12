@@ -57,7 +57,7 @@ export const clickTabByIndex = async (page: Page, index: number) => {
     await expect.poll(async () => tab.getAttribute('aria-selected')).toBe('true')
 }
 
-export const preparePage = async (page: Page, url = '/') => {
+export const preparePage = async (page: Page, url = '/classic') => {
     await seedGameState(page)
     await page.goto(url)
 

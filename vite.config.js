@@ -22,15 +22,15 @@ export default defineConfig({
     }
   },
   server: {
-    host: true, // 외부 접속 허용 (핸드폰에서 접속 가능)
+    host: '127.0.0.1', // 로컬 개발 기본값
     port: 7777, // 포트 고정 (다른 게임과 겹치지 않음)
     strictPort: true, // 7777이 사용 중이면 실행 실패 (실수로 다른 포트 사용 방지)
     hmr: {
       overlay: true // HMR 에러를 화면에 표시
     },
     watch: {
-      usePolling: true, // 파일 변경 감지 강화 (Windows에서 더 안정적)
-      interval: 100 // 100ms마다 파일 변경 확인
+      ignored: ['**/dist/**', '**/functions/lib/**', '**/test-results/**', '**/playwright-report/**'],
+      usePolling: false // 운영체제 파일 감시 사용
     }
   },
   // 개발 모드에서 캐시 비활성화

@@ -29,28 +29,20 @@ export const useDebouncedValue = (value, delay = 300) => {
 export const useThrottle = (callback, delay = 100) => {
     const lastRun = useRef(null)
     const timeoutRef = useRef(null)
-
+    useEffect(() => () => clearTimeout(timeoutRef.current), [])
     return useCallback((...args) => {
         const now = Date.now()
-        if (lastRun.current === null || now - lastRun.current >= delay) {
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current)
-                timeoutRef.current = null
-            }
+        const elapsed = lastRun.current === null ? Infinity : now - lastRun.current
+        clearTimeout(timeoutRef.current)
+        if (elapsed >= delay) {
             lastRun.current = now
             callback(...args)
-            return
+        } else {
+            timeoutRef.current = setTimeout(() => {
+                lastRun.current = Date.now()
+                callback(...args)
+            }, delay - elapsed)
         }
-
-        const timeSinceLastRun = now - lastRun.current
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current)
-        }
-        timeoutRef.current = setTimeout(() => {
-            lastRun.current = Date.now()
-            timeoutRef.current = null
-            callback(...args)
-        }, delay - timeSinceLastRun)
     }, [callback, delay])
 }
 
@@ -59,51 +51,36 @@ export const useThrottle = (callback, delay = 100) => {
  * 불필요한 리렌더링 방지
  */
 export const useStableValue = (value, compareFunc = (a, b) => JSON.stringify(a) === JSON.stringify(b)) => {
-    const stableRef = useRef(value)
-
-    if (!compareFunc(stableRef.current, value)) {
-        stableRef.current = value
+    const [stable, setStable] = useState(() => value)
+    if (!compareFunc(stable, value)) {
+        setStable(() => value)
+        return value
     }
-
-    return stableRef.current
+    return stable
 }
 
 /**
  * 대량의 데이터를 청크로 나누어 점진적으로 렌더링하는 훅
  */
 export const useProgressiveRender = (items, chunkSize = 10, interval = 50) => {
-    const [renderedItems, setRenderedItems] = useState([])
-    const [isComplete, setIsComplete] = useState(false)
-
+    const [result, setResult] = useState(() => ({ items, count: 0 }))
     useEffect(() => {
-        if (!items || items.length === 0) {
-            setRenderedItems([])
-            setIsComplete(true)
-            return
-        }
-
-        setRenderedItems([])
-        setIsComplete(false)
-
-        let currentIndex = 0
+        const length = items?.length || 0
+        const size = Number.isSafeInteger(chunkSize) && chunkSize > 0 ? chunkSize : 10
+        let count = 0, timer, canceled = false
         const renderChunk = () => {
-            const endIndex = Math.min(currentIndex + chunkSize, items.length)
-            setRenderedItems(prev => [...prev, ...items.slice(currentIndex, endIndex)])
-            currentIndex = endIndex
-
-            if (currentIndex < items.length) {
-                requestAnimationFrame(() => {
-                    setTimeout(renderChunk, interval)
-                })
-            } else {
-                setIsComplete(true)
-            }
+            if (canceled) return
+            count = Math.min(count + size, length)
+            setResult({ items, count })
+            if (count < length) timer = setTimeout(renderChunk, Math.max(0, interval))
         }
-
-        renderChunk()
+        timer = setTimeout(renderChunk, 0)
+        return () => { canceled = true; clearTimeout(timer) }
     }, [items, chunkSize, interval])
-
-    return { renderedItems, isComplete, progress: items?.length ? renderedItems.length / items.length : 1 }
+    const count = result.items === items ? result.count : 0
+    const length = items?.length || 0
+    return { renderedItems: items?.slice(0, count) || [], isComplete: count >= length,
+        progress: length ? count / length : 1 }
 }
 
 /**
@@ -111,28 +88,20 @@ export const useProgressiveRender = (items, chunkSize = 10, interval = 50) => {
  * 부드러운 UI 업데이트 제공
  */
 export const useAnimationFrame = (callback, isActive = true) => {
-    const requestRef = useRef()
-    const previousTimeRef = useRef()
-
-    const animate = useCallback((time) => {
-        if (previousTimeRef.current !== undefined) {
-            const deltaTime = time - previousTimeRef.current
-            callback(deltaTime)
-        }
-        previousTimeRef.current = time
-        requestRef.current = requestAnimationFrame(animate)
-    }, [callback])
-
+    const callbackRef = useRef(callback)
+    useEffect(() => { callbackRef.current = callback }, [callback])
     useEffect(() => {
-        if (isActive) {
-            requestRef.current = requestAnimationFrame(animate)
+        if (!isActive) return
+        let request, previous, canceled = false
+        function animate(time) {
+            if (canceled) return
+            if (previous !== undefined) callbackRef.current(time - previous)
+            previous = time
+            if (!canceled) request = requestAnimationFrame(animate)
         }
-        return () => {
-            if (requestRef.current) {
-                cancelAnimationFrame(requestRef.current)
-            }
-        }
-    }, [isActive, animate])
+        request = requestAnimationFrame(animate)
+        return () => { canceled = true; cancelAnimationFrame(request) }
+    }, [isActive])
 }
 
 /**
@@ -172,17 +141,14 @@ export const useBatchedUpdates = (initialState = {}) => {
  * 조건부 메모이제이션 - 특정 조건에서만 값을 재계산
  */
 export const useConditionalMemo = (factory, deps, shouldUpdate = true) => {
-    const valueRef = useRef()
-    const depsRef = useRef(deps)
-
-    const depsChanged = deps.some((dep, i) => dep !== depsRef.current[i])
-
-    if (shouldUpdate && (depsChanged || valueRef.current === undefined)) {
-        valueRef.current = factory()
-        depsRef.current = deps
+    const [memo, setMemo] = useState(() => ({ value: shouldUpdate ? factory() : undefined, deps, initialized: shouldUpdate }))
+    const changed = deps.length !== memo.deps.length || deps.some((dep, i) => !Object.is(dep, memo.deps[i]))
+    if (shouldUpdate && (changed || !memo.initialized)) {
+        const next = { value: factory(), deps, initialized: true }
+        setMemo(next)
+        return next.value
     }
-
-    return valueRef.current
+    return memo.value
 }
 
 /**

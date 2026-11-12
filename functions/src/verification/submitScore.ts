@@ -17,6 +17,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import type { Firestore, QueryDocumentSnapshot, Timestamp } from 'firebase-admin/firestore';
 import { replayGame, TradeAction, ReplayResult } from '../replay/engine';
 import { isVersionCompatible, ENGINE_VERSION } from '../shared/version';
+import { MAX_REPLAY_TICKS, validateSeasonForReplay } from './season';
 
 // ============================================
 // TYPES
@@ -72,7 +73,6 @@ const MAX_TRADE_LOG_LENGTH = 100000; // Prevent abuse
 const MIN_TRADE_LOG_LENGTH = 0; // Allow zero trades (hold strategy)
 // One client year is roughly 109,500 one-second ticks. Keep a small margin
 // without allowing a caller to request an unbounded replay in a 120s function.
-const MAX_REPLAY_TICKS = 120000;
 
 // This replay does not prove what happened in the browser game. Keep public
 // score writes closed until gameplay and verification share an authoritative
@@ -113,7 +113,7 @@ export async function submitScore(
 
     const { meta, tradeLogs, checksum } = payload;
 
-    if (!meta || !Array.isArray(tradeLogs) || typeof checksum !== 'string') {
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta) || !Array.isArray(tradeLogs) || typeof checksum !== 'string') {
         return createError('Payload is missing required fields', 'INVALID_INPUT', { uid });
     }
 
@@ -128,7 +128,7 @@ export async function submitScore(
     // STEP 1: VERSION CHECK
     // ========================================
 
-    if (!meta.engineVersion) {
+    if (typeof meta.engineVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(meta.engineVersion)) {
         return createError('Engine version is required', 'INVALID_VERSION');
     }
 
@@ -143,7 +143,7 @@ export async function submitScore(
     // STEP 2: INPUT VALIDATION
     // ========================================
 
-    if (!meta.seasonId || typeof meta.seasonId !== 'string') {
+    if (typeof meta.seasonId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(meta.seasonId)) {
         return createError('Invalid seasonId', 'INVALID_INPUT');
     }
 
@@ -210,6 +210,10 @@ export async function submitScore(
         return createError('Season has ended', 'SEASON_ENDED');
     }
 
+    if (!validateSeasonForReplay(seasonData as unknown as Record<string, unknown>, meta)) {
+        return createError('Season timing, duration, or configuration is invalid', 'SEASON_CONFIG_ERROR');
+    }
+
     // Verify initial capital matches season config
     if (meta.initialCapital !== seasonData.initialCapital) {
         return createError(
@@ -224,13 +228,6 @@ export async function submitScore(
         if (typeof seasonSecretData?.seed === 'string' && seasonSecretData.seed.length > 0) {
             seed = seasonSecretData.seed;
         }
-    }
-
-    // Backward compatibility for old seasons created before secret split.
-    const legacySeasonData = seasonData as unknown as { seed?: unknown };
-    if (!seed && typeof legacySeasonData.seed === 'string') {
-        seed = legacySeasonData.seed;
-        logSubmissionEvent('legacy_seed_fallback', { uid, seasonId: meta.seasonId });
     }
 
     if (!seed) {
@@ -311,6 +308,14 @@ export async function submitScore(
     const displayName = await getDisplayName(uid);
 
     const transactionResult = await db.runTransaction(async (transaction) => {
+        // Closing or changing a season during replay must conflict with this
+        // transaction. Read authoritative state again before any score write.
+        const currentSeason = await transaction.get(seasonRef);
+        const currentSecret = await transaction.get(seasonSecretRef);
+        if (!validateSeasonForReplay(currentSeason.data(), meta) || currentSecret.data()?.seed !== seed) {
+            return { updated: false, isNewHighScore: false, previousScore: 0,
+                errorCode: 'SEASON_ENDED', error: 'Season closed or changed during verification' };
+        }
         // Read existing entry for this user
         const entriesRef = db.collection(`leaderboard/${meta.seasonId}/entries`);
         const existingQuery = await transaction.get(
@@ -384,6 +389,10 @@ export async function submitScore(
     // ========================================
     // STEP 8: CALCULATE RANK
     // ========================================
+
+    if (transactionResult.errorCode) {
+        return createError(transactionResult.error!, transactionResult.errorCode);
+    }
 
     let rank = 0;
     if (transactionResult.updated) {

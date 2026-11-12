@@ -22,7 +22,12 @@ self.addEventListener('fetch', event => {
         event.respondWith((async () => {
             try {
                 const response = await fetch(request)
-                if (response.ok) {
+                const finalURL = new URL(response.url)
+                const shellPath = path => path === '/' || path === '/index.html'
+                if (response.ok && shellPath(url.pathname) && !url.search &&
+                    !response.redirected && finalURL.origin === self.location.origin &&
+                    shellPath(finalURL.pathname) && !finalURL.search &&
+                    /^text\/html(?:;|$)/i.test(response.headers.get('content-type') || '')) {
                     const cache = await caches.open(CACHE_NAME)
                     await cache.put('/index.html', response.clone())
                 }

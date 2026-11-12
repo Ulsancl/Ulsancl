@@ -74,7 +74,7 @@ async function openPage(snapshot = seed, options = {}) {
       }
     }
   }, { snapshot, raw: options.raw, quota: Boolean(options.quota) })
-  await page.goto('http://127.0.0.1:5263', { waitUntil: 'domcontentloaded', timeout: 45000 })
+  await page.goto('http://127.0.0.1:5263/classic', { waitUntil: 'domcontentloaded', timeout: 45000 })
   await ready(page); await pause(page); await dismissToasts(page)
   return page
 }

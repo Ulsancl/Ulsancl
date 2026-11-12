@@ -63,8 +63,18 @@ export const processOrders = (orders, stocks, cash, portfolio, options = {}) => 
     const feeRate = options.feeRate ?? 0
 
     orders.forEach(order => {
+        // Saved orders are untrusted input. Reject before arithmetic so a bad
+        // row cannot create cash, corrupt a holding or interrupt the game tick.
+        if (!order || !Number.isSafeInteger(order.quantity) || order.quantity <= 0
+            || !['buy', 'sell'].includes(order.side)
+            || ['__proto__', 'constructor', 'prototype'].includes(String(order.stockId))
+            || !Number.isFinite(newCash) || !Number.isFinite(feeRate) || feeRate < 0 || feeRate > 1
+            || (order.type !== 'market' && (!Number.isFinite(order.targetPrice) || order.targetPrice <= 0))) {
+            remainingOrders.push(order)
+            return
+        }
         const stock = stocks.find(s => s.id === order.stockId)
-        if (!stock) {
+        if (!stock || !Number.isFinite(stock.price) || stock.price <= 0) {
             remainingOrders.push(order)
             return
         }
@@ -113,6 +123,18 @@ export const processOrders = (orders, stocks, cash, portfolio, options = {}) => 
 
             const rawTotal = executionPrice * order.quantity
             const fee = Math.floor(rawTotal * feeRate)
+            const prior = newPortfolio[order.stockId]
+            if (!Number.isFinite(rawTotal + fee)
+                || (prior && (!Number.isSafeInteger(prior.quantity) || prior.quantity <= 0
+                    || !Number.isFinite(prior.totalCost) || prior.totalCost < 0
+                    || !Number.isFinite(prior.borrowed ?? 0) || (prior.borrowed ?? 0) < 0
+                    || !Number.isFinite(prior.margin ?? 0) || (prior.margin ?? 0) < 0))
+                || (order.side === 'buy' && (!Number.isSafeInteger((prior?.quantity ?? 0) + order.quantity)
+                    || !Number.isFinite((prior?.totalCost ?? 0) + rawTotal + fee)
+                    || !Number.isFinite((prior?.margin ?? 0) + rawTotal)))) {
+                remainingOrders.push(normalizedOrder)
+                return
+            }
 
             if (order.side === 'buy') {
                 const totalCost = rawTotal + fee
@@ -148,6 +170,10 @@ export const processOrders = (orders, stocks, cash, portfolio, options = {}) => 
                     const soldFraction = order.quantity / holding.quantity
                     const borrowedRepayment = (holding.borrowed || 0) * soldFraction
                     const marginReturn = (holding.margin || 0) * soldFraction
+                    if (!Number.isFinite(newCash + netTotal - borrowedRepayment)) {
+                        remainingOrders.push(normalizedOrder)
+                        return
+                    }
                     newCash += netTotal - borrowedRepayment
                     const remainingQty = holding.quantity - order.quantity
                     const profit = netTotal - (avgPrice * order.quantity)
