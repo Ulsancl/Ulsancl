@@ -32,11 +32,11 @@ const profile = (name = 'investor', publicRanking = true) => ({
   publicRanking,
 })
 let seasonId, operatorToken, aliceToken
-const token = async (uid, claims) => {
+const token = async (uid, claims, emailVerified = true) => {
   await auth.createUser({
     uid,
     email: uid + '@example.test',
-    emailVerified: true,
+    emailVerified,
     password: 'Only-emulator-password-123',
   })
   if (claims) await auth.setCustomUserClaims(uid, claims)
@@ -98,8 +98,29 @@ test('membership and admin claims are enforced independently of supplied fields'
   await assert.rejects(call(alice, { op: 'adminSeason', action: 'create', admin: true }), {
     code: 'permission-denied',
   })
-  const publicData = await call({ uid: null, member: false, admin: false }, { op: 'bootstrap' })
+  const publicData = await call(alice, { op: 'bootstrap' })
   assert.equal(JSON.stringify(publicData).includes('seed'), false)
+})
+test('unauthenticated reads do no database work; authenticated reads cannot bypass the UID quota', async () => {
+  const untouched = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error('unexpected database access')
+      },
+    }
+  )
+  for (const op of ['bootstrap', 'leaderboard']) {
+    await assert.rejects(
+      deskService(untouched, { uid: null, member: false, admin: false }, { op }, start),
+      { code: 'unauthenticated' }
+    )
+  }
+  const actor = { uid: 'read-limited', member: false, admin: false }
+  await db.doc('deskLimits/' + actor.uid).set({ bucket: Math.floor(start / 60000), count: 120 })
+  for (const op of ['bootstrap', 'leaderboard'])
+    await assert.rejects(call(actor, { op }), { code: 'resource-exhausted' })
+  await db.doc('deskLimits/' + actor.uid).delete()
 })
 test('server owns cash, prices and time; request replay is idempotent', async () => {
   const request = {
@@ -343,6 +364,8 @@ test('real callable transport rejects missing auth and forged admin claims', asy
     return response.json()
   }
   assert.equal((await request({ op: 'join' })).error.status, 'UNAUTHENTICATED')
+  for (const op of ['bootstrap', 'leaderboard'])
+    assert.equal((await request({ op })).error.status, 'UNAUTHENTICATED')
   assert.equal(
     (await request({ op: 'adminOverview', admin: true }, aliceToken)).error.status,
     'PERMISSION_DENIED'
@@ -394,6 +417,10 @@ test('durable deletion retries failures and erases auth, historical records, ran
   const { processDeletion, privacySweep } = require('../lib/desk/deletion')
   const uid = 'privacy-owner'
   const otherRow = { uid: 'unrelated', returns: { season: 1 } }
+  await db.doc('deskSeasons/privacy-unrelated-season').set({ id: 'privacy-unrelated-season' })
+  const unaffected = db.doc('deskStandings/privacy-unrelated-season')
+  await unaffected.set({ rows: [otherRow] })
+  const before = (await unaffected.get()).updateTime
   await db.doc('deskStandings/' + seasonId).set({ rows: [{ uid }, otherRow] })
   await db.doc('deskLeaderboard/' + seasonId + '/entries/' + uid).set({ uid })
   await db.doc('deskArchive/' + seasonId + '_' + uid).set({ seasonId })
@@ -426,6 +453,12 @@ test('durable deletion retries failures and erases auth, historical records, ran
   ])
     assert.equal((await db.doc(path).get()).exists, false, path)
   assert.deepEqual((await db.doc('deskStandings/' + seasonId).get()).data().rows, [otherRow])
+  assert.ok(
+    (await unaffected.get()).updateTime.isEqual(before),
+    'unrelated standings must not be rewritten'
+  )
+  await unaffected.delete()
+  await db.doc('deskSeasons/privacy-unrelated-season').delete()
   const receipt = (await db.doc('deskDeletions/' + uid).get()).data()
   assert.equal(receipt.state, 'complete')
   await call(
@@ -459,8 +492,75 @@ test('actual callable accepts a recently signed-in account deletion without trus
   })
   assert.deepEqual((await response.json()).result, { accepted: true })
   assert.equal((await db.doc('deskDeletions/operator').get()).exists, false)
-  assert.equal((await db.doc('deskDeletions/privacy-callable').get()).data().state, 'pending')
+  assert.equal((await db.doc('deskDeletions/privacy-callable').get()).data().state, 'complete')
   const { processDeletion } = require('../lib/desk/deletion')
   await processDeletion(db, auth, 'privacy-callable')
   await assert.rejects(auth.getUser('privacy-callable'), { code: 'auth/user-not-found' })
+})
+
+test('unverified empty identities are erased inline without waiting for the seasonal queue', async () => {
+  const uid = 'privacy-unverified-empty'
+  const bearer = await token(uid, undefined, false)
+  const response = await fetch('http://127.0.0.1:5201/demo-stockdesk/us-central1/deskApi', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + bearer },
+    body: JSON.stringify({ data: { op: 'deleteAccount', confirmation: 'DELETE' } }),
+  })
+  assert.deepEqual((await response.json()).result, { accepted: true })
+  await assert.rejects(auth.getUser(uid), { code: 'auth/user-not-found' })
+  assert.equal((await db.doc('deskDeletions/' + uid).get()).data().state, 'complete')
+  assert.equal((await db.doc('deskLimits/' + uid).get()).exists, false)
+})
+
+test('nonparticipants never enumerate seasons, and clients cannot reset participation evidence', async () => {
+  const { processDeletion } = require('../lib/desk/deletion')
+  const noSeasonScans = new Proxy(db, {
+    get(target, key) {
+      if (key === 'collection')
+        return (name) => {
+          assert.notEqual(name, 'deskSeasons', 'empty identities must not enumerate every season')
+          return target.collection(name)
+        }
+      const value = Reflect.get(target, key)
+      return typeof value === 'function' ? value.bind(target) : value
+    },
+  })
+  for (const hasProfile of [false, true]) {
+    const uid = 'privacy-no-history-' + hasProfile
+    const actor = { uid, member: hasProfile, admin: false, authTime: start / 1000 }
+    if (hasProfile) await call(actor, { op: 'profile', profile: profile(uid) })
+    // A verified reporter can have associated records without a trading profile.
+    await db.doc('deskReports/' + uid).set({ reporterUid: uid, detail: 'remove own data' })
+    await call(actor, { op: 'deleteAccount', confirmation: 'DELETE', hasJoinedSeason: true })
+    const job = (await db.doc('deskDeletions/' + uid).get()).data()
+    assert.equal(job.state, 'identity-pending')
+    assert.equal(job.seasonsDone, true)
+    assert.equal(await processDeletion(noSeasonScans, auth, uid, start), true)
+    assert.equal((await db.doc('deskReports/' + uid).get()).exists, false)
+    assert.equal((await db.doc('deskProfiles/' + uid).get()).exists, false)
+  }
+  assert.equal((await db.doc('deskProfiles/bob').get()).data().hasJoinedSeason, true)
+  await call(bob, { op: 'profile', profile: { ...profile('bob'), hasJoinedSeason: false } })
+  assert.equal((await db.doc('deskProfiles/bob').get()).data().hasJoinedSeason, true)
+})
+
+test('empty-identity backlog cannot consume the worker quota for existing game-data deletion', async () => {
+  const { requestDeletion, privacySweep } = require('../lib/desk/deletion')
+  const uid = 'z-privacy-participant'
+  await db.doc('deskProfiles/' + uid).set({ ...profile(uid), hasJoinedSeason: true })
+  await requestDeletion(db, uid, start / 1000, start)
+  // A legitimate deletion that has finished its seasonal phase is waiting for cleanup.
+  await db.doc('deskDeletions/' + uid).update({ seasonsDone: true })
+  const identities = Array.from({ length: 21 }, (_, i) => 'a-privacy-empty-' + i)
+  for (const id of identities) await requestDeletion(db, id, start / 1000, start)
+  const result = await privacySweep(db, auth, start)
+  assert.equal((await db.doc('deskDeletions/' + uid).get()).data().state, 'complete')
+  assert.equal(result.failed, 0)
+  assert.equal(result.scanned, 21)
+  const pending = await db
+    .collection('deskDeletions')
+    .where('state', '==', 'identity-pending')
+    .get()
+  assert.equal(pending.size, 1)
+  for (const id of [...identities, uid]) await db.doc('deskDeletions/' + id).delete()
 })

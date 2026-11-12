@@ -40,6 +40,7 @@ interface Profile {
   ageBand: string
   publicRanking: boolean
   status: string
+  hasJoinedSeason?: boolean
 }
 interface Session {
   seasonId: string
@@ -345,7 +346,8 @@ export async function deskService(
     await rateLimit(db, actor.uid, now, 120, true)
     return requestDeletion(db, actor.uid, actor.authTime ?? NaN, now)
   }
-  if (actor.uid) await rateLimit(db, actor.uid, now)
+  if (!actor.uid) throw new DeskError('unauthenticated', '먼저 로그인하세요.')
+  await rateLimit(db, actor.uid, now)
   if (op === 'bootstrap') {
     const { control, season } = await controlAndSeason(db)
     const profile = actor.uid
@@ -455,7 +457,12 @@ export async function deskService(
           'failed-precondition',
           '국가·지역·연령대는 참가한 시즌이 끝난 뒤 변경할 수 있습니다. 공개 동의는 언제든 철회할 수 있습니다.'
         )
-      const profile = { ...requested, status: old?.status || 'active' }
+      const profile = {
+        ...requested,
+        status: old?.status || 'active',
+        // Only the server records participation. Legacy profiles remain conservative.
+        hasJoinedSeason: oldDoc.exists ? old?.hasJoinedSeason !== false : false,
+      }
       tx.set(ref, { ...profile, updatedAt: now })
       if (session && season) publish(tx, db, uid, season, session, profile, now)
       return profile
@@ -497,6 +504,7 @@ export async function deskService(
         updatedAt: now,
       }
       if (old) tx.set(db.doc('deskArchive/' + old.seasonId + '_' + uid), { ...old, uid })
+      tx.update(db.doc('deskProfiles/' + uid), { hasJoinedSeason: true })
       tx.set(aRef, session)
       tx.update(sRef, { members: s.members + 1 })
       publish(tx, db, uid, s, session, profile, now)

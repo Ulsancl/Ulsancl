@@ -19,9 +19,21 @@ export async function requestDeletion(db: Firestore, uid: string, authTime: numb
     )
   await db.runTransaction(async (tx) => {
     const ref = db.doc('deskDeletions/' + uid)
-    const [job, profile] = await tx.getAll(ref, db.doc('deskProfiles/' + uid))
+    const [job, profile, account] = await tx.getAll(
+      ref,
+      db.doc('deskProfiles/' + uid),
+      db.doc('deskAccounts/' + uid)
+    )
     if (job.exists) return
-    tx.set(ref, { state: 'pending', cursor: '', requestedAt: now, updatedAt: now })
+    const needsSeasons =
+      account.exists || (profile.exists && profile.data()?.hasJoinedSeason !== false)
+    tx.set(ref, {
+      state: needsSeasons ? 'pending' : 'identity-pending',
+      seasonsDone: !needsSeasons,
+      cursor: '',
+      requestedAt: now,
+      updatedAt: now,
+    })
     if (profile.exists)
       tx.update(profile.ref, { publicRanking: false, status: 'deleting', updatedAt: now })
     tx.delete(db.doc('deskAccounts/' + uid))
@@ -30,10 +42,17 @@ export async function requestDeletion(db: Firestore, uid: string, authTime: numb
 }
 
 /** Bounded, retryable steps; partial failures retain a durable pending job. */
-export async function processDeletion(db: Firestore, auth: Auth, uid: string, now = Date.now()) {
+export async function processDeletion(
+  db: Firestore,
+  auth: Auth,
+  uid: string,
+  now = Date.now(),
+  options: { identityOnly?: boolean } = {}
+) {
   const ref = db.doc('deskDeletions/' + uid)
   const job = (await ref.get()).data()
-  if (!job || job.state !== 'pending') return true
+  if (!job || !['pending', 'identity-pending'].includes(job.state)) return true
+  if (options.identityOnly && job.state !== 'identity-pending') return false
   try {
     await auth.deleteUser(uid)
   } catch (error) {
@@ -49,10 +68,10 @@ export async function processDeletion(db: Firestore, auth: Auth, uid: string, no
         const standing = await tx.get(db.doc('deskStandings/' + season.id))
         tx.delete(db.doc('deskArchive/' + season.id + '_' + uid))
         tx.delete(db.doc('deskLeaderboard/' + season.id + '/entries/' + uid))
-        if (standing.exists)
-          tx.update(standing.ref, {
-            rows: (standing.data()?.rows || []).filter((row: { uid: string }) => row.uid !== uid),
-          })
+        const rows = standing.data()?.rows || []
+        const remaining = rows.filter((row: { uid: string }) => row.uid !== uid)
+        if (standing.exists && remaining.length !== rows.length)
+          tx.update(standing.ref, { rows: remaining })
       })
     }
     await ref.update({
@@ -93,10 +112,16 @@ export async function processDeletion(db: Firestore, auth: Auth, uid: string, no
 }
 
 export async function privacySweep(db: Firestore, auth: Auth, now = Date.now()) {
+  // Empty identities cannot consume the queue budget reserved for actual game data.
   const jobs = await db.collection('deskDeletions').where('state', '==', 'pending').limit(20).get()
+  const identities = await db
+    .collection('deskDeletions')
+    .where('state', '==', 'identity-pending')
+    .limit(20)
+    .get()
   let completed = 0,
     failed = 0
-  for (const job of jobs.docs) {
+  for (const job of [...jobs.docs, ...identities.docs]) {
     try {
       if (await processDeletion(db, auth, job.id, now)) completed++
     } catch {
@@ -112,6 +137,13 @@ export async function privacySweep(db: Firestore, auth: Auth, now = Date.now()) 
   const batch = db.batch()
   for (const doc of expired.docs) batch.delete(doc.ref)
   await batch.commit()
-  await db.doc('deskHealth/privacySweep').set({ at: now, scanned: jobs.size, completed, failed })
-  return { scanned: jobs.size, completed, failed }
+  const scanned = jobs.size + identities.size
+  await db.doc('deskHealth/privacySweep').set({
+    at: now,
+    scanned,
+    identities: identities.size,
+    completed,
+    failed,
+  })
+  return { scanned, completed, failed }
 }
