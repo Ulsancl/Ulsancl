@@ -251,8 +251,7 @@ export function Account({ desk }) {
               사용하세요.
             </p>
             <small>
-              현재 연습 순자산{' '}
-              {won(desk.mode === 'practice' ? desk.summary.equity : desk.practice.account.cash)}원 ·
+              연습 계좌 현금 {won(desk.practice.account.cash)}원 ·
               저장{' '}
               {desk.practice.savedAt
                 ? new Date(desk.practice.savedAt).toLocaleString('ko-KR')
