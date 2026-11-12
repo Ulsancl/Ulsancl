@@ -1,0 +1,17 @@
+{
+  "packageId": "io.github.ulsancl.marketdesk",
+  "developerName": "standard__bae",
+  "versionCode": 20001,
+  "versionName": "2.0.1",
+  "targetSdk": 36,
+  "launchMode": "practice",
+  "origin": "https://market-desk-standard-bae.ulsancl.chatgpt.site",
+  "privacyPath": "/privacy",
+  "deletionPath": "/delete-account",
+  "supportPath": "/support",
+  "supportEmail": null,
+  "playConsoleRegistered": false,
+  "appSigningCertificateSha256": [],
+  "title": "MARKET DESK: 투자 시뮬레이터",
+  "shortDescription": "가상 시장에서 주식·선물·옵션 전략을 실험하고 6개 투자 캠페인에 도전하세요."
+}
