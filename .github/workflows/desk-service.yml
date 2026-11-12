@@ -20,6 +20,8 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             functions/package-lock.json
+      - name: Use the web lockfile's npm version
+        run: npm install --global npm@11.9.0
       - name: Use runner Java 21
         run: |
           echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"

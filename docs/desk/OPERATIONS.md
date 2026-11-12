@@ -4,7 +4,7 @@ The repository works as a standalone offline practice game. No production Fireba
 
 ## Local validation
 
-Use Node 22 or 24 and Java 21. Install root and Functions dependencies separately, then build Functions. Firebase CLI 15 is a development tool, not a runtime dependency.
+Use Node 24.19+ with npm 11.9.0 for web tooling, Node 22 for deployed Functions, and Java 21. The service CI also runs on Node 22 with npm 11.9.0; npm 10 interprets the web lockfile’s ranged security overrides differently. Install root and Functions dependencies separately, then build Functions. Firebase CLI 15 is a development tool, not a runtime dependency.
 
 ```sh
 npm ci
