@@ -1,0 +1,44 @@
+name: Desk service integration
+on:
+  pull_request:
+    paths: ['functions/**', 'src/desk/**', 'scripts/desk-online-browser.mjs', 'firebase.json', 'firestore.rules', 'firestore.indexes.json', '.github/workflows/desk-service.yml']
+  push:
+    branches: [main]
+    paths: ['functions/**', 'src/desk/**', 'scripts/desk-online-browser.mjs', 'firebase.json', 'firestore.rules', 'firestore.indexes.json', '.github/workflows/desk-service.yml']
+permissions:
+  contents: read
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+      - name: Use runner Java 21
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+      - run: npm ci --no-audit --no-fund
+      - run: npm ci --prefix functions --ignore-scripts --no-audit
+      - run: npm run build --prefix functions
+      - run: node --test functions/tests/desk-core.test.cjs
+      - run: npx playwright install --with-deps chromium
+      - name: Exercise actual Auth, Firestore rules, callables and browser flows
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8282
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9299
+        run: npx --yes firebase-tools@15.36.0 emulators:exec --project demo-stockdesk --only auth,firestore,functions "node --test functions/tests/desk-service.test.cjs && node scripts/desk-online-browser.mjs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: desk-service-evidence
+          path: |
+            output/desk-online
+            *-debug.log
+          retention-days: 14

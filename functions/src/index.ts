@@ -357,3 +357,6 @@ export const endSeason = functions.https.onRequest(async (req, res) => {
         res.status(500).json({ error: 'Failed to end season' });
     }
 });
+
+// The rebuilt simulator owns its accounts and prices on the server.
+export { deskApi, deskRiskSweep } from './desk/functions';
