@@ -25,6 +25,20 @@ import { submitScore } from './verification/submitScore';
 import { readActiveSeason } from './verification/season';
 import { updateLeaderboardSnapshot, updateAllActiveSnapshots } from './scheduled/updateSnapshot';
 
+async function verifyActiveUser(request: functions.https.Request, expectedUid?: string) {
+    const token = request.get('authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
+    if (!token) throw new functions.https.HttpsError('unauthenticated', 'Sign in again to continue.');
+    try {
+        // Production token verification does not check disabled/deleted users or
+        // revoked sessions unless explicitly requested (the emulator always does).
+        const decoded = await getAuth().verifyIdToken(token, true);
+        if (expectedUid && decoded.uid !== expectedUid) throw new Error('Actor mismatch');
+        return decoded;
+    } catch {
+        throw new functions.https.HttpsError('unauthenticated', 'Sign in again to continue.');
+    }
+}
+
 // ============================================
 // CALLABLE FUNCTIONS
 // ============================================
@@ -80,6 +94,7 @@ export const submitGameScore = functions
         }
 
         const uid = context.auth.uid;
+        await verifyActiveUser(context.rawRequest, uid);
 
         // ========================================
         // VERIFY AND SUBMIT
@@ -212,21 +227,11 @@ export const createSeason = functions.https.onRequest(async (req, res) => {
         return;
     }
 
-    // Verify admin authorization
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        res.status(401).json({ error: 'Unauthorized - Bearer token required' });
-        return;
-    }
-
-    const token = authHeader.split('Bearer ')[1];
-
     try {
-        // Verify the token is from an admin
-        const decodedToken = await getAuth().verifyIdToken(token);
+        const decodedToken = await verifyActiveUser(req);
 
         // Check for admin claim (you should set this in Firebase Auth)
-        if (!decodedToken.admin) {
+        if (decodedToken.admin !== true) {
             res.status(403).json({ error: 'Forbidden - Admin access required' });
             return;
         }
@@ -288,6 +293,10 @@ export const createSeason = functions.https.onRequest(async (req, res) => {
         });
 
     } catch (error) {
+        if (error instanceof functions.https.HttpsError && error.code === 'unauthenticated') {
+            res.status(401).json({ error: error.message });
+            return;
+        }
         console.error('[createSeason] Error:', error);
         res.status(500).json({ error: 'Failed to create season' });
     }
@@ -313,17 +322,10 @@ export const endSeason = functions.https.onRequest(async (req, res) => {
         return;
     }
 
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
-    }
-
     try {
-        const token = authHeader.split('Bearer ')[1];
-        const decodedToken = await getAuth().verifyIdToken(token);
+        const decodedToken = await verifyActiveUser(req);
 
-        if (!decodedToken.admin) {
+        if (decodedToken.admin !== true) {
             res.status(403).json({ error: 'Admin access required' });
             return;
         }
@@ -353,6 +355,10 @@ export const endSeason = functions.https.onRequest(async (req, res) => {
         });
 
     } catch (error) {
+        if (error instanceof functions.https.HttpsError && error.code === 'unauthenticated') {
+            res.status(401).json({ error: error.message });
+            return;
+        }
         console.error('[endSeason] Error:', error);
         res.status(500).json({ error: 'Failed to end season' });
     }

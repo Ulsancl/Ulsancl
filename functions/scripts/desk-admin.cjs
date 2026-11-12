@@ -36,7 +36,7 @@ async function main() {
   console.log(
     'Admin claim updated for ' +
       uid +
-      '. Sign in again. Desk checks revocation on each request; legacy endpoints may accept old tokens until expiry.'
+      '. Sign in again. Server writes check revocation on each request.'
   )
 }
 main().catch((error) => {
