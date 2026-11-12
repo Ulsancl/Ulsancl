@@ -162,9 +162,23 @@ function requireAdmin(actor: Actor): string {
   if (!actor.admin) throw new DeskError('permission-denied', '운영자 권한이 필요합니다.')
   return uid
 }
-async function rateLimit(db: Firestore, uid: string, now: number, limit = 120) {
+async function rateLimit(
+  db: Firestore,
+  uid: string,
+  now: number,
+  limit = 120,
+  deletionRetry = false
+) {
   const ref = db.doc('deskLimits/' + uid)
   await db.runTransaction(async (tx) => {
+    const deletion = await tx.get(db.doc('deskDeletions/' + uid))
+    if (deletion.exists) {
+      if (!deletionRetry)
+        throw new DeskError('failed-precondition', '계정 삭제가 접수됐습니다. 로그아웃하세요.')
+      // An already verified request may finish after the worker deletes Auth.
+      // Do not recreate a rate-limit document after erasure has completed.
+      if (deletion.data()?.state === 'complete') return
+    }
     const doc = await tx.get(ref),
       previous = doc.data(),
       bucket = Math.floor(now / 60000)
@@ -328,13 +342,10 @@ export async function deskService(
   if (op === 'deleteAccount') {
     if (!actor.uid) throw new DeskError('unauthenticated', '먼저 로그인하세요.')
     if (data.confirmation !== 'DELETE') return fail('삭제 확인이 필요합니다.')
+    await rateLimit(db, actor.uid, now, 120, true)
     return requestDeletion(db, actor.uid, actor.authTime ?? NaN, now)
   }
-  if (actor.uid) {
-    if ((await db.doc('deskDeletions/' + actor.uid).get()).exists)
-      throw new DeskError('failed-precondition', '계정 삭제가 접수됐습니다. 로그아웃하세요.')
-    await rateLimit(db, actor.uid, now)
-  }
+  if (actor.uid) await rateLimit(db, actor.uid, now)
   if (op === 'bootstrap') {
     const { control, season } = await controlAndSeason(db)
     const profile = actor.uid

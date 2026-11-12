@@ -384,6 +384,10 @@ test('account erasure requires recent identity and fences only the caller, inclu
   )
   await assert.rejects(syncSession(db, uid, start), { code: 'failed-precondition' })
   assert.equal((await call(actor, { op: 'deleteAccount', confirmation: 'DELETE' })).accepted, true)
+  await db.doc('deskLimits/' + uid).set({ bucket: Math.floor(start / 60000), count: 120 })
+  await assert.rejects(call(actor, { op: 'deleteAccount', confirmation: 'DELETE' }), {
+    code: 'resource-exhausted',
+  })
 })
 
 test('durable deletion retries failures and erases auth, historical records, rankings and associated reports', async () => {
@@ -424,6 +428,15 @@ test('durable deletion retries failures and erases auth, historical records, ran
   assert.deepEqual((await db.doc('deskStandings/' + seasonId).get()).data().rows, [otherRow])
   const receipt = (await db.doc('deskDeletions/' + uid).get()).data()
   assert.equal(receipt.state, 'complete')
+  await call(
+    { uid, member: false, admin: false, authTime: start / 1000 },
+    { op: 'deleteAccount', confirmation: 'DELETE' }
+  )
+  assert.equal(
+    (await db.doc('deskLimits/' + uid).get()).exists,
+    false,
+    'late retry must not recreate erased metadata'
+  )
   assert.deepEqual(Object.keys(receipt).sort(), [
     'completedAt',
     'expiresAt',
