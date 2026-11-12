@@ -338,8 +338,19 @@ export function Leaderboard({ desk }) {
     setFilters({ ...filters, [k]: v, ...(k === 'country' && !v ? { region: '' } : {}) })
   const load = () => desk.run(async () => setResult(await api({ op: 'leaderboard', ...filters })))
   useEffect(() => {
-    if (desk.configured) load()
-  }, [desk.configured]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!desk.configured) return
+    let active = true
+    api({ op: 'leaderboard' })
+      .then((result) => {
+        if (active) setResult(result)
+      })
+      .catch((error) => {
+        if (active) desk.setError(error.message)
+      })
+    return () => {
+      active = false
+    }
+  }, [desk.configured, desk.setError])
   return (
     <>
       <div className="page-intro">
@@ -519,8 +530,19 @@ export function Admin({ desk }) {
     return r
   }
   useEffect(() => {
-    desk.run(refresh)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!desk.cloud?.admin) return
+    let active = true
+    api({ op: 'adminOverview' })
+      .then((result) => {
+        if (active) setOverview(result)
+      })
+      .catch((error) => {
+        if (active) desk.setError(error.message)
+      })
+    return () => {
+      active = false
+    }
+  }, [desk.cloud?.admin, desk.setError])
   if (!desk.cloud?.admin)
     return (
       <Empty title="운영자 권한이 필요합니다">
@@ -546,7 +568,10 @@ export function Admin({ desk }) {
           <Stat label="활성 계좌 · 최대 100건" value={overview?.accounts ?? '—'} />
           <Stat label="2분 이상 정산 지연" value={overview?.staleAccounts ?? '—'} />
           <Stat label="미처리 신고 · 최대 100건" value={overview?.reports.length ?? '—'} />
-          <Stat label="신규 주문" value={overview?.control.newOrdersEnabled ? '허용' : '중지'} />
+          <Stat
+            label="신규 주문"
+            value={overview ? (overview.control.newOrdersEnabled ? '허용' : '중지') : '조회 중'}
+          />
         </div>
       </Panel>
       <div className="two-column">
