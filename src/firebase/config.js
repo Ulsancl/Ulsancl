@@ -11,7 +11,6 @@ import {
     getDocs,
     getFirestore,
     limit,
-    orderBy,
     query,
     where
 } from 'firebase/firestore'
@@ -142,17 +141,8 @@ export const submitGameScore = httpsCallable(functions, 'submitGameScore')
 export async function getCurrentSeason() {
     if (!isFirebaseConfigured) return null
     try {
-        const q = query(
-            collection(db, 'seasons'),
-            where('active', '==', true),
-            orderBy('startDate', 'desc'),
-            limit(1)
-        )
-        const snapshot = await getDocs(q)
-        if (snapshot.empty) return null
-
-        const seasonDoc = snapshot.docs[0]
-        return { id: seasonDoc.id, ...seasonDoc.data() }
+        const result = await httpsCallable(functions, 'getActiveSeason')()
+        return result.data
     } catch (error) {
         reportClientError('season_fetch_failed', error)
         return null

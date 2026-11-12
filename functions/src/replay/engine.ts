@@ -15,6 +15,7 @@ import { createRng } from '../shared/rng';
 import { calculatePriceChange } from '../shared/priceCalculator';
 import { updateMarketState } from '../shared/marketState';
 import { INITIAL_STOCKS, INITIAL_CAPITAL, SHORT_SELLING } from '../shared/constants';
+import { MAX_REPLAY_TICKS } from '../verification/season';
 
 // ============================================
 // TYPES
@@ -144,6 +145,15 @@ export function replayGame(
     tradeLogs: TradeAction[],
     options: ReplayOptions
 ): ReplayResult {
+    if (!options || !Number.isSafeInteger(options.totalTicks) || options.totalTicks < 0 ||
+        options.totalTicks > MAX_REPLAY_TICKS || !Number.isFinite(options.initialCapital) ||
+        options.initialCapital <= 0 || !Array.isArray(tradeLogs) || tradeLogs.length > 100000 ||
+        tradeLogs.some(trade => !trade || !Number.isSafeInteger(trade.tick) || trade.tick < 0 ||
+            trade.tick > options.totalTicks || !Number.isSafeInteger(trade.quantity) || trade.quantity <= 0)) {
+        return { valid: false, error: 'Invalid replay input or work budget', finalScore: 0,
+            portfolioValue: 0, cashBalance: 0, profitRate: 0, totalAssets: 0,
+            winRate: 0, totalTrades: 0, profitableTrades: 0, maxDrawdown: 0 };
+    }
     // Initialize RNG with season seed
     const rng = createRng(seed);
 
@@ -380,7 +390,9 @@ function executeTrade(
         return { success: false, newCash: cash, error: `Stock not found: ${trade.stockId}` };
     }
 
-    if (trade.quantity <= 0) {
+    if (!Number.isSafeInteger(trade.quantity) || trade.quantity <= 0 || !Number.isFinite(cash) ||
+        cash < 0 || !Number.isFinite(stock.price) || stock.price <= 0 ||
+        !Number.isFinite(stock.price * trade.quantity) || stock.price * trade.quantity > Number.MAX_SAFE_INTEGER) {
         return { success: false, newCash: cash, error: 'Invalid quantity' };
     }
 

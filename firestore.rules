@@ -7,8 +7,9 @@ service cloud.firestore {
     // Client-readable season metadata
     // ============================================
     match /seasons/{seasonId} {
-      // Public read is safe (seed is stored in seasonSecrets)
-      allow read: if true;
+      // Legacy documents may contain secrets. getActiveSeason exposes only
+      // explicitly selected public metadata through the Admin SDK.
+      allow read: if false;
       
       // NEVER allow client writes - Admin SDK only
       allow write: if false;

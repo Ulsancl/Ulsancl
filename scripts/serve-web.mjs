@@ -60,6 +60,8 @@ export async function createRequestHandler(directory) {
   const index = await realpath(indexFile)
   if (!isWithin(root, index) || !(await stat(index)).isFile()) throw new Error('웹 시작 파일이 없습니다.')
   return async (request, response) => {
+    response.setHeader('Content-Security-Policy', "frame-ancestors 'none'")
+    response.setHeader('X-Frame-Options', 'DENY')
     const fail = (status, message) => {
       response.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
       response.end(request.method === 'HEAD' ? undefined : message)

@@ -26,6 +26,8 @@ test('local web server serves indexed files and rejects unlisted paths', async t
         host: HOST, port: server.address().port, path: target,
         headers: { Host: `${HOST}:${PORT}`, ...headers }
       }, response => {
+        assert.equal(response.headers['x-frame-options'], 'DENY')
+        assert.equal(response.headers['content-security-policy'], "frame-ancestors 'none'")
         const chunks = []
         response.on('data', chunk => chunks.push(chunk))
         response.on('end', () => resolve({ status: response.statusCode, body: Buffer.concat(chunks).toString() }))

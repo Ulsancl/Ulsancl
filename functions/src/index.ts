@@ -22,11 +22,17 @@ const db = getFirestore();
 
 // Import verification and utility functions
 import { submitScore } from './verification/submitScore';
+import { readActiveSeason } from './verification/season';
 import { updateLeaderboardSnapshot, updateAllActiveSnapshots } from './scheduled/updateSnapshot';
 
 // ============================================
 // CALLABLE FUNCTIONS
 // ============================================
+
+export const getActiveSeason = functions.runWith({ enforceAppCheck: true }).https.onCall(async (_data, context) => {
+    if (!context.app) throw new functions.https.HttpsError('failed-precondition', 'App Check is required.');
+    return readActiveSeason(db);
+});
 
 /**
  * Submit a game score for verification
