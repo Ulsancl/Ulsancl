@@ -60,7 +60,7 @@ export function useDesk() {
       setSession(null)
       setMode('practice')
       uncertain.current = null
-      if (configured)
+      if (configured && u)
         api({ op: 'bootstrap' })
           .then((data) => {
             if (generation === current) {

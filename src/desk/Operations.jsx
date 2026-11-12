@@ -340,6 +340,7 @@ export function Account({ desk }) {
 }
 export function Leaderboard({ desk }) {
   const configured = desk.configured,
+    uid = desk.user?.uid,
     reportError = desk.setError
   const [filters, setFilters] = useState({
       period: 'season',
@@ -355,7 +356,8 @@ export function Leaderboard({ desk }) {
     setFilters({ ...filters, [k]: v, ...(k === 'country' && !v ? { region: '' } : {}) })
   const load = () => desk.run(async () => setResult(await api({ op: 'leaderboard', ...filters })))
   useEffect(() => {
-    if (!configured) return
+    setResult(null)
+    if (!configured || !uid) return
     let active = true
     api({ op: 'leaderboard' })
       .then((result) => {
@@ -367,7 +369,7 @@ export function Leaderboard({ desk }) {
     return () => {
       active = false
     }
-  }, [configured, reportError])
+  }, [configured, uid, reportError])
   return (
     <>
       <div className="page-intro">
@@ -414,7 +416,7 @@ export function Leaderboard({ desk }) {
             />
           </label>
           <AgeField all value={filters.ageBand} onChange={(v) => update('ageBand', v)} />
-          <button className="secondary" disabled={!desk.configured || desk.busy}>
+          <button className="secondary" disabled={!configured || !uid || desk.busy}>
             순위 조회
           </button>
         </form>
@@ -471,9 +473,11 @@ export function Leaderboard({ desk }) {
             title={
               !desk.configured
                 ? '공개 서버 연결을 기다리고 있습니다'
-                : result?.cohortPending
-                  ? '비교할 참가자가 더 필요합니다'
-                  : '아직 집계된 순위가 없습니다'
+                : !uid
+                  ? '로그인하면 공개 순위를 조회할 수 있습니다'
+                  : result?.cohortPending
+                    ? '비교할 참가자가 더 필요합니다'
+                    : '아직 집계된 순위가 없습니다'
             }
           >
             {result?.cohortPending

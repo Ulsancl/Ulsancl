@@ -2,7 +2,7 @@ import * as functions from 'firebase-functions/v1'
 import { getFirestore } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 import { deskService, riskSweep, DeskError } from './service'
-import { privacySweep } from './deletion'
+import { privacySweep, processDeletion } from './deletion'
 export const deskApi = functions
   .runWith({
     enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== 'true',
@@ -35,7 +35,7 @@ export const deskApi = functions
       (provider === 'google.com' || context.auth.token.email_verified === true)
     )
     try {
-      return await deskService(
+      const result = await deskService(
         getFirestore(),
         {
           uid: context.auth?.uid || null,
@@ -45,6 +45,20 @@ export const deskApi = functions
         },
         data
       )
+      if (data?.op === 'deleteAccount' && context.auth) {
+        try {
+          // No season history: finish bounded cleanup immediately instead of building a backlog.
+          await processDeletion(getFirestore(), getAuth(), context.auth.uid, Date.now(), {
+            identityOnly: true,
+          })
+        } catch (error) {
+          // The durable, separate identity queue retries transient Auth/Firestore failures.
+          functions.logger.warn('desk_identity_erasure_deferred', {
+            code: (error as { code?: string })?.code,
+          })
+        }
+      }
+      return result
     } catch (error) {
       if (error instanceof DeskError)
         throw new functions.https.HttpsError(error.code, error.message)

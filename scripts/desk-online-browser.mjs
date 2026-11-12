@@ -68,6 +68,12 @@ async function login(uid) {
 }
 try {
   await page.goto('http://127.0.0.1:5274/')
+  await nav('리더보드').click()
+  await page.getByText('로그인하면 공개 순위를 조회할 수 있습니다', { exact: true }).waitFor()
+  assert.equal(
+    await page.getByRole('button', { name: '순위 조회', exact: true }).isDisabled(),
+    true
+  )
   await login('web-player')
   await page.getByLabel('닉네임', { exact: true }).fill('검증 투자자')
   await page.getByLabel('국가', { exact: true }).selectOption('KR')
