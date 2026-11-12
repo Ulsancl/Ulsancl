@@ -35,7 +35,7 @@ jobs:
         env:
           FIRESTORE_EMULATOR_HOST: 127.0.0.1:8282
           FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9299
-        run: npx --yes firebase-tools@15.36.0 emulators:exec --project demo-stockdesk --only auth,firestore,functions "node --test functions/tests/desk-service.test.cjs && node scripts/desk-online-browser.mjs"
+        run: npx --yes firebase-tools@15.36.0 emulators:exec --project demo-stockdesk --only auth,firestore,functions "node --test functions/tests/desk-service.test.cjs && node --test functions/tests/legacy-auth.test.cjs && node scripts/desk-online-browser.mjs"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
