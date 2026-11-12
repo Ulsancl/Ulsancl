@@ -1,17 +1,17 @@
 name: Android release candidate
 on:
   pull_request:
-    paths: ['android/**', 'release/**', 'public/icons/**', 'public/manifest.json', 'public/.well-known/**', 'scripts/check-play-release.mjs', '.github/workflows/android.yml']
+    paths: ['android/**', 'release/**', 'public/icons/**', 'public/manifest.json', 'public/.well-known/**', 'scripts/check-play-release.mjs', 'scripts/android-device-smoke.py', '.github/workflows/android.yml']
   push:
     branches: [main]
-    paths: ['android/**', 'release/**', 'public/icons/**', 'public/manifest.json', 'public/.well-known/**', 'scripts/check-play-release.mjs', '.github/workflows/android.yml']
+    paths: ['android/**', 'release/**', 'public/icons/**', 'public/manifest.json', 'public/.well-known/**', 'scripts/check-play-release.mjs', 'scripts/android-device-smoke.py', '.github/workflows/android.yml']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -39,3 +39,24 @@ jobs:
             output/android
             android/app/build/reports/lint-results-debug.html
           retention-days: 30
+      - name: Start an accelerated Android 36 device
+        run: |
+          test -e /dev/kvm
+          sudo chown "$USER" /dev/kvm
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'emulator' 'system-images;android-36;google_apis_playstore;x86_64'
+          printf 'no\n' | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name marketdesk-smoke --package 'system-images;android-36;google_apis_playstore;x86_64' --device pixel_2
+          mkdir -p output/android-device
+          nohup "$ANDROID_HOME/emulator/emulator" -avd marketdesk-smoke -port 5554 -accel on -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader -memory 2048 -cores 2 -wipe-data > output/android-device/emulator.log 2>&1 &
+      - name: Verify installed app against the public practice release
+        run: python3 scripts/android-device-smoke.py --apk output/android/market-desk-debug.apk
+      - name: Preserve native screenshots and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: market-desk-android-device
+          path: output/android-device
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Stop the test device
+        if: always()
+        run: adb -s emulator-5554 emu kill || true
