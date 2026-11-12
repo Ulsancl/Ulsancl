@@ -77,6 +77,20 @@ export function useDesk() {
       stop()
     }
   }, [])
+  useEffect(() => {
+    const cleared = (event) => {
+      if (event.key === SAVE_KEY && event.newValue === null) {
+        const next = freshPractice()
+        practiceRef.current = next
+        setPractice(next)
+        setPlaying(false)
+        setStorageError('')
+        setNotice('다른 탭에서 연습 기록을 삭제했습니다.')
+      }
+    }
+    addEventListener('storage', cleared)
+    return () => removeEventListener('storage', cleared)
+  }, [])
   async function save(next) {
     if (storageError) {
       setPractice(next)

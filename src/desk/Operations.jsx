@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { COUNTRY_CODES } from './core'
+import { DeleteAccount, LocalDeletion } from './Privacy'
 import { api, loginGoogle, logout, emailAuth, resetPassword } from './client'
 import { downloadSave, SAVE_KEY } from './storage'
 import { Panel, Empty, Modal, Stat, won, pct, tone } from './components'
@@ -242,6 +243,22 @@ export function Account({ desk }) {
           </form>
         </Panel>
       </div>
+      <Panel title="개인정보와 삭제" eyebrow="YOUR DATA">
+        <div className="button-row">
+          <a href="/privacy">개인정보 처리 안내</a>
+          <a href="/delete-account">계정 · 데이터 삭제</a>
+          <a href="/support">도움말</a>
+        </div>
+        <div className="button-row">
+          <DeleteAccount
+            user={desk.user}
+            busy={desk.busy}
+            run={desk.run}
+            onAccepted={desk.setNotice}
+          />
+          <LocalDeletion busy={desk.busy} />
+        </div>
+      </Panel>
       <Panel title="연습 기록과 보관" eyebrow="LOCAL WORKSPACE">
         <div className="save-grid">
           <div>
@@ -251,8 +268,7 @@ export function Account({ desk }) {
               사용하세요.
             </p>
             <small>
-              연습 계좌 현금 {won(desk.practice.account.cash)}원 ·
-              저장{' '}
+              연습 계좌 현금 {won(desk.practice.account.cash)}원 · 저장{' '}
               {desk.practice.savedAt
                 ? new Date(desk.practice.savedAt).toLocaleString('ko-KR')
                 : '대기'}

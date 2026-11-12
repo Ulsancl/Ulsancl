@@ -352,3 +352,102 @@ test('real callable transport rejects missing auth and forged admin claims', asy
   await auth.updateUser('alice', { disabled: true })
   assert.equal((await request({ op: 'bootstrap' }, aliceToken)).error.status, 'UNAUTHENTICATED')
 })
+
+test('account erasure requires recent identity and fences only the caller, including unverified accounts', async () => {
+  const uid = 'privacy-owner'
+  await auth.createUser({ uid, email: 'privacy-owner@example.test', emailVerified: false })
+  const actor = { uid, member: false, admin: false, authTime: start / 1000 }
+  await db.doc('deskProfiles/' + uid).set(profile('private-name'))
+  await db.doc('deskAccounts/' + uid).set({ seasonId, account: createAccount('sandbox') })
+  await assert.rejects(
+    call(
+      { ...actor, authTime: start / 1000 - 301 },
+      { op: 'deleteAccount', confirmation: 'DELETE' }
+    ),
+    { code: 'unauthenticated' }
+  )
+  await assert.rejects(call(actor, { op: 'deleteAccount', confirmation: 'wrong' }), {
+    code: 'invalid-argument',
+  })
+  const requested = await call(actor, {
+    op: 'deleteAccount',
+    confirmation: 'DELETE',
+    targetUid: 'bob',
+  })
+  assert.equal(requested.accepted, true)
+  assert.equal((await db.doc('deskAccounts/' + uid).get()).exists, false)
+  assert.equal((await db.doc('deskDeletions/bob').get()).exists, false)
+  assert.equal((await db.doc('deskProfiles/' + uid).get()).data().publicRanking, false)
+  await assert.rejects(
+    call({ ...actor, member: true }, { op: 'profile', profile: profile('resurrect') }),
+    { code: 'failed-precondition' }
+  )
+  await assert.rejects(syncSession(db, uid, start), { code: 'failed-precondition' })
+  assert.equal((await call(actor, { op: 'deleteAccount', confirmation: 'DELETE' })).accepted, true)
+})
+
+test('durable deletion retries failures and erases auth, historical records, rankings and associated reports', async () => {
+  const { processDeletion, privacySweep } = require('../lib/desk/deletion')
+  const uid = 'privacy-owner'
+  const otherRow = { uid: 'unrelated', returns: { season: 1 } }
+  await db.doc('deskStandings/' + seasonId).set({ rows: [{ uid }, otherRow] })
+  await db.doc('deskLeaderboard/' + seasonId + '/entries/' + uid).set({ uid })
+  await db.doc('deskArchive/' + seasonId + '_' + uid).set({ seasonId })
+  await db
+    .doc('deskReports/privacy-report')
+    .set({ reporterUid: uid, targetUid: 'unrelated', detail: 'erase me' })
+  await db.doc('deskAudit/privacy-audit').set({ actorUid: 'operator', target: uid })
+  await assert.rejects(
+    processDeletion(
+      db,
+      {
+        deleteUser: async () => {
+          throw Object.assign(new Error('temporary'), { code: 'auth/internal-error' })
+        },
+      },
+      uid,
+      start
+    )
+  )
+  assert.equal((await db.doc('deskDeletions/' + uid).get()).data().state, 'pending')
+  assert.equal(await processDeletion(db, auth, uid, start), true)
+  assert.equal(await processDeletion(db, auth, uid, start), true)
+  await assert.rejects(auth.getUser(uid), { code: 'auth/user-not-found' })
+  for (const path of [
+    'deskProfiles/' + uid,
+    'deskArchive/' + seasonId + '_' + uid,
+    'deskLeaderboard/' + seasonId + '/entries/' + uid,
+    'deskReports/privacy-report',
+    'deskAudit/privacy-audit',
+  ])
+    assert.equal((await db.doc(path).get()).exists, false, path)
+  assert.deepEqual((await db.doc('deskStandings/' + seasonId).get()).data().rows, [otherRow])
+  const receipt = (await db.doc('deskDeletions/' + uid).get()).data()
+  assert.equal(receipt.state, 'complete')
+  assert.deepEqual(Object.keys(receipt).sort(), [
+    'completedAt',
+    'expiresAt',
+    'requestedAt',
+    'state',
+  ])
+  await privacySweep(db, auth, start + 31 * 86400000)
+  assert.equal((await db.doc('deskDeletions/' + uid).get()).exists, false)
+})
+
+test('actual callable accepts a recently signed-in account deletion without trusting a target uid', async () => {
+  const bearer = await token('privacy-callable')
+  const endpoint = 'http://127.0.0.1:5201/demo-stockdesk/us-central1/deskApi'
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + bearer },
+    body: JSON.stringify({
+      data: { op: 'deleteAccount', confirmation: 'DELETE', targetUid: 'operator' },
+    }),
+  })
+  assert.deepEqual((await response.json()).result, { accepted: true })
+  assert.equal((await db.doc('deskDeletions/operator').get()).exists, false)
+  assert.equal((await db.doc('deskDeletions/privacy-callable').get()).data().state, 'pending')
+  const { processDeletion } = require('../lib/desk/deletion')
+  await processDeletion(db, auth, 'privacy-callable')
+  await assert.rejects(auth.getUser('privacy-callable'), { code: 'auth/user-not-found' })
+})

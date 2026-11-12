@@ -1,16 +1,28 @@
 {
   "name": "MARKET DESK",
   "short_name": "MARKET DESK",
-  "start_url": ".",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "lang": "ko",
+  "categories": ["games", "education", "finance"],
   "display": "standalone",
   "background_color": "#0c1119",
   "theme_color": "#0c1119",
   "description": "가상 자본으로 배우는 멀티 자산 투자 시뮬레이터",
   "icons": [
     {
-      "src": "app-icon.svg",
-      "sizes": "192x192 512x512",
-      "type": "image/svg+xml"
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

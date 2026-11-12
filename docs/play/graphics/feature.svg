@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0c1119"/><stop offset="1" stop-color="#1a3034"/></linearGradient><linearGradient id="fill" x2="0" y2="1"><stop stop-color="#b9ef83" stop-opacity=".18"/><stop offset="1" stop-color="#b9ef83" stop-opacity="0"/></linearGradient></defs>
+<rect width="1024" height="500" fill="url(#bg)"/>
+<g stroke="#324145" opacity=".5"><path d="M620 80v350M720 80v350M820 80v350M920 80v350M560 130h430M560 230h430M560 330h430M560 430h430"/></g>
+<path d="M574 380L625 349 661 363 712 295 750 310 796 230 830 253 882 164 920 181 980 110V440H574Z" fill="url(#fill)"/>
+<path d="M574 380L625 349 661 363 712 295 750 310 796 230 830 253 882 164 920 181 980 110" fill="none" stroke="#b9ef83" stroke-width="5" stroke-linejoin="round"/>
+<circle cx="980" cy="110" r="9" fill="#b9ef83"/>
+<text x="64" y="80" fill="#b9ef83" font-size="17" letter-spacing="4" font-family="DejaVu Sans,sans-serif">INVESTING SIMULATOR</text>
+<g fill="#edf2ee" font-family="DejaVu Sans,sans-serif" font-size="70" font-weight="bold"><text x="60" y="184">MARKET</text><text x="60" y="262">DESK<tspan fill="#b9ef83">.</tspan></text></g>
+<text x="64" y="330" fill="#dce5dd" font-family="Noto Sans CJK KR,sans-serif" font-size="25">가상 자본. 나만의 투자 원칙.</text>
+<text x="64" y="374" fill="#92a3a9" font-family="Noto Sans CJK KR,sans-serif" font-size="17">주식 · 선물 · 옵션   /   6개 투자 캠페인</text>
+<text x="64" y="451" fill="#92a3a9" font-family="DejaVu Sans,sans-serif" font-size="15">standard__bae</text>
+<text x="984" y="468" text-anchor="end" fill="#92a3a9" font-family="Noto Sans CJK KR,sans-serif" font-size="13">실제 돈을 입금하거나 출금하지 않는 가상 투자 게임</text>
+</svg>

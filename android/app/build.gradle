@@ -1,0 +1,39 @@
+plugins { id 'com.android.application' }
+
+def releaseKeys = ['MARKETDESK_KEYSTORE', 'MARKETDESK_STORE_PASSWORD', 'MARKETDESK_KEY_ALIAS', 'MARKETDESK_KEY_PASSWORD']
+def hasReleaseKey = releaseKeys.every { System.getenv(it) }
+android {
+    namespace 'io.github.ulsancl.marketdesk'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'io.github.ulsancl.marketdesk'
+        minSdk 24
+        targetSdk 36
+        versionCode 20001
+        versionName '2.0.1'
+    }
+    signingConfigs {
+        if (hasReleaseKey) {
+            release {
+                storeFile file(System.getenv('MARKETDESK_KEYSTORE'))
+                storePassword System.getenv('MARKETDESK_STORE_PASSWORD')
+                keyAlias System.getenv('MARKETDESK_KEY_ALIAS')
+                keyPassword System.getenv('MARKETDESK_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (hasReleaseKey) signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+        debug { applicationIdSuffix '.debug'; versionNameSuffix '-debug' }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    lint { abortOnError true; checkReleaseBuilds true }
+}
+tasks.register('verifyReleaseSigning') {
+    doLast { if (!hasReleaseKey && !project.hasProperty('marketdeskUnsignedPreview')) throw new GradleException('Configure MARKETDESK_* signing secrets before producing a Play upload bundle. For a non-uploadable review artifact only, pass -PmarketdeskUnsignedPreview.') }
+}
+tasks.matching { it.name == 'bundleRelease' }.configureEach { dependsOn 'verifyReleaseSigning' }
+dependencies { implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4' }
