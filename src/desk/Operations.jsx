@@ -324,6 +324,8 @@ export function Account({ desk }) {
   )
 }
 export function Leaderboard({ desk }) {
+  const configured = desk.configured,
+    reportError = desk.setError
   const [filters, setFilters] = useState({
       period: 'season',
       country: '',
@@ -338,19 +340,19 @@ export function Leaderboard({ desk }) {
     setFilters({ ...filters, [k]: v, ...(k === 'country' && !v ? { region: '' } : {}) })
   const load = () => desk.run(async () => setResult(await api({ op: 'leaderboard', ...filters })))
   useEffect(() => {
-    if (!desk.configured) return
+    if (!configured) return
     let active = true
     api({ op: 'leaderboard' })
       .then((result) => {
         if (active) setResult(result)
       })
       .catch((error) => {
-        if (active) desk.setError(error.message)
+        if (active) reportError(error.message)
       })
     return () => {
       active = false
     }
-  }, [desk.configured, desk.setError])
+  }, [configured, reportError])
   return (
     <>
       <div className="page-intro">
@@ -517,6 +519,8 @@ export function Leaderboard({ desk }) {
   )
 }
 export function Admin({ desk }) {
+  const isAdmin = desk.cloud?.admin,
+    reportError = desk.setError
   const [overview, setOverview] = useState(null),
     [reason, setReason] = useState(''),
     [message, setMessage] = useState(''),
@@ -530,19 +534,19 @@ export function Admin({ desk }) {
     return r
   }
   useEffect(() => {
-    if (!desk.cloud?.admin) return
+    if (!isAdmin) return
     let active = true
     api({ op: 'adminOverview' })
       .then((result) => {
         if (active) setOverview(result)
       })
       .catch((error) => {
-        if (active) desk.setError(error.message)
+        if (active) reportError(error.message)
       })
     return () => {
       active = false
     }
-  }, [desk.cloud?.admin, desk.setError])
+  }, [isAdmin, reportError])
   if (!desk.cloud?.admin)
     return (
       <Empty title="운영자 권한이 필요합니다">
