@@ -88,18 +88,20 @@ export const useProgressiveRender = (items, chunkSize = 10, interval = 50) => {
  * 부드러운 UI 업데이트 제공
  */
 export const useAnimationFrame = (callback, isActive = true) => {
+    const callbackRef = useRef(callback)
+    useEffect(() => { callbackRef.current = callback }, [callback])
     useEffect(() => {
         if (!isActive) return
         let request, previous, canceled = false
         function animate(time) {
             if (canceled) return
-            if (previous !== undefined) callback(time - previous)
+            if (previous !== undefined) callbackRef.current(time - previous)
             previous = time
             if (!canceled) request = requestAnimationFrame(animate)
         }
         request = requestAnimationFrame(animate)
         return () => { canceled = true; cancelAnimationFrame(request) }
-    }, [isActive, callback])
+    }, [isActive])
 }
 
 /**

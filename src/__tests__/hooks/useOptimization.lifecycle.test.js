@@ -58,3 +58,15 @@ test('conditional memo caches undefined after being enabled', () => {
     rerender({ enabled: true })
     expect(factory).toHaveBeenCalledTimes(1)
 })
+
+test('a callback update does not restart the active animation clock', () => {
+    const first = jest.fn(), next = jest.fn()
+    const { rerender, unmount } = renderHook(({ callback }) => useAnimationFrame(callback), {
+        initialProps: { callback: first }
+    })
+    act(() => jest.advanceTimersByTime(48))
+    rerender({ callback: next })
+    act(() => jest.advanceTimersByTime(16))
+    expect(next).toHaveBeenCalledWith(16)
+    unmount()
+})
