@@ -1,7 +1,10 @@
 import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
-const App =
-  location.pathname === '/classic' || location.pathname.startsWith('/classic/')
+const App = ['/privacy', '/delete-account', '/support'].some(
+  (path) => location.pathname === path || location.pathname === path + '/'
+)
+  ? lazy(() => import('./desk/Privacy'))
+  : location.pathname === '/classic' || location.pathname.startsWith('/classic/')
     ? lazy(() => import('./ClassicRoot'))
     : lazy(() => import('./desk/DeskApp'))
 if (import.meta.env.PROD && 'serviceWorker' in navigator)

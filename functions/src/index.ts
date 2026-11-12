@@ -359,4 +359,4 @@ export const endSeason = functions.https.onRequest(async (req, res) => {
 });
 
 // The rebuilt simulator owns its accounts and prices on the server.
-export { deskApi, deskRiskSweep } from './desk/functions';
+export { deskApi, deskRiskSweep, deskPrivacySweep } from './desk/functions';

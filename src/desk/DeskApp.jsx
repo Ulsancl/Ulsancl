@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useDesk } from './useDesk'
 import Market from './Market'
 import { Portfolio, Strategies, Campaigns, Journal } from './Pages'
@@ -17,8 +17,22 @@ const pages = [
 ]
 export default function DeskApp() {
   const desk = useDesk(),
-    [page, setPage] = useState('market'),
+    [page, updatePage] = useState(() =>
+      pages.some(([key]) => key === location.hash.slice(1)) ? location.hash.slice(1) : 'market'
+    ),
     [selected, setSelected] = useState('nova')
+  const setPage = (next) => {
+    if (next !== page) history.pushState(null, '', '#' + next)
+    updatePage(next)
+  }
+  useEffect(() => {
+    const back = () =>
+      updatePage(
+        pages.some(([key]) => key === location.hash.slice(1)) ? location.hash.slice(1) : 'market'
+      )
+    addEventListener('popstate', back)
+    return () => removeEventListener('popstate', back)
+  }, [])
   const nav = desk.cloud?.admin ? [...pages, ['shield', '운영 콘솔', 'OPERATIONS']] : pages
   const currentPage = nav.find(([key]) => key === page) || pages[0],
     scenario = SCENARIOS.find((s) => s.id === desk.account.scenario)
@@ -182,7 +196,7 @@ export default function DeskApp() {
             />
           </div>
           {desk.mode === 'practice' && (
-            <div className="time-controls">
+            <div className="time-controls" role="group" aria-label="연습 시장 시간">
               <div>
                 <Icon name="clock" size={17} />
                 <strong>시장 시간</strong>
@@ -235,6 +249,11 @@ export default function DeskApp() {
           {page === 'shield' && <Admin desk={desk} />}
           <footer className="desk-footer">
             <span>VIRTUAL CAPITAL. REAL CONVICTION.</span>
+            <nav className="button-row" aria-label="서비스 안내">
+              <a href="/privacy">개인정보</a>
+              <a href="/delete-account">데이터 삭제</a>
+              <a href="/support">도움말</a>
+            </nav>
             <small>
               모든 자산과 시세는 투자 학습용 모형입니다. 실제 돈을 입금하거나 출금하지 않습니다.
             </small>

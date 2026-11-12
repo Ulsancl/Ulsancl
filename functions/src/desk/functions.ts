@@ -2,6 +2,7 @@ import * as functions from 'firebase-functions/v1'
 import { getFirestore } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 import { deskService, riskSweep, DeskError } from './service'
+import { privacySweep } from './deletion'
 export const deskApi = functions
   .runWith({
     enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== 'true',
@@ -26,6 +27,8 @@ export const deskApi = functions
       }
     }
     const provider = context.auth?.token.firebase?.sign_in_provider
+    if (data?.op === 'deleteAccount' && provider === 'anonymous')
+      throw new functions.https.HttpsError('permission-denied', '등록 계정으로 로그인하세요.')
     const member = Boolean(
       context.auth &&
       provider !== 'anonymous' &&
@@ -34,7 +37,12 @@ export const deskApi = functions
     try {
       return await deskService(
         getFirestore(),
-        { uid: context.auth?.uid || null, member, admin: context.auth?.token.admin === true },
+        {
+          uid: context.auth?.uid || null,
+          member,
+          admin: context.auth?.token.admin === true,
+          authTime: Number(context.auth?.token.auth_time),
+        },
         data
       )
     } catch (error) {
@@ -56,3 +64,8 @@ export const deskRiskSweep = functions
   .runWith({ memory: '512MB', timeoutSeconds: 540, maxInstances: 1 })
   .pubsub.schedule('every 1 minutes')
   .onRun(() => riskSweep(getFirestore()))
+
+export const deskPrivacySweep = functions
+  .runWith({ memory: '256MB', timeoutSeconds: 540, maxInstances: 1 })
+  .pubsub.schedule('every 10 minutes')
+  .onRun(() => privacySweep(getFirestore(), getAuth()))

@@ -1969,3 +1969,95 @@ td small {
     font-size: 9px;
   }
 }
+
+/* Public privacy/deletion pages stay usable outside an installed app. */
+/* Keep the market visible on phone screens instead of spending the first fold on totals. */
+@media (max-width: 520px) {
+  .topbar {
+    height: 44px;
+  }
+  .workspace main {
+    padding-top: 12px;
+  }
+  .page-header {
+    margin-bottom: 14px;
+  }
+  .page-header .eyebrow {
+    display: none;
+  }
+  .page-header h1 {
+    margin-top: 4px;
+    margin-bottom: 6px;
+    font-size: 22px;
+  }
+  .page-header p {
+    line-height: 1.5;
+  }
+  .mode-switch {
+    margin-top: 0;
+  }
+  .mode-switch button {
+    min-height: 36px;
+    font-size: 9px;
+  }
+  .account-strip {
+    padding: 12px 0;
+    row-gap: 12px;
+    margin-bottom: 12px;
+  }
+  .account-strip .stat {
+    padding: 0 13px;
+    gap: 4px;
+  }
+  .account-strip .stat > strong {
+    font-size: 20px;
+  }
+  .time-controls {
+    padding: 6px 8px;
+    margin-bottom: 14px;
+  }
+  .time-controls > div:first-child {
+    display: none;
+  }
+  .time-controls button {
+    min-height: 36px;
+    padding: 4px 5px;
+    font-size: 10px;
+  }
+  .time-controls .speed-select {
+    min-height: 36px;
+  }
+  .sidebar nav button > span {
+    font-size: 9px;
+  }
+}
+.policy-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: max(32px, env(safe-area-inset-top)) 24px max(48px, env(safe-area-inset-bottom));
+  line-height: 1.8;
+}
+.policy-page .panel {
+  margin-top: 24px;
+}
+.policy-page a,
+.desk-footer a {
+  color: var(--accent, #b9ef83);
+}
+.policy-page h1 {
+  font-size: clamp(26px, 5vw, 40px);
+}
+.policy-page p {
+  overflow-wrap: anywhere;
+}
+.policy-page input {
+  margin-bottom: 12px;
+}
+@media (max-width: 700px) {
+  .sidebar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .workspace {
+    padding-bottom: calc(75px + env(safe-area-inset-bottom));
+  }
+}

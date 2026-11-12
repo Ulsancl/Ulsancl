@@ -12,10 +12,14 @@ import {
   objectives,
 } from './broker'
 import { quote, candles, newsAt } from './market'
+import { DeskError } from './errors'
+export { DeskError } from './errors'
+import { assertNotDeleting, requestDeletion } from './deletion'
 export interface Actor {
   uid: string | null
   admin: boolean
   member: boolean
+  authTime?: number
 }
 interface Season {
   id: string
@@ -49,21 +53,6 @@ interface Control {
   newOrdersEnabled: boolean
   message: string
   revision: number
-}
-export class DeskError extends Error {
-  constructor(
-    public code:
-      | 'invalid-argument'
-      | 'unauthenticated'
-      | 'permission-denied'
-      | 'failed-precondition'
-      | 'resource-exhausted'
-      | 'aborted'
-      | 'not-found',
-    message: string
-  ) {
-    super(message)
-  }
 }
 const fail = (message: string): never => {
   throw new DeskError('invalid-argument', message)
@@ -173,9 +162,23 @@ function requireAdmin(actor: Actor): string {
   if (!actor.admin) throw new DeskError('permission-denied', '운영자 권한이 필요합니다.')
   return uid
 }
-async function rateLimit(db: Firestore, uid: string, now: number, limit = 120) {
+async function rateLimit(
+  db: Firestore,
+  uid: string,
+  now: number,
+  limit = 120,
+  deletionRetry = false
+) {
   const ref = db.doc('deskLimits/' + uid)
   await db.runTransaction(async (tx) => {
+    const deletion = await tx.get(db.doc('deskDeletions/' + uid))
+    if (deletion.exists) {
+      if (!deletionRetry)
+        throw new DeskError('failed-precondition', '계정 삭제가 접수됐습니다. 로그아웃하세요.')
+      // An already verified request may finish after the worker deletes Auth.
+      // Do not recreate a rate-limit document after erasure has completed.
+      if (deletion.data()?.state === 'complete') return
+    }
     const doc = await tx.get(ref),
       previous = doc.data(),
       bucket = Math.floor(now / 60000)
@@ -221,6 +224,7 @@ export async function syncSession(
   command?: Record<string, unknown>
 ) {
   return db.runTransaction(async (tx) => {
+    await assertNotDeleting(tx, db, uid)
     const ref = db.doc('deskAccounts/' + uid),
       sessionDoc = await tx.get(ref),
       profileDoc = await tx.get(db.doc('deskProfiles/' + uid)),
@@ -335,6 +339,12 @@ export async function deskService(
     return fail('요청 크기 또는 형식이 올바르지 않습니다.')
   const data = input as Record<string, unknown>,
     op = String(data.op || '')
+  if (op === 'deleteAccount') {
+    if (!actor.uid) throw new DeskError('unauthenticated', '먼저 로그인하세요.')
+    if (data.confirmation !== 'DELETE') return fail('삭제 확인이 필요합니다.')
+    await rateLimit(db, actor.uid, now, 120, true)
+    return requestDeletion(db, actor.uid, actor.authTime ?? NaN, now)
+  }
   if (actor.uid) await rateLimit(db, actor.uid, now)
   if (op === 'bootstrap') {
     const { control, season } = await controlAndSeason(db)
@@ -423,6 +433,7 @@ export async function deskService(
   if (op === 'profile') {
     const requested = profileInput(data.profile)
     return db.runTransaction(async (tx) => {
+      await assertNotDeleting(tx, db, uid)
       const ref = db.doc('deskProfiles/' + uid),
         oldDoc = await tx.get(ref),
         accountDoc = await tx.get(db.doc('deskAccounts/' + uid))
@@ -452,6 +463,7 @@ export async function deskService(
   }
   if (op === 'join') {
     return db.runTransaction(async (tx) => {
+      await assertNotDeleting(tx, db, uid)
       const c = (await tx.get(db.doc('deskControl/current'))).data() as Control | undefined
       if (!c?.activeSeasonId)
         throw new DeskError('failed-precondition', '운영 중인 공개 시즌이 없습니다.')
@@ -484,7 +496,7 @@ export async function deskService(
         receipts: [],
         updatedAt: now,
       }
-      if (old) tx.set(db.doc('deskArchive/' + old.seasonId + '_' + uid), old)
+      if (old) tx.set(db.doc('deskArchive/' + old.seasonId + '_' + uid), { ...old, uid })
       tx.set(aRef, session)
       tx.update(sRef, { members: s.members + 1 })
       publish(tx, db, uid, s, session, profile, now)
@@ -524,6 +536,8 @@ export async function deskService(
       .update(uid + ':' + target + ':' + Math.floor(now / 86400000))
       .digest('hex')
     await db.runTransaction(async (tx) => {
+      await assertNotDeleting(tx, db, uid)
+      await assertNotDeleting(tx, db, target)
       const ref = db.doc('deskReports/' + key)
       if ((await tx.get(ref)).exists)
         throw new DeskError('resource-exhausted', '이 참가자에 대한 신고가 이미 접수됐습니다.')
@@ -574,6 +588,7 @@ export async function deskService(
   if (op === 'adminFlags') {
     if (typeof data.newOrdersEnabled !== 'boolean') return fail('주문 상태를 지정하세요.')
     return db.runTransaction(async (tx) => {
+      await assertNotDeleting(tx, db, uid)
       const ref = db.doc('deskControl/current'),
         old = ((await tx.get(ref)).data() as Control) || defaultControl()
       if (data.revision !== old.revision)
@@ -592,6 +607,7 @@ export async function deskService(
   if (op === 'adminSeason') {
     const action = String(data.action)
     return db.runTransaction(async (tx) => {
+      await assertNotDeleting(tx, db, uid)
       const ref = db.doc('deskControl/current'),
         control = ((await tx.get(ref)).data() as Control) || defaultControl()
       if (data.revision !== control.revision)
@@ -654,6 +670,8 @@ export async function deskService(
       reportId = data.reportId ? id(data.reportId) : null
     if (!['suspend', 'restore', 'resolve'].includes(action)) return fail('처리 유형을 확인하세요.')
     return db.runTransaction(async (tx) => {
+      await assertNotDeleting(tx, db, uid)
+      await assertNotDeleting(tx, db, target)
       const pRef = db.doc('deskProfiles/' + target),
         profile = (await tx.get(pRef)).data() as Profile | undefined
       const session = (await tx.get(db.doc('deskAccounts/' + target))).data() as Session | undefined
@@ -727,9 +745,19 @@ export async function riskSweep(db: Firestore, now = Date.now()) {
       })
     }
     // Publish one atomic common-time snapshot; failed/catching-up accounts are excluded.
-    await db
-      .doc('deskStandings/' + season.id)
-      .set({ at: now, tick: tickAt(season, now), rows: rows.slice(0, 100) })
+    await db.runTransaction(async (tx) => {
+      const profiles = rows.length
+        ? await tx.getAll(...rows.map((r) => db.doc('deskProfiles/' + r.uid)))
+        : []
+      const visible = rows.filter(
+        (_, i) => profiles[i]?.exists && profiles[i].data()?.status !== 'deleting'
+      )
+      tx.set(db.doc('deskStandings/' + season.id), {
+        at: now,
+        tick: tickAt(season, now),
+        rows: visible.slice(0, 100),
+      })
+    })
   }
   await db.doc('deskHealth/riskSweep').set({ at: now, updated, failed, scanned: accounts.size })
   return { updated, failed }

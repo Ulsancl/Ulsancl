@@ -63,3 +63,15 @@ npm run test:offline
 서버 통합 테스트는 로컬 Firebase Auth/Firestore/Functions 에뮬레이터를 필요로 합니다. 실행 방법과 데이터 초기화 범위는 운영 문서에 있습니다. CI는 회계·권한·중복 주문·동시성·순위 개인정보·신고·규칙 검증과 데스크톱/모바일 실제 사용자 흐름을 실행합니다. 테스트 통과는 미발견 결함이 없다는 보장이 아니며 운영 환경 App Check와 부하 검증은 배포 시 별도로 수행해야 합니다.
 
 기존 게임의 상세 설명은 [재무](docs/detail-finance.md), [차트](docs/detail-charts.md), [저장](docs/detail-storage.md) 문서에 남아 있습니다.
+
+
+## Android / Play release preparation
+
+The Android project in `android/` packages the game with Android Browser Helper (TWA), targets API 36, and preserves browser-based authentication and saves. `release/play.json` holds the package/version/domain and the owner-selected developer name, **standard__bae**. The initial hosted build is practice-only while Firebase is unconfigured.
+
+- [Android build and Play submission guide](docs/play/RELEASE.md)
+- [Korean store listing](docs/play/LISTING.ko-KR.md) and [feature graphic](docs/play/graphics/feature.png)
+- [Phone-sized actual game captures](docs/play/screenshots/) (confirm against final Play-installed build)
+- `/privacy`, `/delete-account`, `/support` provide public help and privacy controls; registered accounts have a recent-login-protected deletion queue and scheduled cleanup.
+
+Run `npm run check:play` for source validation. `npm run check:play:production` intentionally fails until the developer account, support email, signing certificate and upload-key inputs are configured. Android CI creates an installable **debug APK** and an **unsigned review AAB**; neither is a claim of Play publication.

@@ -1,7 +1,7 @@
 {
   "name": "stock-trading-game",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,7 +21,9 @@
     "build-storybook": "storybook build",
     "test:detail": "node scripts/detail-browser.mjs",
     "test:offline": "node scripts/offline-browser.mjs",
-    "test:desk": "playwright test e2e/desk.spec.ts"
+    "test:desk": "playwright test e2e/desk.spec.ts",
+    "check:play": "node scripts/check-play-release.mjs",
+    "check:play:production": "node scripts/check-play-release.mjs --production"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",

@@ -123,3 +123,66 @@ test('all workspaces remain reachable without server and do not invent rankings'
   await expect(page.getByText('공개 서버 연결을 기다리고 있습니다')).toBeVisible()
   await expect(page.locator('tbody tr')).toHaveCount(0)
 })
+
+test('privacy and deletion work without installing the app and local erase preserves classic by default', async ({
+  page,
+  context,
+}) => {
+  await page.getByRole('button', { name: '+1분', exact: true }).click()
+  await expect.poll(async () => (await saved(page))?.revision).toBe(1)
+  await page.evaluate(() => localStorage.setItem('stockTradingGame', 'classic-preserved'))
+  const another = await context.newPage()
+  await another.goto('/')
+  await expect(another.getByRole('heading', { name: '트레이딩', exact: true })).toBeVisible()
+  await page.goto('/privacy')
+  await expect(page.getByRole('heading', { name: '개인정보 처리 안내' })).toBeVisible()
+  await expect(page.getByText('개발자: standard__bae.', { exact: false })).toBeVisible()
+  await page.getByRole('link', { name: '데이터 삭제', exact: true }).click()
+  await page.getByRole('button', { name: '이 기기 연습 기록 삭제' }).click()
+  await Promise.all([
+    page.waitForEvent('framenavigated', { predicate: (frame) => frame === page.mainFrame() }),
+    page.getByRole('button', { name: '연습 기록 영구 삭제' }).click(),
+  ])
+  await expect(page.getByRole('status')).toContainText('저장을 삭제했습니다')
+  expect(await page.evaluate(() => localStorage.getItem('marketdesk.v2'))).toBeNull()
+  expect(await page.evaluate(() => localStorage.getItem('marketdesk.v2.backup'))).toBeNull()
+  expect(await page.evaluate(() => localStorage.getItem('stockTradingGame'))).toBe(
+    'classic-preserved'
+  )
+  await expect(another.getByRole('status')).toContainText('다른 탭에서 연습 기록을 삭제')
+  await another.close()
+  await page.evaluate(() => {
+    localStorage.setItem('stockTradingGame:originals:v1', 'classic-backup')
+    localStorage.setItem('stockGame_settings', 'classic-settings')
+    localStorage.setItem('unrelated-app', 'keep')
+  })
+  await page.getByRole('button', { name: '이 기기 연습 기록 삭제' }).click()
+  await page.getByRole('checkbox', { name: '기존 /classic 게임 저장도 삭제' }).check()
+  await Promise.all([
+    page.waitForEvent('framenavigated', { predicate: (frame) => frame === page.mainFrame() }),
+    page.getByRole('button', { name: '연습 기록 영구 삭제' }).click(),
+  ])
+  await expect(page.getByRole('status')).toContainText('저장을 삭제했습니다')
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        ['stockTradingGame', 'stockTradingGame:originals:v1', 'stockGame_settings'].map((key) =>
+          localStorage.getItem(key)
+        )
+      )
+    )
+    .toEqual([null, null, null])
+  expect(await page.evaluate(() => localStorage.getItem('unrelated-app'))).toBe('keep')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
+})
+
+test('Android/browser back returns to the previous workspace without dropping the account', async ({
+  page,
+}) => {
+  await nav(page, '포트폴리오').click()
+  await nav(page, '캠페인').click()
+  await page.goBack()
+  await expect(page.getByRole('heading', { name: '포트폴리오', exact: true })).toBeVisible()
+  await page.goBack()
+  await expect(page.getByRole('heading', { name: '트레이딩', exact: true })).toBeVisible()
+})

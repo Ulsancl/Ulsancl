@@ -1,0 +1,41 @@
+name: Android release candidate
+on:
+  pull_request:
+    paths: ['android/**', 'release/**', 'public/icons/**', 'public/manifest.json', 'public/.well-known/**', 'scripts/check-play-release.mjs', '.github/workflows/android.yml']
+  push:
+    branches: [main]
+    paths: ['android/**', 'release/**', 'public/icons/**', 'public/manifest.json', 'public/.well-known/**', 'scripts/check-play-release.mjs', '.github/workflows/android.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Validate release metadata and image dimensions
+        run: node scripts/check-play-release.mjs
+      - name: Use Java 21 and install Android 36
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Build review artifacts and run Android lint
+        run: android/gradlew -p android --no-daemon assembleDebug lintDebug bundleRelease -PmarketdeskUnsignedPreview
+      - name: Label unsigned artifacts explicitly
+        run: |
+          mkdir -p output/android
+          cp android/app/build/outputs/apk/debug/app-debug.apk output/android/market-desk-debug.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab output/android/market-desk-UNSIGNED-preview.aab
+          sha256sum output/android/* > output/android/SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: market-desk-android-review
+          path: |
+            output/android
+            android/app/build/reports/lint-results-debug.html
+          retention-days: 30
