@@ -6,6 +6,7 @@ on:
     paths:
       - 'functions/**'
       - 'scripts/copy-engine.cjs'
+      - 'scripts/desk-liquidation-preview.cjs'
       - 'src/engine/**'
       - 'src/constants/**'
       - '.github/workflows/functions-security.yml'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'functions/**'
       - 'scripts/copy-engine.cjs'
+      - 'scripts/desk-liquidation-preview.cjs'
       - 'src/engine/**'
       - 'src/constants/**'
       - '.github/workflows/functions-security.yml'
