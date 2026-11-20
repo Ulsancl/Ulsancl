@@ -17,6 +17,23 @@ Ports: Auth 9299, Firestore 8282, Functions 5201. Start the web server with `VIT
 
 The Functions CLI may ignore NO_PROXY for local control requests. In an environment with a mandatory outbound HTTP proxy, use a separate local-emulator-only process with the HTTP proxy variables removed after downloading emulator dependencies. Keep the proxy and trusted CA for external downloads and services.
 
+## Local liquidation-rule preview (synthetic only)
+
+Build the Functions core, then run the read-only preview from the repository root:
+
+```sh
+npm ci --prefix functions --ignore-scripts
+npm run build --prefix functions
+node scripts/desk-liquidation-preview.cjs
+node scripts/desk-liquidation-preview.cjs --json
+```
+
+The script compares seven **constructed test accounts** at the same deterministic market tick, with the same positions, cash and marked equity. It uses the [pre-#33 maintenance calculation](https://github.com/Ulsancl/Ulsancl/blob/caef63a08c462e50e52e74536f9a63f7e6208957/functions/src/desk/broker.ts#L53-L122) as a pinned baseline, and the current checkout's compiled broker for the new requirement. Rebuild after switching branches. Under the old rule, all short liabilities were subtracted across the portfolio. Under the new rule, each position or spread can only offset its own maintenance requirement. Marked equity already includes the short liability.
+
+A fixture is a `new-only` candidate only if the same cash and equity passed the old gate and fail the new one. Both gates flag negative cash or equity strictly below the maintenance requirement; equality passes the maintenance check. For example, the covered-call plus gold-futures fixture has ₩9,932 equity and a ₩0 → ₩45,016 requirement, so only the new rule flags it. The higher-cash fixture with the same positions passes both.
+
+This is a point-in-time test of the maintenance gate, not a market replay, an estimate of real-account impact, or an execution test. It rejects fixtures with unsettled expiries or terminal accounts; it does not advance the clock, settle expiries, process orders, calculate liquidation fills, or touch saves. It does not load account files, credentials, Firebase, or an emulator. It reads no production data and writes no account state; there is no deployment step.
+
 ## Production setup
 
 1. Choose the intended Firebase project explicitly (`firebase use --add`). Enable Firestore Native mode, Google sign-in and/or email/password, email verification, authorized domains, password policy and Firebase App Check with reCAPTCHA v3. Never configure the old anonymous score path for the new desk.

@@ -276,3 +276,63 @@ test('a fully covered call cannot pay the maintenance margin on an unrelated fut
   ])
   assert.equal(valuation(hedged, market()).maintenanceMargin, maintenance)
 })
+
+test('synthetic liquidation preview compares both rules without mutating accounts', () => {
+  const { compareFixture, dryRun, syntheticFixtures } = require('../../scripts/desk-liquidation-preview.cjs')
+  const fixtures = syntheticFixtures()
+  const before = structuredClone(fixtures)
+  const report = dryRun()
+  assert.equal(report.source, 'built-in-synthetic-fixtures')
+  assert.equal(report.legacyBaseCommit, 'caef63a08c462e50e52e74536f9a63f7e6208957')
+  assert.deepEqual(report.newCandidates, ['covered-new-candidate'])
+  assert.deepEqual(report.fixtures, fixtures.map(compareFixture))
+  assert.deepEqual(fixtures, before)
+
+  const byId = Object.fromEntries(report.fixtures.map((item) => [item.id, item]))
+  assert.equal(byId['covered-new-candidate'].equity, 9932)
+  assert.equal(byId['covered-new-candidate'].legacyMaintenance, 0)
+  assert.equal(byId['covered-new-candidate'].currentMaintenance, 45016)
+  assert.deepEqual(byId['covered-new-candidate'].currentReasons, ['below-maintenance'])
+  assert.equal(byId['covered-still-healthy'].classification, 'neither')
+  assert.equal(byId['covered-already-below'].classification, 'both')
+  assert.deepEqual(byId['cash-deficit'].legacyReasons, ['negative-cash'])
+  assert.deepEqual(byId['cash-deficit'].currentReasons, ['negative-cash'])
+  assert.equal(byId['spot-short-only'].maintenanceChange, 0)
+  assert.equal(byId['vertical-with-partial-cover'].legacyMaintenance, 3260)
+  assert.equal(byId['vertical-with-partial-cover'].currentMaintenance, 51630)
+
+  const candidate = fixtures.find((item) => item.id === 'covered-new-candidate')
+  assert.equal(advanceAccount(candidate.account, candidate.market, candidate.market.tick + 1).liquidationCount, 1)
+  assert.equal(candidate.account.liquidationCount, 0)
+  const exactlyAtMaintenance = {
+    ...candidate,
+    account: { ...candidate.account, cash: candidate.account.cash + 45016 - 9932 },
+  }
+  assert.equal(compareFixture(exactlyAtMaintenance).classification, 'neither')
+})
+
+test('synthetic liquidation preview rejects stale marks, terminal accounts and unsettled expiry', () => {
+  const { compareFixture, syntheticFixtures } = require('../../scripts/desk-liquidation-preview.cjs')
+  const fixture = syntheticFixtures().find((item) => item.id === 'covered-new-candidate')
+  const error = /requires a consistent active fixture/
+  assert.throws(() => compareFixture({ ...fixture, market: { ...fixture.market, tick: 0 } }), error)
+  assert.throws(() => compareFixture({ ...fixture, account: { ...fixture.account, status: 'completed' } }), error)
+  const expiry = 20 * TICKS_PER_DAY
+  assert.throws(() => compareFixture({
+    ...fixture,
+    market: { ...fixture.market, tick: expiry },
+    account: { ...fixture.account, tick: expiry },
+  }), error)
+})
+
+test('liquidation preview CLI offers JSON but cannot ingest account dumps', () => {
+  const { spawnSync } = require('node:child_process')
+  const script = require.resolve('../../scripts/desk-liquidation-preview.cjs')
+  const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' })
+  const json = run('--json')
+  assert.equal(json.status, 0, json.stderr)
+  assert.deepEqual(JSON.parse(json.stdout).newCandidates, ['covered-new-candidate'])
+  const arbitraryFile = run('accounts.json')
+  assert.equal(arbitraryFile.status, 2)
+  assert.match(arbitraryFile.stderr, /Only built-in synthetic fixtures/)
+})
