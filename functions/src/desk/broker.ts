@@ -52,8 +52,7 @@ export function createAccount(scenario: string, startedTick = 0): Account {
 }
 function marginFor(account: Account, market: Market) {
   let initial = 0,
-    maintenance = 0,
-    liabilities = 0
+    maintenance = 0
   const longOptions = new Map(
     account.positions
       .filter((p) => instrument(p.instrumentId).kind === 'option' && p.quantity > 0)
@@ -76,10 +75,10 @@ function marginFor(account: Account, market: Market) {
       continue
     }
     if (p.quantity >= 0) continue
-    liabilities += notional
     if (a.kind !== 'option') {
       initial += notional * 1.5
-      maintenance += notional * 1.25
+      // Equity already includes this position's short liability.
+      maintenance += notional * 0.25
       continue
     }
     let remaining = -p.quantity
@@ -105,7 +104,9 @@ function marginFor(account: Account, market: Market) {
           a.right === 'call' ? long.strike! - a.strike! : a.strike! - long.strike!
         )
       initial += width * matched * a.multiplier
-      maintenance += width * matched * a.multiplier
+      // Net only this spread's short premium against its positive strike gap.
+      // A protected position cannot supply margin for an unrelated leg.
+      maintenance += Math.max(0, width - price) * matched * a.multiplier
       remaining -= matched
       longOptions.set(id, quantity - matched)
     }
@@ -115,10 +116,10 @@ function marginFor(account: Account, market: Market) {
       const reserve =
         (price + Math.max(underlying * 0.2 - otm, underlying * 0.1)) * remaining * a.multiplier
       initial += reserve
-      maintenance += reserve * 0.8
+      maintenance += Math.max(0, reserve * 0.8 - price * remaining * a.multiplier)
     }
   }
-  return { initial: money(initial), maintenance: Math.max(0, money(maintenance - liabilities)) }
+  return { initial: money(initial), maintenance: money(maintenance) }
 }
 function orderReserve(o: PendingOrder, account: Account, market: Market): number {
   if (o.reduceOnly) return 0
@@ -418,7 +419,11 @@ function liquidate(account: Account, market: Market) {
 }
 function processOrders(account: Account, market: Market) {
   account.orders = account.orders.filter((o) => o.expiresTick > account.tick)
-  for (const order of [...account.orders]) {
+  // A rejected fill restores a cloned account. Resolve each id against the
+  // live book so later trigger/remaining updates survive that rollback.
+  for (const id of account.orders.map((o) => o.id)) {
+    const order = account.orders.find((o) => o.id === id)
+    if (!order) continue
     const mark = quote(order.instrumentId, market).price
     const triggered =
       order.triggered ||
@@ -457,7 +462,7 @@ function processOrders(account: Account, market: Market) {
       account.orders = account.orders.filter((o) => o.id !== order.id)
       continue
     }
-    account.orders.find((o) => o.id === order.id)!.remaining -= quantity
+    order.remaining -= quantity
     account.orders = account.orders.filter((o) => o.remaining > 0)
     fill(account, order, quantity, price, order.type === 'limit' ? '지정가 체결' : '스톱 체결')
     try {

@@ -234,3 +234,45 @@ test('partially filled stop remains triggered after price returns below its stop
   a = advanceAccount(a, market(), 2)
   assert.ok(!a.orders.length || a.orders[0].remaining < before)
 })
+
+test('settled option and futures quotes stay at their expiry mark', () => {
+  for (const asset of INSTRUMENTS.filter((a) => a.expiry)) {
+    const final = quote(asset.id, market(asset.expiry))
+    const later = market(asset.expiry + 30 * TICKS_PER_DAY)
+    assert.equal(quote(asset.id, later).price, final.price, asset.id)
+    assert.ok(candles(asset.id, later, 5, 3).every(
+      (c) => [c.open, c.high, c.low, c.close].every((price) => price === final.price)
+    ), asset.id)
+  }
+})
+
+test('a rejected fill does not reset the next partially filled stop', () => {
+  let account = createAccount('sandbox')
+  account.cash = 100000000
+  account = placeOrder(account, market(), buy('usd', 4, { type: 'stop', price: 1 }))
+  account = placeOrder(account, market(), buy('nova', 300, { type: 'stop', price: 1 }))
+  // Buying power no longer covers both orders at this tick. The first fails;
+  // the second still fits on its own and must keep its triggered state.
+  account.cash = 24000000
+  account = advanceAccount(account, market(), 1)
+  assert.equal(account.orders.length, 1)
+  assert.equal(account.orders[0].instrumentId, 'nova')
+  const remaining = account.orders[0].remaining
+  assert.ok(remaining > 0 && remaining < 300)
+  assert.equal(account.orders[0].triggered, true)
+  // The mark is below this buy trigger on the following tick.
+  account.orders[0].price = quote('nova', market(2)).price + 1
+  account = advanceAccount(account, market(), 2)
+  assert.ok(!account.orders.length || account.orders[0].remaining < remaining)
+})
+
+test('a fully covered call cannot pay the maintenance margin on an unrelated future', () => {
+  const futures = placeOrder(createAccount('sandbox'), market(), buy('gold-future', 1))
+  const maintenance = valuation(futures, market()).maintenanceMargin
+  assert.ok(maintenance > 0)
+  const hedged = placeBasket(futures, market(), [
+    buy('index', 10),
+    sell('index-call-30000-20', 1),
+  ])
+  assert.equal(valuation(hedged, market()).maintenanceMargin, maintenance)
+})

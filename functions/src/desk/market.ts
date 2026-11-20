@@ -134,7 +134,7 @@ export function quote(id: string, market: Market) {
   if (asset.kind !== 'future' && asset.kind !== 'option')
     return { price: spotPrice(asset, market), delta: 1, theta: 0, vega: 0, gamma: 0 }
   const underlying = instrument(asset.underlying!),
-    spot = spotPrice(underlying, market),
+    spot = spotPrice(underlying, market.tick > asset.expiry! ? { ...market, tick: asset.expiry! } : market),
     years = Math.max(0, (asset.expiry! - market.tick) / (TICKS_PER_DAY * 252))
   if (asset.kind === 'future')
     return {
