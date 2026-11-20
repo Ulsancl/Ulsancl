@@ -97,9 +97,12 @@ try {
   await nav('리더보드').click()
   await page.getByRole('cell', { name: '검증 투자자', exact: true }).waitFor()
   await nav('계정 · 저장').click()
+  // Returning to the form must render the actual saved consent on first paint.
+  assert.equal(await page.getByRole('checkbox').isChecked(), true)
   await page.getByRole('checkbox').uncheck()
   await page.getByRole('button', { name: '프로필 저장', exact: true }).click()
   await page.getByText('프로필을 저장했습니다.', { exact: true }).waitFor()
+  assert.equal((await db.doc('deskProfiles/web-player').get()).data().publicRanking, false)
   const rankings = await deskService(db, operator, { op: 'leaderboard' })
   assert.ok(!rankings.entries.some((r) => r.uid === 'web-player'))
   await page.getByRole('button', { name: '로그아웃', exact: true }).click()

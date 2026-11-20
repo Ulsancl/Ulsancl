@@ -49,21 +49,16 @@ function AgeField({ value, onChange, all = false }) {
     </label>
   )
 }
+const EMPTY_PROFILE = { displayName: '', country: '', region: '', ageBand: '', publicRanking: false }
 export function Account({ desk }) {
   const [email, setEmail] = useState(''),
     [password, setPassword] = useState(''),
     [signup, setSignup] = useState(false)
-  const [profile, setProfile] = useState({
-    displayName: '',
-    country: '',
-    region: '',
-    ageBand: '',
-    publicRanking: false,
-  })
-  useEffect(() => {
-    if (desk.cloud?.profile) setProfile(desk.cloud.profile)
-  }, [desk.cloud?.profile])
-  const field = (key, value) => setProfile({ ...profile, [key]: value })
+  // Read the server profile on the first paint, not in a post-paint effect.
+  // A new bootstrap must not replace the user's in-progress consent change.
+  const [draft, setDraft] = useState(null)
+  const profile = draft ?? desk.cloud?.profile ?? EMPTY_PROFILE
+  const field = (key, value) => setDraft((prev) => ({ ...(prev ?? profile), [key]: value }))
   return (
     <>
       <div className="two-column">
@@ -199,6 +194,7 @@ export function Account({ desk }) {
               desk.run(async () => {
                 await api({ op: 'profile', profile })
                 await desk.refresh()
+                setDraft(null)
                 desk.setNotice('프로필을 저장했습니다.')
               })
             }}

@@ -245,7 +245,7 @@ export default function DeskApp() {
           {page === 'campaign' && <Campaigns desk={desk} goMarket={() => setPage('market')} />}
           {page === 'journal' && <Journal desk={desk} />}
           {page === 'rank' && <Leaderboard desk={desk} />}
-          {page === 'account' && <Account desk={desk} />}
+          {page === 'account' && <Account key={desk.user?.uid ?? 'signed-out'} desk={desk} />}
           {page === 'shield' && <Admin desk={desk} />}
           <footer className="desk-footer">
             <span>VIRTUAL CAPITAL. REAL CONVICTION.</span>
