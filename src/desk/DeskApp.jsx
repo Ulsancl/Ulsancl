@@ -176,6 +176,17 @@ export default function DeskApp() {
               서버에서 이전 기간을 정산하고 있습니다. 정산 완료 후 주문할 수 있습니다.
             </div>
           )}
+          {page === 'market' && desk.mode === 'practice' && desk.account.trades === 0 && (
+            <aside className="notice" aria-label="첫 거래 안내">
+              <span>
+                <strong>로그인 없이 첫 거래</strong> · 종목을 고르고, 주문 수량을 입력한 다음
+                시장가로 매수해 보세요. 시세와 자금은 연습용입니다.
+              </span>
+              <button className="text-button" onClick={() => setPage('campaign')}>
+                캠페인 보기
+              </button>
+            </aside>
+          )}
           <div className="account-strip">
             <Stat label="총 순자산" value={won(desk.summary?.equity)} sub="KRW · 비용 반영" />
             <Stat

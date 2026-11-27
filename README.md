@@ -65,6 +65,10 @@ npm run test:offline
 기존 게임의 상세 설명은 [재무](docs/detail-finance.md), [차트](docs/detail-charts.md), [저장](docs/detail-storage.md) 문서에 남아 있습니다.
 
 
+## 공개 웹 출시
+
+공개 웹 출시와 커뮤니티 공유 준비는 [웹 출시 체크리스트](docs/web-release.md)를 참고하세요.
+
 ## Android / Play release preparation
 
 The Android project in `android/` packages the game with Android Browser Helper (TWA), targets API 36, and preserves browser-based authentication and saves. `release/play.json` holds the package/version/domain and the owner-selected developer name, **standard__bae**. The initial hosted build is practice-only while Firebase is unconfigured.
