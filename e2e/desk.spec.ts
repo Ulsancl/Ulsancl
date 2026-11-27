@@ -7,6 +7,22 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: '트레이딩', exact: true })).toBeVisible()
 })
+test('shared homepage explains and starts practice without an account', async ({ page }) => {
+  const guide = page.getByRole('complementary', { name: '첫 거래 안내' })
+  await expect(guide).toContainText('로그인 없이 첫 거래')
+  await expect(page.locator('meta[property="og:description"]')).toHaveAttribute(
+    'content',
+    /로그인 없이/
+  )
+  await guide.getByRole('button', { name: '캠페인 보기' }).click()
+  await expect(page.getByRole('heading', { name: '캠페인', level: 1 })).toBeVisible()
+  await page.goBack()
+  await expect(guide).toBeVisible()
+  await page.getByLabel('주문 수량').fill('1')
+  await page.getByRole('button', { name: '매수 주문', exact: true }).click()
+  await expect.poll(async () => (await saved(page))?.account.trades).toBe(1)
+  await expect(guide).toHaveCount(0)
+})
 test('cash trade, costs, clock, reload, and reduce-only close preserve accounting', async ({
   page,
 }) => {
